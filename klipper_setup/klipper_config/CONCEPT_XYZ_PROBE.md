@@ -26,7 +26,7 @@ It performs the full T0 calibration, T1 calibration, absolute T0/T1 X/Y
 rebase plus T1-only Z correction,
 deployment/parity check, and nine-contact T0/T1 verification. The only
 diagnostic form is `scripts/run_multi_head_zero_contact_map.sh --tool T0` or
-`--tool T1`; it collects that single 18-contact calibration and makes no
+`--tool T1`; it collects that single 26-contact calibration and makes no
 configuration change. There are no bounds, homing, reference, workflow, or
 output-path options.
 
@@ -50,7 +50,7 @@ declared safe height above the ball; the fixed logical target remains `Z=-1`.
 Optional X/Y are logical diagnostic coordinates. The calibration helper alone
 uses its internal no-contact mode for coarse seed points.
 
-Every batch creates a root `batch_manifest.json`, immutable per-tool schema-v4
+Every batch creates a root `batch_manifest.json`, immutable per-tool schema-v5
 `manifest.json`/`records.csv` artifacts, and tool-named plots. The prescribed
 logical targets are transformed into the active tool's physical machine frame
 before each contact. CSV and manifest records retain both logical
@@ -68,7 +68,7 @@ the final verification result. The compact live view at
 once per second. It uses a fixed isometric logical XYZ view: each contact's
 vertical stalk starts at that run's lowest completed contact, so the ball shape
 is readable without hiding absolute result cards. Completed PNG plots open in a
-fullscreen modal. Chapter 1 retains the T0/T1 18-contact calibration plots and
+fullscreen modal. Chapter 1 retains the T0/T1 26-contact calibration plots and
 calculations; chapter 2 appends the T0/T1 nine-contact verification and paired
 result. The result card presents source, applied, and change values for
 `T1−T0` endstop offsets rather than raw T1 endstops. It is a status view only;
@@ -92,7 +92,7 @@ operation, where the other toolhead is parked at its own X endstop.
 simultaneous-carriage modes and is not the physical parked-tool clearance
 authority for this workflow.
 
-## Calibration: 18 contacts per tool
+## Calibration: 26 contacts per tool
 
 Calibration is the only workflow that can produce input for an endstop update.
 It uses a known 5 mm ball and a 2.8 mm refinement ring. This leaves margin to
@@ -120,8 +120,8 @@ the printer's hard front-Y travel limit around the installed ball position.
 The seed is serpentine: `(72,-12) → (75,-12) → (78,-12) → (78,-9) → …`.
 It reduces seed travel to 24.000 mm per tool from 31.416 mm while leaving the
 measurements and fit unchanged. Contacts never home or select a tool. After
-T0's eighteenth contact retracts, the batch lifts to `Z=10.000`, switches once
-from T0 to T1, then completes T1's eighteen contacts.
+T0's twenty-sixth contact retracts, the batch lifts to `Z=10.000`, switches once
+from T0 to T1, then completes T1's twenty-six contacts.
 
 ### Phase 2 — ring refinement (8 contacts)
 
@@ -140,13 +140,22 @@ x_refined = x_rough + A * scale
 y_refined = y_rough + B * scale
 ```
 
-The calibration result stores refined X/Y, direct phase-1 summit Z, harmonic
-coefficients, and fixed-sphere residuals for all ring measurements. It does
-not fit a sphere, alter the known radius, or fall back to another search.
+This produces the intermediate phase-2 centre.
+
+### Phase 3 — final ring refinement (8 contacts)
+
+Centre a second mandatory eight-point `r=2.8 mm` ring on the phase-2 centre
+and apply the same first-harmonic calculation again. Its phase-3 centre is the
+final X/Y result used for calibration. The phase-1 summit remains the sole
+physical Z datum: neither ring is used to infer a summit height.
+
+The calibration result stores both centres, both harmonic corrections, direct
+phase-1 summit Z, and fixed-sphere diagnostics for each ring. It does not fit
+a sphere, alter the known radius, or fall back to another search.
 
 ## Applying calibration
 
-After successful T0 and T1 18-contact runs made from the same source config,
+After successful T0 and T1 26-contact runs made from the same source config,
 run:
 
 ```text

@@ -53,7 +53,7 @@ def test_only_tool_selection_is_exposed_to_the_user():
         runner.build_parser().parse_args(["--workflow", "calibration"])
 
 
-def test_calibration_seed_is_serpentine_and_keeps_the_18_contact_contract():
+def test_calibration_adds_a_second_ring_around_the_first_refined_centre():
     runner = load_runner()
     args = SimpleNamespace(
         tool="T0",
@@ -87,8 +87,8 @@ def test_calibration_seed_is_serpentine_and_keeps_the_18_contact_contract():
         progress_callback=lambda record: progress.append(record["sample_index"]),
     )
 
-    assert len(records) == 18
-    assert progress == list(range(1, 19))
+    assert len(records) == 26
+    assert progress == list(range(1, 27))
     assert [
         (record["commanded_x"], record["commanded_y"]) for record in records[:9]
     ] == [
@@ -103,6 +103,18 @@ def test_calibration_seed_is_serpentine_and_keeps_the_18_contact_contract():
         (6.0, 3.0),
     ]
     assert summary["phase_1"]["fit"]["status"] == "valid"
+    phase_2_centre = summary["phase_2"]["refined_center"]
+    phase_3_ring = summary["phase_3"]["ring_contacts"]
+    assert summary["contact_count"] == 26
+    assert all(
+        (
+            (record["x"] - phase_2_centre["x"]) ** 2
+            + (record["y"] - phase_2_centre["y"]) ** 2
+        )
+        ** 0.5
+        == pytest.approx(args.ring_radius_mm)
+        for record in phase_3_ring
+    )
 
 
 def test_verification_uses_centre_and_eight_point_ring():
@@ -356,10 +368,10 @@ def test_workflow_event_is_emitted_to_the_printer_console(monkeypatch):
         runner, "run_gcode", lambda _url, script: commands.append(script)
     )
 
-    runner.printer_log("unused", 'T0 1/18 phase_1_seed Z=0.500 "quoted"')
+    runner.printer_log("unused", 'T0 1/26 phase_1_seed Z=0.500 "quoted"')
 
     assert commands == [
-        "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 1/18 phase_1_seed Z=0.500 'quoted'\""
+        "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 1/26 phase_1_seed Z=0.500 'quoted'\""
     ]
 
 
@@ -394,6 +406,46 @@ def test_absolute_xy_endstop_rebase_places_both_tools_at_target():
     assert t0["y"] + deltas["t0"]["y_endstop"] == pytest.approx(target["y"])
     assert t1["x"] + deltas["t1"]["x_endstop"] == pytest.approx(target["x"])
     assert t1["y"] + deltas["t1"]["y_endstop"] == pytest.approx(target["y"])
+
+
+def test_applier_uses_the_second_ring_centre(tmp_path):
+    applier = load_applier()
+    run_dir = tmp_path / "T0"
+    run_dir.mkdir()
+    manifest = {
+        "schema_version": 5,
+        "workflow": "calibration",
+        "tool": "T0",
+        "status": "completed",
+        "calibration": {
+            "algorithm": "three_stage_sphere_ring_calibration_v2",
+            "contact_count": 26,
+            "termination_reason": "phase_3_complete",
+            "ball_radius_mm": 5.0,
+            "ring_radius_mm": 2.8,
+            "phase_1": {
+                "fit": {"status": "valid"},
+                "summit": {"trigger_z": 1.25},
+            },
+            "phase_2": {
+                "ring_contact_count": 8,
+                "refined_center": {"x": 74.1, "y": -8.1},
+            },
+            "phase_3": {
+                "ring_contact_count": 8,
+                "refined_center": {"x": 74.9, "y": -8.9},
+            },
+        },
+    }
+    (run_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = applier.load_run(run_dir, "T0")
+
+    assert result["phase_2_x"] == pytest.approx(74.1)
+    assert result["phase_2_y"] == pytest.approx(-8.1)
+    assert result["x"] == pytest.approx(74.9)
+    assert result["y"] == pytest.approx(-8.9)
+    assert result["z"] == pytest.approx(1.25)
 
 
 def test_generated_parked_tool_limits_preserve_measured_clearance():
@@ -505,6 +557,9 @@ def test_dashboard_assets_render_live_and_final_sections():
     assert "height: 390" in script
     assert "xySpanPixels: 247.5" in script
     assert "grid-line" in script
+    assert "formatMicrometres" in script
+    assert "verificationCentreProgressCard" in script
+    assert 'record.phase === "verification_centre"' in script
     assert "plotBounds" in script
     assert len(captured["runs"]["t0"]["records"]) == 18
     assert captured["runs"]["t0"]["records"][9]["trigger_z"] == pytest.approx(0.8405)

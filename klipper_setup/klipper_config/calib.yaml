@@ -60,13 +60,13 @@ tap_mesh:
 # workflow may translate both together, but must preserve their difference.
 tools:
   t0:
-    x_endstop: -85.398
-    y_endstop: -15.608
+    x_endstop: -85.082
+    y_endstop: -15.578
     z_endstop: 291.493
   t1:
-    x_endstop: 345.624
-    y_endstop: -13.973
-    z_endstop: 290.818
+    x_endstop: 345.563
+    y_endstop: -13.962
+    z_endstop: 290.816
 
 # Measured parked-tool clearance for normal IDEX operation. With T0 at
 # X=-85.4, T1 first clears it at X=16.0: exactly 101.4 mm nozzle separation.

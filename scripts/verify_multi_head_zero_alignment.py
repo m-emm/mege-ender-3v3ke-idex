@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt
 
 XY_LIMIT_MM = 0.05
 Z_LIMIT_MM = 0.02
+COMPARISON_EPSILON_MM = 1.0e-6
 VERIFICATION_DIRECTIONS = (
     "east",
     "north_east",
@@ -104,7 +105,7 @@ def load_calibration_result(path):
         raise VerificationError("missing calibration result: %s" % path)
     result = json.loads(path.read_text(encoding="utf-8"))
     if (
-        result.get("schema_version") != 3
+        result.get("schema_version") != 4
         or result.get("workflow") != "multi_head_zero_calibration_result"
     ):
         raise VerificationError("%s is not a calibration result" % path)
@@ -125,7 +126,7 @@ def load_run(run_dir, expected_tool, calibration_result):
         raise VerificationError("missing verification manifest: %s" % path)
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if (
-        manifest.get("schema_version") != 4
+        manifest.get("schema_version") != 5
         or manifest.get("workflow") != "verification"
         or manifest.get("status") != "completed"
         or manifest.get("tool") != expected_tool
@@ -292,41 +293,49 @@ def write_report(output_dir, result, t0, t1):
     xy_axis.legend()
     xy_axis.grid(True, alpha=0.3)
     residual = result["t1_minus_t0"]
+    micrometres = 1000.0
     xy_axis.text(
         0.03,
         0.03,
-        "T0 error: X=%+.4f Y=%+.4f mm\nT1 error: X=%+.4f Y=%+.4f mm\nPaired: X=%+.4f Y=%+.4f mm"
+        "T0 error: X=%+.1f Y=%+.1f µm\nT1 error: X=%+.1f Y=%+.1f µm\nPaired: X=%+.1f Y=%+.1f µm"
         % (
-            result["target_error_mm"]["t0"]["x"],
-            result["target_error_mm"]["t0"]["y"],
-            result["target_error_mm"]["t1"]["x"],
-            result["target_error_mm"]["t1"]["y"],
-            residual["x"],
-            residual["y"],
+            result["target_error_mm"]["t0"]["x"] * micrometres,
+            result["target_error_mm"]["t0"]["y"] * micrometres,
+            result["target_error_mm"]["t1"]["x"] * micrometres,
+            result["target_error_mm"]["t1"]["y"] * micrometres,
+            residual["x"] * micrometres,
+            residual["y"] * micrometres,
         ),
         transform=xy_axis.transAxes,
         va="bottom",
         bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
     )
     directions = list(VERIFICATION_DIRECTIONS)
-    ring_deltas = result["z_diagnostics"]["periphery_deltas_mm"]
-    z_axis.axhspan(-Z_LIMIT_MM, Z_LIMIT_MM, color="tab:green", alpha=0.12)
+    ring_deltas = [
+        value * micrometres for value in result["z_diagnostics"]["periphery_deltas_mm"]
+    ]
+    z_axis.axhspan(
+        -Z_LIMIT_MM * micrometres,
+        Z_LIMIT_MM * micrometres,
+        color="tab:green",
+        alpha=0.12,
+    )
     z_axis.axhline(0.0, color="black", linewidth=0.8)
     z_axis.plot(directions, ring_deltas, marker="o", label="Paired ring ΔZ")
     z_axis.axhline(
-        result["z_diagnostics"]["centre_delta_mm"],
+        result["z_diagnostics"]["centre_delta_mm"] * micrometres,
         color="tab:orange",
         linestyle="--",
         label="Centre ΔZ",
     )
     z_axis.axhline(
-        result["z_diagnostics"]["periphery_mean_delta_mm"],
+        result["z_diagnostics"]["periphery_mean_delta_mm"] * micrometres,
         color="tab:blue",
         linestyle=":",
         label="Periphery mean ΔZ (diagnostic)",
     )
     z_axis.tick_params(axis="x", rotation=35)
-    z_axis.set_ylabel("T1 − T0 logical Z (mm)")
+    z_axis.set_ylabel("T1 − T0 logical Z (µm)")
     z_axis.set_title("Centre Z result and raw periphery diagnostic")
     z_axis.grid(True, alpha=0.3)
     z_axis.legend(fontsize=8)
@@ -356,13 +365,13 @@ def paired_result(calibration_result_path, t0, t1, target):
         for tool, measurement in (("t0", t0), ("t1", t1))
     }
     pass_components = {
-        "t0_x": abs(target_error["t0"]["x"]) <= XY_LIMIT_MM,
-        "t0_y": abs(target_error["t0"]["y"]) <= XY_LIMIT_MM,
-        "t1_x": abs(target_error["t1"]["x"]) <= XY_LIMIT_MM,
-        "t1_y": abs(target_error["t1"]["y"]) <= XY_LIMIT_MM,
-        "paired_x": abs(residual["x"]) <= XY_LIMIT_MM,
-        "paired_y": abs(residual["y"]) <= XY_LIMIT_MM,
-        "z_center": abs(centre_delta) <= Z_LIMIT_MM,
+        "t0_x": abs(target_error["t0"]["x"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t0_y": abs(target_error["t0"]["y"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t1_x": abs(target_error["t1"]["x"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t1_y": abs(target_error["t1"]["y"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "paired_x": abs(residual["x"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "paired_y": abs(residual["y"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "z_center": abs(centre_delta) <= Z_LIMIT_MM + COMPARISON_EPSILON_MM,
     }
     return {
         "schema_version": 3,
@@ -418,18 +427,18 @@ def main(argv):
     passed = result["pass"]
     json_path, csv_path, plot_path = write_report(args.output_dir, result, t0, t1)
     print(
-        "Target errors: T0 X=%+.6f Y=%+.6f; T1 X=%+.6f Y=%+.6f mm. "
-        "T1-minus-T0: X=%+.6f Y=%+.6f centre Z=%+.6f periphery-mean Z=%+.6f mm; radial XY=%.6f"
+        "Target errors: T0 X=%+.1f Y=%+.1f; T1 X=%+.1f Y=%+.1f µm. "
+        "T1-minus-T0: X=%+.1f Y=%+.1f centre Z=%+.1f periphery-mean Z=%+.1f µm; radial XY=%.1f µm"
         % (
-            result["target_error_mm"]["t0"]["x"],
-            result["target_error_mm"]["t0"]["y"],
-            result["target_error_mm"]["t1"]["x"],
-            result["target_error_mm"]["t1"]["y"],
-            residual["x"],
-            residual["y"],
-            centre_delta,
-            periphery_mean_delta,
-            radial_xy,
+            result["target_error_mm"]["t0"]["x"] * 1000.0,
+            result["target_error_mm"]["t0"]["y"] * 1000.0,
+            result["target_error_mm"]["t1"]["x"] * 1000.0,
+            result["target_error_mm"]["t1"]["y"] * 1000.0,
+            residual["x"] * 1000.0,
+            residual["y"] * 1000.0,
+            centre_delta * 1000.0,
+            periphery_mean_delta * 1000.0,
+            radial_xy * 1000.0,
         )
     )
     print("Verification: %s" % ("PASS" if passed else "FAIL"))

@@ -62,40 +62,56 @@ def load_run(run_dir, expected_tool):
         raise CalibrationError(
             "%s is not a %s calibration run" % (manifest_path, expected_tool)
         )
-    if manifest.get("schema_version") != 4 or manifest.get("workflow") != "calibration":
-        raise CalibrationError("%s is not a schema-v4 calibration run" % manifest_path)
+    if manifest.get("schema_version") != 5 or manifest.get("workflow") != "calibration":
+        raise CalibrationError("%s is not a schema-v5 calibration run" % manifest_path)
     if manifest.get("status") != "completed":
         raise CalibrationError("%s is not completed" % manifest_path)
     calibration = manifest.get("calibration")
     if (
         not isinstance(calibration, dict)
-        or calibration.get("algorithm") != "two_stage_sphere_ring_calibration_v1"
-        or calibration.get("contact_count") != 18
-        or calibration.get("termination_reason") != "phase_2_complete"
+        or calibration.get("algorithm") != "three_stage_sphere_ring_calibration_v2"
+        or calibration.get("contact_count") != 26
+        or calibration.get("termination_reason") != "phase_3_complete"
     ):
         raise CalibrationError(
-            "%s has no valid 18-contact calibration result" % manifest_path
+            "%s has no valid 26-contact calibration result" % manifest_path
         )
     phase_1 = calibration.get("phase_1")
     phase_2 = calibration.get("phase_2")
-    if not isinstance(phase_1, dict) or not isinstance(phase_2, dict):
+    phase_3 = calibration.get("phase_3")
+    if (
+        not isinstance(phase_1, dict)
+        or not isinstance(phase_2, dict)
+        or not isinstance(phase_3, dict)
+    ):
         raise CalibrationError("%s lacks calibration phases" % manifest_path)
     fit = phase_1.get("fit")
     summit = phase_1.get("summit")
-    refined = phase_2.get("refined_center")
+    phase_2_refined = phase_2.get("refined_center")
+    refined = phase_3.get("refined_center")
     if not isinstance(fit, dict) or fit.get("status") != "valid":
         raise CalibrationError("%s has no valid phase-1 fit" % manifest_path)
-    if not isinstance(summit, dict) or not isinstance(refined, dict):
+    if (
+        not isinstance(summit, dict)
+        or not isinstance(phase_2_refined, dict)
+        or not isinstance(refined, dict)
+    ):
         raise CalibrationError("%s lacks summit or refined centre" % manifest_path)
-    if phase_2.get("ring_contact_count") != 8:
+    if phase_2.get("ring_contact_count") != 8 or phase_3.get("ring_contact_count") != 8:
         raise CalibrationError(
-            "%s does not contain eight completed ring contacts" % manifest_path
+            "%s does not contain two completed eight-contact rings" % manifest_path
         )
     return {
         "manifest": manifest,
         "run_dir": run_dir.resolve(),
         "x": finite(refined.get("x"), "%s refined X" % expected_tool),
         "y": finite(refined.get("y"), "%s refined Y" % expected_tool),
+        "phase_2_x": finite(
+            phase_2_refined.get("x"), "%s phase-2 refined X" % expected_tool
+        ),
+        "phase_2_y": finite(
+            phase_2_refined.get("y"), "%s phase-2 refined Y" % expected_tool
+        ),
         "z": finite(
             summit.get("trigger_z"), "%s direct logical summit Z" % expected_tool
         ),
@@ -306,7 +322,7 @@ def write_result(
     target_config_fingerprint,
 ):
     payload = {
-        "schema_version": 3,
+        "schema_version": 4,
         "workflow": "multi_head_zero_calibration_result",
         "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "source_runs": {"t0": str(t0_run["run_dir"]), "t1": str(t1_run["run_dir"])},
@@ -317,6 +333,10 @@ def write_result(
         "measured_centers": {
             "t0": {axis: t0_run[axis] for axis in ("x", "y", "z")},
             "t1": {axis: t1_run[axis] for axis in ("x", "y", "z")},
+        },
+        "phase_2_centers": {
+            "t0": {axis: t0_run["phase_2_%s" % axis] for axis in ("x", "y")},
+            "t1": {axis: t1_run["phase_2_%s" % axis] for axis in ("x", "y")},
         },
         "target_error_before_mm": target_error,
         "applied_endstop_delta_mm": applied_delta,

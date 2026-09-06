@@ -31,7 +31,7 @@ DEFAULT_DASHBOARD_ROOT = "~/printer_data/vision/multi_head_zero_calibration"
 FIT_CONDITION_LIMIT = 1.0e6
 FIT_CONCAVITY_EPSILON = 1.0e-6
 SEED_CONTACT_COUNT = 9
-CALIBRATION_CONTACT_COUNT = 18
+CALIBRATION_CONTACT_COUNT = 26
 VERIFICATION_CONTACT_COUNT = 9
 FRAME_TOLERANCE_MM = 1.0e-6
 
@@ -726,6 +726,76 @@ def require_contact(record, label):
         )
 
 
+def run_ring_refinement(
+    args,
+    tool_index,
+    records,
+    *,
+    center,
+    summit_z,
+    phase,
+    contact_function,
+    progress_callback,
+):
+    theta, targets = ring_targets(center["x"], center["y"], args.ring_radius_mm)
+    ring_records = []
+    for angle, target in zip(theta, targets):
+        record = contact_function(
+            args.moonraker_url,
+            tool=args.tool,
+            tool_index=tool_index,
+            x=float(target[0]),
+            y=float(target[1]),
+            sample_index=len(records) + 1,
+            phase=phase,
+        )
+        record["angle_degrees"] = float(math.degrees(angle))
+        records.append(record)
+        if progress_callback is not None:
+            progress_callback(record)
+        require_contact(
+            record, "%s contact %.0f degrees" % (phase, math.degrees(angle))
+        )
+        ring_records.append(record)
+    refined = fit_xy_from_ring(
+        center["x"],
+        center["y"],
+        theta,
+        [record["trigger_z"] for record in ring_records],
+        args.ball_radius_mm,
+        args.ring_radius_mm,
+    )
+    expected_ring_z = sphere_z(
+        [record["commanded_x"] for record in ring_records],
+        [record["commanded_y"] for record in ring_records],
+        refined["x"],
+        refined["y"],
+        summit_z,
+        args.ball_radius_mm,
+    )
+    residuals = [
+        float(record["trigger_z"] - expected)
+        for record, expected in zip(ring_records, expected_ring_z)
+    ]
+    return {
+        "ring_center": {"x": center["x"], "y": center["y"]},
+        "ring_contact_count": len(ring_records),
+        "ring_angles_degrees": [float(math.degrees(angle)) for angle in theta],
+        "ring_contacts": [contact_payload(record) for record in ring_records],
+        "harmonic": {
+            "a_cos_mm": refined["a_cos_mm"],
+            "b_sin_mm": refined["b_sin_mm"],
+            "scale": refined["scale"],
+            "dx_mm": refined["dx_mm"],
+            "dy_mm": refined["dy_mm"],
+        },
+        "refined_center": {"x": refined["x"], "y": refined["y"]},
+        "sphere_residuals_mm": residuals,
+        "sphere_residual_rmse_mm": float(np.sqrt(np.mean(np.square(residuals)))),
+        "sphere_residual_max_abs_mm": float(max(abs(value) for value in residuals)),
+    }
+
+
 def run_calibration(
     args, tool_index, records, contact_function=perform_contact, progress_callback=None
 ):
@@ -771,48 +841,28 @@ def run_calibration(
     if progress_callback is not None:
         progress_callback(summit)
     require_contact(summit, "phase-1 summit contact")
-    theta, targets = ring_targets(predicted["x"], predicted["y"], args.ring_radius_mm)
-    ring_records = []
-    for angle, target in zip(theta, targets):
-        record = contact_function(
-            args.moonraker_url,
-            tool=args.tool,
-            tool_index=tool_index,
-            x=float(target[0]),
-            y=float(target[1]),
-            sample_index=len(records) + 1,
-            phase="phase_2_ring",
-        )
-        record["angle_degrees"] = float(math.degrees(angle))
-        records.append(record)
-        if progress_callback is not None:
-            progress_callback(record)
-        require_contact(
-            record, "phase-2 ring contact %.0f degrees" % math.degrees(angle)
-        )
-        ring_records.append(record)
-    refined = fit_xy_from_ring(
-        predicted["x"],
-        predicted["y"],
-        theta,
-        [record["trigger_z"] for record in ring_records],
-        args.ball_radius_mm,
-        args.ring_radius_mm,
+    phase_2 = run_ring_refinement(
+        args,
+        tool_index,
+        records,
+        center=predicted,
+        summit_z=summit["trigger_z"],
+        phase="phase_2_ring",
+        contact_function=contact_function,
+        progress_callback=progress_callback,
     )
-    expected_ring_z = sphere_z(
-        [record["commanded_x"] for record in ring_records],
-        [record["commanded_y"] for record in ring_records],
-        refined["x"],
-        refined["y"],
-        summit["trigger_z"],
-        args.ball_radius_mm,
+    phase_3 = run_ring_refinement(
+        args,
+        tool_index,
+        records,
+        center=phase_2["refined_center"],
+        summit_z=summit["trigger_z"],
+        phase="phase_3_ring",
+        contact_function=contact_function,
+        progress_callback=progress_callback,
     )
-    residuals = [
-        float(record["trigger_z"] - expected)
-        for record, expected in zip(ring_records, expected_ring_z)
-    ]
     return {
-        "algorithm": "two_stage_sphere_ring_calibration_v1",
+        "algorithm": "three_stage_sphere_ring_calibration_v2",
         "contact_count": CALIBRATION_CONTACT_COUNT,
         "ball_radius_mm": args.ball_radius_mm,
         "ring_radius_mm": args.ring_radius_mm,
@@ -822,23 +872,9 @@ def run_calibration(
             "fit": coarse_fit,
             "summit": contact_payload(summit),
         },
-        "phase_2": {
-            "ring_contact_count": len(ring_records),
-            "ring_angles_degrees": [float(math.degrees(angle)) for angle in theta],
-            "ring_contacts": [contact_payload(record) for record in ring_records],
-            "harmonic": {
-                "a_cos_mm": refined["a_cos_mm"],
-                "b_sin_mm": refined["b_sin_mm"],
-                "scale": refined["scale"],
-                "dx_mm": refined["dx_mm"],
-                "dy_mm": refined["dy_mm"],
-            },
-            "refined_center": {"x": refined["x"], "y": refined["y"]},
-            "sphere_residuals_mm": residuals,
-            "sphere_residual_rmse_mm": float(np.sqrt(np.mean(np.square(residuals)))),
-            "sphere_residual_max_abs_mm": float(max(abs(value) for value in residuals)),
-        },
-        "termination_reason": "phase_2_complete",
+        "phase_2": phase_2,
+        "phase_3": phase_3,
+        "termination_reason": "phase_3_complete",
     }
 
 
@@ -937,6 +973,7 @@ def render_calibration(output_dir, tool, records, summary):
     )
     phase_1 = summary["phase_1"]
     phase_2 = summary["phase_2"]
+    phase_3 = summary["phase_3"]
     bounds = phase_1["bounds"]
     seed = [record for record in records if record["phase"] == "phase_1_seed"]
     complete_seed = completed_records(seed)
@@ -976,8 +1013,10 @@ def render_calibration(output_dir, tool, records, summary):
             zorder=4,
         )
     summit = phase_1["summit"]
-    refined = phase_2["refined_center"]
+    phase_2_refined = phase_2["refined_center"]
+    refined = phase_3["refined_center"]
     ring = phase_2["ring_contacts"]
+    final_ring = phase_3["ring_contacts"]
     xy_axis.scatter(
         [summit["x"]],
         [summit["y"]],
@@ -999,6 +1038,26 @@ def render_calibration(output_dir, tool, records, summary):
         zorder=5,
     )
     xy_axis.scatter(
+        [item["x"] for item in final_ring],
+        [item["y"] for item in final_ring],
+        marker="s",
+        facecolors="none",
+        edgecolors="tab:purple",
+        s=82,
+        label="Phase-3 ring",
+        zorder=5,
+    )
+    xy_axis.scatter(
+        [phase_2_refined["x"]],
+        [phase_2_refined["y"]],
+        marker="D",
+        color="lightskyblue",
+        edgecolors="black",
+        s=70,
+        label="Phase-2 centre",
+        zorder=6,
+    )
+    xy_axis.scatter(
         [refined["x"]],
         [refined["y"]],
         marker="D",
@@ -1014,30 +1073,43 @@ def render_calibration(output_dir, tool, records, summary):
         aspect="equal",
         xlabel="Commanded X (mm)",
         ylabel="Commanded Y (mm)",
-        title="18-contact calibration (%s)" % tool,
+        title="26-contact calibration (%s)" % tool,
     )
     xy_axis.grid(True, alpha=0.3)
     xy_axis.legend(fontsize=8, loc="upper right")
     angles = phase_2["ring_angles_degrees"]
     residuals = phase_2["sphere_residuals_mm"]
+    final_residuals = phase_3["sphere_residuals_mm"]
     residual_axis.axhline(0.0, color="black", linewidth=0.8)
-    residual_axis.plot(angles, residuals, marker="o", color="tab:red")
+    residual_axis.plot(
+        angles, residuals, marker="o", color="tab:red", label="Phase-2 ring"
+    )
+    residual_axis.plot(
+        angles,
+        final_residuals,
+        marker="s",
+        color="tab:purple",
+        label="Phase-3 ring",
+    )
     residual_axis.set(
         xticks=angles,
         xlabel="Ring angle (degrees)",
         ylabel="Measured − sphere Z (mm)",
-        title="Fixed-sphere residuals (%s)" % tool,
+        title="Fixed-sphere diagnostics (%s)" % tool,
     )
     residual_axis.grid(True, alpha=0.3)
+    residual_axis.legend(fontsize=8)
     residual_axis.text(
         0.03,
         0.03,
-        "Refined XY: %.4f, %.4f\nDirect summit Z: %.4f\nRMSE: %.4f mm"
+        "Phase-2 XY: %.4f, %.4f\nFinal XY: %.4f, %.4f\nDirect summit Z: %.4f\nFinal RMSE: %.4f mm"
         % (
+            phase_2_refined["x"],
+            phase_2_refined["y"],
             refined["x"],
             refined["y"],
             summit["trigger_z"],
-            phase_2["sphere_residual_rmse_mm"],
+            phase_3["sphere_residual_rmse_mm"],
         ),
         transform=residual_axis.transAxes,
         va="bottom",
@@ -1184,7 +1256,7 @@ def run_tool_workflow(
     args = configured_runtime_args(priors, tool, DEFAULT_MOONRAKER_URL)
     records = []
     manifest = {
-        "schema_version": 4,
+        "schema_version": 5,
         "run_id": batch_dir.name,
         "tool": tool,
         "workflow": workflow,
@@ -1273,7 +1345,7 @@ def run_tool_workflow(
     if manifest["status"] != "completed":
         raise ContactMapError(manifest["error"])
     if workflow == "calibration":
-        refined = summary["phase_2"]["refined_center"]
+        refined = summary["phase_3"]["refined_center"]
         summit = summary["phase_1"]["summit"]
         workflow_log(
             DEFAULT_MOONRAKER_URL,

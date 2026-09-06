@@ -30,6 +30,12 @@ function format(value, digits = 3) {
   return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : "—";
 }
 
+function formatMicrometres(value, digits = 1) {
+  return Number.isFinite(Number(value))
+    ? `${(Number(value) * 1000).toFixed(digits)} µm`
+    : "—";
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
@@ -40,15 +46,25 @@ function latestMeasurement(run) {
   return [...(run.records || [])].reverse().find((record) => record.status === "completed");
 }
 
+function verificationCentreContact(run) {
+  return (run.records || []).find(
+    (record) => record.phase === "verification_centre" && record.status === "completed",
+  );
+}
+
 function summaryNumbers(run) {
   const summary = run.summary || {};
-  if (summary.phase_2?.refined_center) {
-    const center = summary.phase_2.refined_center;
+  if (summary.phase_3?.refined_center || summary.phase_2?.refined_center) {
+    const center = summary.phase_3?.refined_center || summary.phase_2.refined_center;
     return [["Centre X", center.x], ["Centre Y", center.y], ["Summit Z", summary.phase_1?.summit?.trigger_z]];
   }
   if (summary.estimated_center) {
     const center = summary.estimated_center;
     return [["Centre X", center.x], ["Centre Y", center.y], ["Centre Z", center.trigger_z]];
+  }
+  const verificationCentre = verificationCentreContact(run);
+  if (verificationCentre) {
+    return [["Centre X", verificationCentre.commanded_x], ["Centre Y", verificationCentre.commanded_y], ["Centre Z", verificationCentre.trigger_z]];
   }
   const latest = latestMeasurement(run) || {};
   return [["Latest X", latest.commanded_x], ["Latest Y", latest.commanded_y], ["Trigger Z", latest.trigger_z]];
@@ -56,17 +72,26 @@ function summaryNumbers(run) {
 
 function calculationDetails(run) {
   const summary = run.summary || {};
+  if (summary.phase_3?.harmonic) {
+    const first = summary.phase_2 || {};
+    const final = summary.phase_3;
+    return `<dl class="calculation-details">
+      <dt>First ring correction</dt><dd>ΔX ${formatMicrometres(first.harmonic?.dx_mm)} · ΔY ${formatMicrometres(first.harmonic?.dy_mm)}</dd>
+      <dt>Final ring correction</dt><dd>ΔX ${formatMicrometres(final.harmonic.dx_mm)} · ΔY ${formatMicrometres(final.harmonic.dy_mm)}</dd>
+      <dt>Final sphere diagnostic</dt><dd>RMSE ${formatMicrometres(final.sphere_residual_rmse_mm)} · max ${formatMicrometres(final.sphere_residual_max_abs_mm)}</dd>
+    </dl>`;
+  }
   if (summary.phase_2?.harmonic) {
     const harmonic = summary.phase_2.harmonic;
     return `<dl class="calculation-details">
-      <dt>Ring correction</dt><dd>ΔX ${format(harmonic.dx_mm, 4)} · ΔY ${format(harmonic.dy_mm, 4)} mm</dd>
-      <dt>Sphere residual</dt><dd>RMSE ${format(summary.phase_2.sphere_residual_rmse_mm, 4)} · max ${format(summary.phase_2.sphere_residual_max_abs_mm, 4)} mm</dd>
+      <dt>Ring correction</dt><dd>ΔX ${formatMicrometres(harmonic.dx_mm)} · ΔY ${formatMicrometres(harmonic.dy_mm)}</dd>
+      <dt>Sphere residual</dt><dd>RMSE ${formatMicrometres(summary.phase_2.sphere_residual_rmse_mm)} · max ${formatMicrometres(summary.phase_2.sphere_residual_max_abs_mm)}</dd>
     </dl>`;
   }
   if (summary.harmonic) {
     return `<dl class="calculation-details">
-      <dt>Ring correction</dt><dd>ΔX ${format(summary.harmonic.dx_mm, 4)} · ΔY ${format(summary.harmonic.dy_mm, 4)} mm</dd>
-      <dt>Periphery Z</dt><dd>mean ${format(summary.periphery_mean_z, 4)} · σ ${format(summary.periphery_z_standard_deviation, 4)} mm</dd>
+      <dt>Ring correction</dt><dd>ΔX ${formatMicrometres(summary.harmonic.dx_mm)} · ΔY ${formatMicrometres(summary.harmonic.dy_mm)}</dd>
+      <dt>Periphery Z</dt><dd>mean ${format(summary.periphery_mean_z, 4)} mm · σ ${formatMicrometres(summary.periphery_z_standard_deviation)}</dd>
     </dl>`;
   }
   return "";
@@ -203,15 +228,28 @@ function calibrationCards(entry) {
     <article class="outcome-card"><h2>Absolute ball target</h2><dl>
       <dt>Target</dt><dd>X=${format(target.x, 3)}, Y=${format(target.y, 3)} mm</dd>
       <dt>T0 measured</dt><dd>X=${format(centres.t0?.x, 4)}, Y=${format(centres.t0?.y, 4)}</dd>
-      <dt>T0 target error</dt><dd>X=${format(errors.t0?.x, 4)}, Y=${format(errors.t0?.y, 4)} mm</dd>
+      <dt>T0 target error</dt><dd>X=${formatMicrometres(errors.t0?.x)}, Y=${formatMicrometres(errors.t0?.y)}</dd>
       <dt>T1 measured</dt><dd>X=${format(centres.t1?.x, 4)}, Y=${format(centres.t1?.y, 4)}</dd>
-      <dt>T1 target error</dt><dd>X=${format(errors.t1?.x, 4)}, Y=${format(errors.t1?.y, 4)} mm</dd>
+      <dt>T1 target error</dt><dd>X=${formatMicrometres(errors.t1?.x)}, Y=${formatMicrometres(errors.t1?.y)}</dd>
     </dl></article>
     <article class="outcome-card"><h2>Measured T1−T0 calibration</h2><dl>
-      <dt>ΔX refined</dt><dd>${format(measured.x, 4)} mm</dd>
-      <dt>ΔY refined</dt><dd>${format(measured.y, 4)} mm</dd>
-      <dt>ΔZ physical summit</dt><dd>${format(measured.z, 4)} mm</dd>
+      <dt>ΔX refined</dt><dd>${formatMicrometres(measured.x)}</dd>
+      <dt>ΔY refined</dt><dd>${formatMicrometres(measured.y)}</dd>
+      <dt>ΔZ physical summit</dt><dd>${formatMicrometres(measured.z)}</dd>
     </dl></article>`;
+}
+
+function verificationCentreProgressCard(entry) {
+  const runs = entry?.runs || {};
+  const t0 = verificationCentreContact(runs.t0 || {});
+  const t1 = verificationCentreContact(runs.t1 || {});
+  if (!t0 && !t1) return "";
+  const delta = t0 && t1 ? Number(t1.trigger_z) - Number(t0.trigger_z) : undefined;
+  return `<article class="outcome-card"><h2>Live physical centre-Z comparison</h2><dl>
+    <dt>T0 centre Z</dt><dd>${t0 ? `${format(t0.trigger_z, 4)} mm` : "waiting for first contact"}</dd>
+    <dt>T1 centre Z</dt><dd>${t1 ? `${format(t1.trigger_z, 4)} mm` : "waiting for first contact"}</dd>
+    <dt>T1−T0 centre ΔZ</dt><dd>${formatMicrometres(delta)}</dd>
+  </dl><p>Captured by the first centre contact; ring contacts do not change it.</p></article>`;
 }
 
 function verificationCards(entry) {
@@ -226,27 +264,27 @@ function verificationCards(entry) {
   const components = verification.pass_components || {};
   const verificationCard = `<article class="outcome-card ${pass ? "pass" : "fail"}"><h2>Paired verification: ${pass ? "PASS" : "FAIL"}</h2><dl>
     <dt>Target</dt><dd>X=${format(target.x, 3)}, Y=${format(target.y, 3)} mm</dd>
-    <dt>T0 target ΔX ${components.t0_x === false ? "✗" : ""}</dt><dd>${format(targetErrors.t0?.x, 4)} mm</dd>
-    <dt>T0 target ΔY ${components.t0_y === false ? "✗" : ""}</dt><dd>${format(targetErrors.t0?.y, 4)} mm</dd>
-    <dt>T1 target ΔX ${components.t1_x === false ? "✗" : ""}</dt><dd>${format(targetErrors.t1?.x, 4)} mm</dd>
-    <dt>T1 target ΔY ${components.t1_y === false ? "✗" : ""}</dt><dd>${format(targetErrors.t1?.y, 4)} mm</dd>
-    <dt>Paired ΔX ${components.paired_x === false ? "✗" : ""}</dt><dd>${format(resultValue(residual, "x", "delta_x_mm", "delta_x"), 4)} mm</dd>
-    <dt>Paired ΔY ${components.paired_y === false ? "✗" : ""}</dt><dd>${format(resultValue(residual, "y", "delta_y_mm", "delta_y"), 4)} mm</dd>
-    <dt>Centre ΔZ ${components.z_center === false ? "✗" : ""}</dt><dd>${format(resultValue(zDiagnostics, "centre_delta_mm") ?? residual.z, 4)} mm</dd>
-    <dt>Periphery mean</dt><dd>${format(zDiagnostics.periphery_mean_delta_mm, 4)} mm</dd>
-    <dt>Periphery σ</dt><dd>${format(zDiagnostics.periphery_delta_standard_deviation_mm, 4)} mm</dd>
-    <dt>Centre−periphery</dt><dd>${format(zDiagnostics.centre_minus_periphery_mean_mm, 4)} mm</dd>
-    <dt>Radial XY</dt><dd>${format(resultValue(verification, "radial_xy_mm", "radial_xy_error_mm", "radial_xy_error"), 4)} mm</dd>
+    <dt>T0 target ΔX ${components.t0_x === false ? "✗" : ""}</dt><dd>${formatMicrometres(targetErrors.t0?.x)}</dd>
+    <dt>T0 target ΔY ${components.t0_y === false ? "✗" : ""}</dt><dd>${formatMicrometres(targetErrors.t0?.y)}</dd>
+    <dt>T1 target ΔX ${components.t1_x === false ? "✗" : ""}</dt><dd>${formatMicrometres(targetErrors.t1?.x)}</dd>
+    <dt>T1 target ΔY ${components.t1_y === false ? "✗" : ""}</dt><dd>${formatMicrometres(targetErrors.t1?.y)}</dd>
+    <dt>Paired ΔX ${components.paired_x === false ? "✗" : ""}</dt><dd>${formatMicrometres(resultValue(residual, "x", "delta_x_mm", "delta_x"))}</dd>
+    <dt>Paired ΔY ${components.paired_y === false ? "✗" : ""}</dt><dd>${formatMicrometres(resultValue(residual, "y", "delta_y_mm", "delta_y"))}</dd>
+    <dt>Centre ΔZ ${components.z_center === false ? "✗" : ""}</dt><dd>${formatMicrometres(resultValue(zDiagnostics, "centre_delta_mm") ?? residual.z)}</dd>
+    <dt>Periphery mean</dt><dd>${formatMicrometres(zDiagnostics.periphery_mean_delta_mm)}</dd>
+    <dt>Periphery σ</dt><dd>${formatMicrometres(zDiagnostics.periphery_delta_standard_deviation_mm)}</dd>
+    <dt>Centre−periphery</dt><dd>${formatMicrometres(zDiagnostics.centre_minus_periphery_mean_mm)}</dd>
+    <dt>Radial XY</dt><dd>${formatMicrometres(resultValue(verification, "radial_xy_mm", "radial_xy_error_mm", "radial_xy_error"))}</dd>
   </dl><p>Periphery Z is diagnostic only; the physical centre contact is authoritative.</p></article>`;
   const audit = entry?.audit?.data;
   if (!audit) return verificationCard;
   const auditPass = Boolean(audit.passed);
   const metrics = audit.metrics || {};
   return `${verificationCard}<article class="outcome-card ${auditPass ? "pass" : "fail"}"><h2>Z repeatability audit: ${auditPass ? "PASS" : "FAIL"}</h2><dl>
-    <dt>T0 centre range</dt><dd>${format(metrics.t0_centre_z?.range_mm, 4)} mm</dd>
-    <dt>T1 centre range</dt><dd>${format(metrics.t1_centre_z?.range_mm, 4)} mm</dd>
-    <dt>Paired ΔZ range</dt><dd>${format(metrics.paired_centre_delta_z?.range_mm, 4)} mm</dd>
-    <dt>Limit</dt><dd>${format(audit.limit_mm, 4)} mm</dd>
+    <dt>T0 centre range</dt><dd>${formatMicrometres(metrics.t0_centre_z?.range_mm)}</dd>
+    <dt>T1 centre range</dt><dd>${formatMicrometres(metrics.t1_centre_z?.range_mm)}</dd>
+    <dt>Paired ΔZ range</dt><dd>${formatMicrometres(metrics.paired_centre_delta_z?.range_mm)}</dd>
+    <dt>Limit</dt><dd>${formatMicrometres(audit.limit_mm)}</dd>
   </dl><p>${escapeHtml(audit.termination_reason || "Repeatability audit recorded")}</p></article>`;
 }
 
@@ -288,7 +326,7 @@ function render(data) {
   const chapters = normaliseChapters(data);
   const priors = data.configured_priors;
   renderChapter(calibrationChapter, calibrationState, calibrationTools, calibrationOutcome, chapters.calibration, priors, calibrationCards(chapters.calibration));
-  renderChapter(verificationChapter, verificationState, verificationTools, verificationOutcome, chapters.verification, priors, verificationCards(chapters.verification));
+  renderChapter(verificationChapter, verificationState, verificationTools, verificationOutcome, chapters.verification, priors, `${verificationCentreProgressCard(chapters.verification)}${verificationCards(chapters.verification)}`);
   empty.hidden = Boolean(chapters.calibration || chapters.verification);
 }
 
