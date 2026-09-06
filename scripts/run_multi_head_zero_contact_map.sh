@@ -99,15 +99,10 @@ run_remote_batch() {
   local mode="$1"
   local run_id="$2"
   local output_dir="$3"
-  local reference_x="${4:-}"
-  local reference_y="${5:-}"
   mkdir -p "${output_dir}"
   echo "Multi-head-zero ${mode} batch: ${run_id}"
   local remote_command
   remote_command="MULTI_HEAD_ZERO_BATCH_MODE=$(printf '%q' "${mode}") MULTI_HEAD_ZERO_BATCH_RUN_ID=$(printf '%q' "${run_id}")"
-  if [[ -n "${reference_x}" ]]; then
-    remote_command+=" MULTI_HEAD_ZERO_REFERENCE_X=$(printf '%q' "${reference_x}") MULTI_HEAD_ZERO_REFERENCE_Y=$(printf '%q' "${reference_y}")"
-  fi
   remote_command+=" ${REMOTE_HELPER} --tool ${tool}"
   local remote_status
   set +e
@@ -128,26 +123,23 @@ if [[ "${tool}" != "both" ]]; then
 fi
 
 calibration_result="${calibration_dir}/calibration_result.json"
-printer_console "paired calibration complete; applying T1 correction"
-echo "Applying paired T1 correction..."
+printer_console "paired calibration complete; applying absolute T0/T1 XY and T1 Z correction"
+echo "Applying absolute T0/T1 XY and T1 Z correction..."
 python "${APPLY_SCRIPT}" \
   --t0-run "${calibration_dir}/T0" \
   --t1-run "${calibration_dir}/T1" \
   --result "${calibration_result}"
-dashboard_publish "${calibration_result}" "${calibration_id}_calibration_result.json" "calibration_result" "T1 correction calculated"
+dashboard_publish "${calibration_result}" "${calibration_id}_calibration_result.json" "calibration_result" "Absolute XY correction calculated"
 
-printer_console "T1 correction calculated; deploying configuration"
+printer_console "absolute XY and T1 Z correction calculated; deploying configuration"
 echo "Deploying paired calibration and checking parity..."
 "${UPDATE_SCRIPT}"
 "${UPDATE_SCRIPT}" --check
 printer_console "configuration deployment parity passed; starting nine-contact verification"
 
-read -r reference_x reference_y < <(
-  python -c 'import json, sys; point=json.load(open(sys.argv[1], encoding="utf-8"))["reference_center"]; print("%.9f %.9f" % (point["x"], point["y"]))' "${calibration_result}"
-)
 verification_id="${timestamp}_T0_T1_verification"
 verification_dir="${LOCAL_OUT_ROOT}/${verification_id}"
-run_remote_batch verification "${verification_id}" "${verification_dir}" "${reference_x}" "${reference_y}"
+run_remote_batch verification "${verification_id}" "${verification_dir}"
 
 echo "Reporting paired verification..."
 set +e

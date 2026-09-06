@@ -196,7 +196,17 @@ function calibrationCards(entry) {
   const calibration = entry?.result?.data;
   if (!calibration) return "";
   const measured = calibration.measured_t1_minus_t0 || {};
+  const target = calibration.target_center || {};
+  const centres = calibration.measured_centers || {};
+  const errors = calibration.target_error_before_mm || {};
   return `${renderOffsetCard(calibration)}
+    <article class="outcome-card"><h2>Absolute ball target</h2><dl>
+      <dt>Target</dt><dd>X=${format(target.x, 3)}, Y=${format(target.y, 3)} mm</dd>
+      <dt>T0 measured</dt><dd>X=${format(centres.t0?.x, 4)}, Y=${format(centres.t0?.y, 4)}</dd>
+      <dt>T0 target error</dt><dd>X=${format(errors.t0?.x, 4)}, Y=${format(errors.t0?.y, 4)} mm</dd>
+      <dt>T1 measured</dt><dd>X=${format(centres.t1?.x, 4)}, Y=${format(centres.t1?.y, 4)}</dd>
+      <dt>T1 target error</dt><dd>X=${format(errors.t1?.x, 4)}, Y=${format(errors.t1?.y, 4)} mm</dd>
+    </dl></article>
     <article class="outcome-card"><h2>Measured T1−T0 calibration</h2><dl>
       <dt>ΔX refined</dt><dd>${format(measured.x, 4)} mm</dd>
       <dt>ΔY refined</dt><dd>${format(measured.y, 4)} mm</dd>
@@ -210,11 +220,18 @@ function verificationCards(entry) {
   if (!verification) return "";
   const pass = Boolean(resultValue(verification, "passed", "pass"));
   const residual = resultValue(verification, "t1_minus_t0", "residuals", "residual") || verification;
+  const target = verification.target_center || {};
+  const targetErrors = verification.target_error_mm || {};
   const zDiagnostics = verification.z_diagnostics || {};
   const components = verification.pass_components || {};
   const verificationCard = `<article class="outcome-card ${pass ? "pass" : "fail"}"><h2>Paired verification: ${pass ? "PASS" : "FAIL"}</h2><dl>
-    <dt>ΔX ${components.x === false ? "✗" : ""}</dt><dd>${format(resultValue(residual, "x", "delta_x_mm", "delta_x"), 4)} mm</dd>
-    <dt>ΔY ${components.y === false ? "✗" : ""}</dt><dd>${format(resultValue(residual, "y", "delta_y_mm", "delta_y"), 4)} mm</dd>
+    <dt>Target</dt><dd>X=${format(target.x, 3)}, Y=${format(target.y, 3)} mm</dd>
+    <dt>T0 target ΔX ${components.t0_x === false ? "✗" : ""}</dt><dd>${format(targetErrors.t0?.x, 4)} mm</dd>
+    <dt>T0 target ΔY ${components.t0_y === false ? "✗" : ""}</dt><dd>${format(targetErrors.t0?.y, 4)} mm</dd>
+    <dt>T1 target ΔX ${components.t1_x === false ? "✗" : ""}</dt><dd>${format(targetErrors.t1?.x, 4)} mm</dd>
+    <dt>T1 target ΔY ${components.t1_y === false ? "✗" : ""}</dt><dd>${format(targetErrors.t1?.y, 4)} mm</dd>
+    <dt>Paired ΔX ${components.paired_x === false ? "✗" : ""}</dt><dd>${format(resultValue(residual, "x", "delta_x_mm", "delta_x"), 4)} mm</dd>
+    <dt>Paired ΔY ${components.paired_y === false ? "✗" : ""}</dt><dd>${format(resultValue(residual, "y", "delta_y_mm", "delta_y"), 4)} mm</dd>
     <dt>Centre ΔZ ${components.z_center === false ? "✗" : ""}</dt><dd>${format(resultValue(zDiagnostics, "centre_delta_mm") ?? residual.z, 4)} mm</dd>
     <dt>Periphery mean</dt><dd>${format(zDiagnostics.periphery_mean_delta_mm, 4)} mm</dd>
     <dt>Periphery σ</dt><dd>${format(zDiagnostics.periphery_delta_standard_deviation_mm, 4)} mm</dd>

@@ -22,7 +22,8 @@ Use the prescribed local workflow:
 scripts/run_multi_head_zero_contact_map.sh
 ```
 
-It performs the full T0 calibration, T1 calibration, T1-only correction,
+It performs the full T0 calibration, T1 calibration, absolute T0/T1 X/Y
+rebase plus T1-only Z correction,
 deployment/parity check, and nine-contact T0/T1 verification. The only
 diagnostic form is `scripts/run_multi_head_zero_contact_map.sh --tool T0` or
 `--tool T1`; it collects that single 18-contact calibration and makes no
@@ -155,16 +156,20 @@ scripts/apply_multi_head_zero_maximum_calibration.py \
   --result <calibration_result.json>
 ```
 
-The helper rejects mismatched provenance and updates only T1:
+The helper rejects mismatched provenance and uses the configured ball target
+`(75,-9)` as the absolute X/Y datum:
 
-- subtract `T1−T0` refined X/Y from the T1 X/Y endstops;
+- add `target − measured centre` independently to T0 and T1 X/Y endstops;
 - subtract `T1−T0` direct logical-frame summit Z from the T1 Z endstop. T1's
   logical trigger Z is machine Z minus its active origin
   (`T0_z_endstop − T1_z_endstop`), so increasing the T1 endstop would make a
   positive T1−T0 Z residual worse;
-- preserve T0, regenerate `printer.cfg`, and write a calibration-result JSON.
+- preserve T0 Z, derive the two parked-tool X limits from the corrected
+  endstops and the exact 101.4 mm clearance, regenerate `printer.cfg`, and
+  write a calibration-result JSON.
 
-That result records the target endstops and the refined T0 reference centre.
+That result records the configured target centre, pre-correction centres and
+target errors, applied endstop deltas, and target endstops.
 The prescribed workflow deploys it and requires parity automatically. The
 Klipper restart may invalidate homing, so verification checks XYZ and homes
 once only if needed before its own T0-to-T1 batch.
@@ -174,11 +179,12 @@ once only if needed before its own T0-to-T1 batch.
 Verification is evidence only. It never edits, calculates, or deploys another
 calibration.
 
-The wrapper reads the refined T0 centre from `calibration_result.json` and runs
-the same nine-point pattern for each tool under the deployed configuration:
+The runner reads the configured target directly from the generated runtime
+priors and runs the same nine-point pattern for each tool under the deployed
+configuration:
 
-1. one centre contact at the shared reference X/Y; and
-2. eight mandatory ring contacts at 2.8 mm: east, north-east, north,
+1. one centre contact exactly at logical `X=75, Y=-9`; and
+2. eight mandatory ring contacts at 2.8 mm around exactly that point: east, north-east, north,
    north-west, west, south-west, south, and south-east.
 
 The octagonal ring heights recover each tool's local X/Y centre using the same
@@ -201,6 +207,10 @@ The report refuses stale configuration provenance, writes JSON/CSV/plot output,
 and passes only when all limits hold:
 
 ```text
+abs(T0 X − 75) <= 0.05 mm
+abs(T0 Y + 9) <= 0.05 mm
+abs(T1 X − 75) <= 0.05 mm
+abs(T1 Y + 9) <= 0.05 mm
 abs(T1−T0 X) <= 0.05 mm
 abs(T1−T0 Y) <= 0.05 mm
 abs(T1−T0 Z) <= 0.02 mm

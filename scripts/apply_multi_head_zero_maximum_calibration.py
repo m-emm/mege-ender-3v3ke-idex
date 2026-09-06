@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply T1 IDEX endstops from paired 18-contact multi-head-zero calibrations."""
+"""Rebase IDEX X/Y to the multi-head-zero target and align T1 Z."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ class CalibrationError(RuntimeError):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Update T1 endstops from paired 18-contact multi-head-zero calibrations."
+        description="Update T0/T1 X/Y and T1 Z from paired multi-head-zero calibrations."
     )
     parser.add_argument("--t0-run", type=Path, required=True)
     parser.add_argument("--t1-run", type=Path, required=True)
@@ -114,6 +114,16 @@ def source_config_fingerprint(run):
     return str(macro["source_sha256"])
 
 
+def configured_target(run):
+    priors = run["manifest"].get("configured_priors")
+    if not isinstance(priors, dict):
+        raise CalibrationError("run manifest lacks configured multi-head-zero priors")
+    return {
+        "x": finite(priors.get("target_x"), "configured ball target X"),
+        "y": finite(priors.get("target_y"), "configured ball target Y"),
+    }
+
+
 def source_endstops(run):
     settings = (
         run["manifest"]
@@ -167,7 +177,11 @@ def verify_sources(t0_run, t1_run):
         raise CalibrationError("T0 and T1 runs used different sphere geometry")
     if source_config_fingerprint(t0_run) != source_config_fingerprint(t1_run):
         raise CalibrationError("T0 and T1 runs used different config fingerprints")
-    return source_t0
+    target_t0 = configured_target(t0_run)
+    target_t1 = configured_target(t1_run)
+    if target_t0 != target_t1:
+        raise CalibrationError("T0 and T1 runs used different ball targets")
+    return source_t0, target_t0
 
 
 def generated_config_fingerprint(path):
@@ -199,49 +213,80 @@ def endstops_match(left, right):
     )
 
 
-def suggested_t1_endstops(source, t0_run, t1_run):
-    error = {axis: t1_run[axis] - t0_run[axis] for axis in ("x", "y", "z")}
-    if any(abs(value) > MAX_CORRECTION_MM for value in error.values()):
-        raise CalibrationError(
-            "refusing correction larger than %.1f mm: %s" % (MAX_CORRECTION_MM, error)
-        )
-    return error, {
-        "x_endstop": round(source["t1"]["x_endstop"] - error["x"], 3),
-        "y_endstop": round(source["t1"]["y_endstop"] - error["y"], 3),
-        # T1 logical Z is machine Z minus its active G-code origin. That
-        # origin is T0_z_endstop - T1_z_endstop, so increasing the T1 endstop
-        # increases the reported logical trigger Z. A positive T1−T0 residual
-        # therefore needs a lower T1 endstop.
-        "z_endstop": round(source["t1"]["z_endstop"] - error["z"], 3),
+def suggested_endstops(source, t0_run, t1_run, target):
+    measured_t1_minus_t0 = {
+        axis: t1_run[axis] - t0_run[axis] for axis in ("x", "y", "z")
     }
+    target_error = {
+        "t0": {axis: t0_run[axis] - target[axis] for axis in ("x", "y")},
+        "t1": {axis: t1_run[axis] - target[axis] for axis in ("x", "y")},
+    }
+    applied_delta = {
+        "t0": {
+            "x_endstop": -target_error["t0"]["x"],
+            "y_endstop": -target_error["t0"]["y"],
+            "z_endstop": 0.0,
+        },
+        "t1": {
+            "x_endstop": -target_error["t1"]["x"],
+            "y_endstop": -target_error["t1"]["y"],
+            # T1 logical Z is machine Z minus its active G-code origin. That
+            # origin is T0_z_endstop - T1_z_endstop, so increasing the T1
+            # endstop increases its reported logical trigger Z.
+            "z_endstop": -measured_t1_minus_t0["z"],
+        },
+    }
+    correction_values = [
+        value for tool in applied_delta.values() for value in tool.values()
+    ]
+    if any(abs(value) > MAX_CORRECTION_MM for value in correction_values):
+        raise CalibrationError(
+            "refusing correction larger than %.1f mm: %s"
+            % (MAX_CORRECTION_MM, applied_delta)
+        )
+    suggested = {
+        tool: {
+            key: round(source[tool][key] + applied_delta[tool][key], 3)
+            for key in ("x_endstop", "y_endstop", "z_endstop")
+        }
+        for tool in ("t0", "t1")
+    }
+    return measured_t1_minus_t0, target_error, applied_delta, suggested
 
 
-def rewrite_t1_endstops(calib_path, suggested):
+def rewrite_endstops(calib_path, suggested):
     lines = calib_path.read_text(encoding="utf-8").splitlines(keepends=True)
     in_tools = False
-    in_t1 = False
-    replaced = {key: 0 for key in suggested}
+    active_tool = None
+    replaced = {tool: {key: 0 for key in values} for tool, values in suggested.items()}
     for index, line in enumerate(lines):
         stripped = line.rstrip("\r\n")
         if re.match(r"^tools:\s*$", stripped):
-            in_tools, in_t1 = True, False
+            in_tools, active_tool = True, None
             continue
         if in_tools and re.match(r"^[^ ]", line) and line.strip():
-            in_tools, in_t1 = False, False
-        if in_tools and re.match(r"^  t1:\s*$", stripped):
-            in_t1 = True
+            in_tools, active_tool = False, None
+        tool_match = re.match(r"^  (t[01]):\s*$", stripped)
+        if in_tools and tool_match:
+            active_tool = tool_match.group(1)
             continue
-        if in_t1 and re.match(r"^  [^ ]", line) and line.strip():
-            in_t1 = False
-        if not in_t1:
+        if active_tool and re.match(r"^  [^ ]", line) and line.strip():
+            active_tool = None
+        if not active_tool or active_tool not in suggested:
             continue
-        for key, value in suggested.items():
+        for key, value in suggested[active_tool].items():
             if re.match(r"^    %s:\s*" % re.escape(key), line):
                 newline = "\r\n" if line.endswith("\r\n") else "\n"
                 lines[index] = "    %s: %.3f%s" % (key, value, newline)
-                replaced[key] += 1
-    if any(count != 1 for count in replaced.values()):
-        raise CalibrationError("could not uniquely update tools.t1: %s" % replaced)
+                replaced[active_tool][key] += 1
+    if any(
+        count != 1
+        for tool_counts in replaced.values()
+        for count in tool_counts.values()
+    ):
+        raise CalibrationError(
+            "could not uniquely update tools endstops: %s" % replaced
+        )
     temporary = calib_path.with_name(".%s.%d.tmp" % (calib_path.name, os.getpid()))
     temporary.write_text("".join(lines), encoding="utf-8")
     os.replace(temporary, calib_path)
@@ -254,20 +299,29 @@ def write_result(
     t1_run,
     source,
     suggested,
-    error,
+    measured_t1_minus_t0,
+    target,
+    target_error,
+    applied_delta,
     target_config_fingerprint,
 ):
     payload = {
-        "schema_version": 2,
+        "schema_version": 3,
         "workflow": "multi_head_zero_calibration_result",
         "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "source_runs": {"t0": str(t0_run["run_dir"]), "t1": str(t1_run["run_dir"])},
         "source_endstops": source,
-        "target_endstops": {"t0": source["t0"], "t1": suggested},
-        "measured_t1_minus_t0": error,
+        "target_endstops": suggested,
+        "measured_t1_minus_t0": measured_t1_minus_t0,
+        "target_center": target,
+        "measured_centers": {
+            "t0": {axis: t0_run[axis] for axis in ("x", "y", "z")},
+            "t1": {axis: t1_run[axis] for axis in ("x", "y", "z")},
+        },
+        "target_error_before_mm": target_error,
+        "applied_endstop_delta_mm": applied_delta,
         "source_config_fingerprint": source_config_fingerprint(t0_run),
         "target_config_fingerprint": target_config_fingerprint,
-        "reference_center": {"x": t0_run["x"], "y": t0_run["y"], "z": t0_run["z"]},
         "ball_radius_mm": t0_run["ball_radius_mm"],
         "ring_radius_mm": t0_run["ring_radius_mm"],
     }
@@ -282,28 +336,44 @@ def main(argv):
     t0_run = load_run(args.t0_run, "T0")
     t1_run = load_run(args.t1_run, "T1")
     calibration = yaml.safe_load(args.calib.read_text(encoding="utf-8"))
-    source = verify_sources(t0_run, t1_run)
-    error, suggested = suggested_t1_endstops(source, t0_run, t1_run)
+    source, target_center = verify_sources(t0_run, t1_run)
+    (
+        measured_t1_minus_t0,
+        target_error,
+        applied_delta,
+        suggested,
+    ) = suggested_endstops(source, t0_run, t1_run, target_center)
     current = calibration_endstops(calibration)
-    target = {"t0": source["t0"], "t1": suggested}
     current_matches_source = endstops_match(current, source)
-    current_matches_target = endstops_match(current, target)
+    current_matches_target = endstops_match(current, suggested)
     if not current_matches_source and not current_matches_target:
         raise CalibrationError(
             "calib.yaml no longer matches either the calibration source or its target"
         )
     print(
-        "T1-minus-T0 refined error: X=%+.6f Y=%+.6f Z=%+.6f mm"
-        % (error["x"], error["y"], error["z"])
+        "Ball target: X=%.6f Y=%.6f; measured T1-minus-T0: X=%+.6f Y=%+.6f Z=%+.6f mm"
+        % (
+            target_center["x"],
+            target_center["y"],
+            measured_t1_minus_t0["x"],
+            measured_t1_minus_t0["y"],
+            measured_t1_minus_t0["z"],
+        )
     )
     print(
-        "Suggested tools.t1 endstops: X=%.6f Y=%.6f Z=%.6f"
-        % (suggested["x_endstop"], suggested["y_endstop"], suggested["z_endstop"])
+        "Applied endstop deltas: T0 X=%+.6f Y=%+.6f; T1 X=%+.6f Y=%+.6f Z=%+.6f mm"
+        % (
+            applied_delta["t0"]["x_endstop"],
+            applied_delta["t0"]["y_endstop"],
+            applied_delta["t1"]["x_endstop"],
+            applied_delta["t1"]["y_endstop"],
+            applied_delta["t1"]["z_endstop"],
+        )
     )
     if args.dry_run:
         return 0
     if not current_matches_target:
-        rewrite_t1_endstops(args.calib, suggested)
+        rewrite_endstops(args.calib, suggested)
         subprocess.run([sys.executable, str(args.generator)], check=True)
     target_config_fingerprint = generated_config_fingerprint(
         args.generator.parent / "printer.cfg"
@@ -314,7 +384,10 @@ def main(argv):
         t1_run=t1_run,
         source=source,
         suggested=suggested,
-        error=error,
+        measured_t1_minus_t0=measured_t1_minus_t0,
+        target=target_center,
+        target_error=target_error,
+        applied_delta=applied_delta,
         target_config_fingerprint=target_config_fingerprint,
     )
     print(

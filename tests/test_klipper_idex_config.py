@@ -67,6 +67,19 @@ SYNTHETIC_CALIBRATION_VALUES = {
     "t1_y_endstop": -15.6,
 }
 
+SYNTHETIC_MULTI_HEAD_ZERO_PROBE = {
+    "ball_diameter_mm": 10.0,
+    "ball_front_gap_mm": 1.0,
+    "y_zero_behind_front_edge_mm": 3.0,
+    "target_x": 75.0,
+    "target_y": -9.0,
+    "seed_x_min": 72.0,
+    "seed_x_max": 78.0,
+    "seed_y_min": -12.0,
+    "seed_y_max": -6.0,
+    "refinement_ring_radius_mm": 2.8,
+}
+
 
 def test_image_waits_for_wlan_ipv4_before_printer_usb_consumers():
     image_install = (IMAGE_BUILD_STAGE_DIR / "01-run-chroot.sh").read_text(
@@ -310,12 +323,8 @@ def test_eddy_probe_geometry_and_visualization_mesh_are_generated_from_calib():
     probe = _section(config_text, "probe_eddy_current btt_eddy")
     mesh = _section(config_text, "bed_mesh")
 
-    assert _setting_float(probe, "x_offset") == pytest.approx(
-        eddy["nozzle_to_coil_x"]
-    )
-    assert _setting_float(probe, "y_offset") == pytest.approx(
-        eddy["nozzle_to_coil_y"]
-    )
+    assert _setting_float(probe, "x_offset") == pytest.approx(eddy["nozzle_to_coil_x"])
+    assert _setting_float(probe, "y_offset") == pytest.approx(eddy["nozzle_to_coil_y"])
     assert _setting_float(probe, "descend_z") > 0
     assert _setting_float(probe, "tap_z_offset") == pytest.approx(0.0)
     assert "tap_z_offset" not in eddy
@@ -352,9 +361,9 @@ def test_global_bed_to_nozzle_gap_is_required_finite_and_signed(
             ),
             encoding="utf-8",
         )
-        assert generator.load_calibration(signed_gap)["bed_to_nozzle_gap"] == pytest.approx(
-            float(value)
-        )
+        assert generator.load_calibration(signed_gap)[
+            "bed_to_nozzle_gap"
+        ] == pytest.approx(float(value))
 
     for index, value in enumerate((".nan", ".inf", "-.inf", "true")):
         invalid_gap = tmp_path / f"invalid-gap-{index}.yaml"
@@ -442,6 +451,7 @@ def test_eddy_klipper_calibration_curve_round_trips_exactly():
             },
         },
         "eddy_relative_calibration": eddy,
+        "multi_head_zero_probe": SYNTHETIC_MULTI_HEAD_ZERO_PROBE,
         "nozzle_cam": None,
     }
 
@@ -531,9 +541,7 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     eddy_fiducial_macro = _section(
         config_text, "gcode_macro IDEX_EDDY_FIDUCIAL_XZ_ACQUIRE"
     )
-    tool_xz_sweep_macro = _section(
-        config_text, "gcode_macro IDEX_TOOL_XZ_SWEEP_REPORT"
-    )
+    tool_xz_sweep_macro = _section(config_text, "gcode_macro IDEX_TOOL_XZ_SWEEP_REPORT")
     capture_script = (IMAGE_BUILD_FILES_DIR / "vision_capture.py").read_text(
         encoding="utf-8"
     )
@@ -639,7 +647,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert red_marker_definition["publish_on_accept"] is True
     rough_x_definition = registry["job_types"]["idex_rough_tool_x_verify"]
     assert rough_x_definition["definition_version"] == 1
-    assert rough_x_definition["verification_offset_from_fiducial_x_mm"] == pytest.approx(23.0)
+    assert rough_x_definition[
+        "verification_offset_from_fiducial_x_mm"
+    ] == pytest.approx(23.0)
     assert rough_x_definition["discard_fresh_frames"] == 1
     assert rough_x_definition["publish_on_accept"] is True
     assert [item["fact_name"] for item in rough_x_definition["requires"]] == [
@@ -652,9 +662,9 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     ]
     for tool in ("t0", "t1"):
         xy_definition = registry["job_types"][f"idex_tool_xy_measure_{tool}"]
-        assert [160.0 + value for value in xy_definition["x_offsets_from_fiducial_mm"]] == [
-            pytest.approx(value) for value in (191.0, 193.0, 195.0, 197.0, 199.0)
-        ]
+        assert [
+            160.0 + value for value in xy_definition["x_offsets_from_fiducial_mm"]
+        ] == [pytest.approx(value) for value in (191.0, 193.0, 195.0, 197.0, 199.0)]
     xz_definition = registry["job_types"]["idex_tool_xz_sweep_report"]
     assert [160.0 + value for value in xz_definition["x_offsets_from_fiducial_mm"]] == [
         pytest.approx(value) for value in (183.0, 186.0, 189.0, 192.0, 195.0, 198.0)
@@ -1451,6 +1461,7 @@ def test_idex_tool_offsets_are_derived_from_calibration_values():
             "capture": None,
             "temperature_calibration_temp": 38.5,
         },
+        "multi_head_zero_probe": SYNTHETIC_MULTI_HEAD_ZERO_PROBE,
     }
 
     values = generator.template_values(calibration, "synthetic-fingerprint")
@@ -1954,8 +1965,7 @@ def test_soft_outside_demo_uses_print_only_brush_toolchange():
     assert "wipe_tower_y" not in overrides
     assert "wipe_tower_no_sparse_layers" not in overrides
     assert overrides["change_filament_gcode"] == (
-        "T{next_extruder}\n"
-        "IDEX_PRIME_AND_BRUSH TOOL={next_extruder}"
+        "T{next_extruder}\n" "IDEX_PRIME_AND_BRUSH TOOL={next_extruder}"
     )
 
 

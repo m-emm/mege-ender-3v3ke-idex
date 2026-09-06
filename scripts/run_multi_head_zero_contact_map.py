@@ -903,7 +903,7 @@ def run_verification(
         "contact_count": VERIFICATION_CONTACT_COUNT,
         "ball_radius_mm": args.ball_radius_mm,
         "ring_radius_mm": args.ring_radius_mm,
-        "reference_center": {"x": args.reference_x, "y": args.reference_y},
+        "target_center": {"x": args.reference_x, "y": args.reference_y},
         "centre_contact": contact_payload(centre),
         "ring_contacts": [
             contact_payload(record)
@@ -1120,7 +1120,7 @@ def log(message):
     print("Multi-head-zero: %s" % message, flush=True)
 
 
-def configured_runtime_args(priors, tool, moonraker_url, reference_center=None):
+def configured_runtime_args(priors, tool, moonraker_url):
     return SimpleNamespace(
         tool=tool,
         moonraker_url=moonraker_url,
@@ -1130,8 +1130,8 @@ def configured_runtime_args(priors, tool, moonraker_url, reference_center=None):
         y_max=priors["seed_y_max"],
         ball_radius_mm=priors["ball_radius_mm"],
         ring_radius_mm=priors["ring_radius_mm"],
-        reference_x=None if reference_center is None else reference_center["x"],
-        reference_y=None if reference_center is None else reference_center["y"],
+        reference_x=priors["target_x"],
+        reference_y=priors["target_y"],
     )
 
 
@@ -1178,13 +1178,10 @@ def run_tool_workflow(
     initial_status,
     prepared_status,
     priors,
-    reference_center,
     dashboard,
 ):
     tool_index = int(tool[-1])
-    args = configured_runtime_args(
-        priors, tool, DEFAULT_MOONRAKER_URL, reference_center=reference_center
-    )
+    args = configured_runtime_args(priors, tool, DEFAULT_MOONRAKER_URL)
     records = []
     manifest = {
         "schema_version": 4,
@@ -1304,18 +1301,6 @@ def run_tool_workflow(
     }
 
 
-def batch_reference_center():
-    try:
-        return {
-            "x": float(os.environ["MULTI_HEAD_ZERO_REFERENCE_X"]),
-            "y": float(os.environ["MULTI_HEAD_ZERO_REFERENCE_Y"]),
-        }
-    except KeyError as exc:
-        raise ContactMapError(
-            "verification batch is missing its calibration reference"
-        ) from exc
-
-
 def main(argv):
     command_args = build_parser().parse_args(argv)
     workflow = os.environ.get("MULTI_HEAD_ZERO_BATCH_MODE", "calibration")
@@ -1338,7 +1323,6 @@ def main(argv):
     priors = apply_configured_priors(priors_args, start_status)
     batch_dir = Path(DEFAULT_OUTPUT_DIR).expanduser() / run_id
     batch_dir.mkdir(parents=True, exist_ok=False)
-    reference_center = batch_reference_center() if workflow == "verification" else None
     batch = {
         "schema_version": 1,
         "workflow": workflow,
@@ -1368,7 +1352,6 @@ def main(argv):
                 initial_status=start_status,
                 prepared_status=prepared_status,
                 priors=priors,
-                reference_center=reference_center,
                 dashboard=dashboard,
             )
             batch["runs"][tool.lower()] = result

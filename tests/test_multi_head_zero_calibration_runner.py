@@ -37,6 +37,14 @@ def load_verifier():
     return module
 
 
+def load_generator():
+    path = ROOT / "klipper_setup/klipper_config/generate_printer_cfg.py"
+    spec = importlib.util.spec_from_file_location("idex_config_generator", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_only_tool_selection_is_exposed_to_the_user():
     runner = load_runner()
     assert runner.build_parser().parse_args([]).tool == "both"
@@ -125,6 +133,8 @@ def test_verification_uses_centre_and_eight_point_ring():
     assert len(records) == 9
     assert summary["algorithm"] == "nine_contact_octagonal_verification_v2"
     assert summary["termination_reason"] == "nine_contact_complete"
+    assert summary["target_center"] == {"x": 75.0, "y": -9.0}
+    assert (records[0]["commanded_x"], records[0]["commanded_y"]) == (75.0, -9.0)
     assert [record["direction"] for record in records[1:]] == [
         "east",
         "north_east",
@@ -137,6 +147,26 @@ def test_verification_uses_centre_and_eight_point_ring():
     ]
     assert summary["estimated_center"]["trigger_z"] == pytest.approx(1.0)
     assert summary["periphery_mean_z"] == pytest.approx(1.0)
+
+
+def test_verification_runtime_args_use_the_generated_target():
+    runner = load_runner()
+    args = runner.configured_runtime_args(
+        {
+            "seed_x_min": 72.0,
+            "seed_x_max": 78.0,
+            "seed_y_min": -12.0,
+            "seed_y_max": -6.0,
+            "ball_radius_mm": 5.0,
+            "ring_radius_mm": 2.8,
+            "target_x": 75.0,
+            "target_y": -9.0,
+        },
+        "T1",
+        "unused",
+    )
+
+    assert (args.reference_x, args.reference_y) == (75.0, -9.0)
 
 
 def test_runtime_frame_requires_zero_manual_adjustment_and_inactive_mesh():
@@ -333,20 +363,46 @@ def test_workflow_event_is_emitted_to_the_printer_console(monkeypatch):
     ]
 
 
-def test_t1_endstop_correction_reduces_positive_logical_residuals():
+def test_absolute_xy_endstop_rebase_places_both_tools_at_target():
     applier = load_applier()
-    source = {"t1": {"x_endstop": 300.0, "y_endstop": -10.0, "z_endstop": 290.0}}
+    source = {
+        "t0": {"x_endstop": -100.0, "y_endstop": -20.0, "z_endstop": 300.0},
+        "t1": {"x_endstop": 300.0, "y_endstop": -10.0, "z_endstop": 290.0},
+    }
     t0 = {"x": 10.0, "y": 20.0, "z": 30.0}
     t1 = {"x": 10.2, "y": 20.3, "z": 30.4}
+    target = {"x": 11.0, "y": 21.0}
 
-    error, suggested = applier.suggested_t1_endstops(source, t0, t1)
+    measured, errors, deltas, suggested = applier.suggested_endstops(
+        source, t0, t1, target
+    )
 
-    assert error == pytest.approx({"x": 0.2, "y": 0.3, "z": 0.4})
+    assert measured == pytest.approx({"x": 0.2, "y": 0.3, "z": 0.4})
+    assert errors["t0"] == pytest.approx({"x": -1.0, "y": -1.0})
+    assert errors["t1"] == pytest.approx({"x": -0.8, "y": -0.7})
+    assert deltas["t0"] == pytest.approx(
+        {"x_endstop": 1.0, "y_endstop": 1.0, "z_endstop": 0.0}
+    )
+    assert deltas["t1"] == pytest.approx(
+        {"x_endstop": 0.8, "y_endstop": 0.7, "z_endstop": -0.4}
+    )
     assert suggested == {
-        "x_endstop": 299.8,
-        "y_endstop": -10.3,
-        "z_endstop": 289.6,
+        "t0": {"x_endstop": -99.0, "y_endstop": -19.0, "z_endstop": 300.0},
+        "t1": {"x_endstop": 300.8, "y_endstop": -9.3, "z_endstop": 289.6},
     }
+    assert t0["x"] + deltas["t0"]["x_endstop"] == pytest.approx(target["x"])
+    assert t0["y"] + deltas["t0"]["y_endstop"] == pytest.approx(target["y"])
+    assert t1["x"] + deltas["t1"]["x_endstop"] == pytest.approx(target["x"])
+    assert t1["y"] + deltas["t1"]["y_endstop"] == pytest.approx(target["y"])
+
+
+def test_generated_parked_tool_limits_preserve_measured_clearance():
+    generator = load_generator()
+    clearance = {"first_contact_nozzle_separation_mm": 101.4, "safety_margin_mm": 0.0}
+    t0_max, t1_min = generator._parked_tool_x_limits(-85.4, 345.6, clearance)
+
+    assert 345.6 - t0_max == pytest.approx(101.4)
+    assert t1_min - (-85.4) == pytest.approx(101.4)
 
 
 def test_verification_z_pass_uses_only_the_physical_centre_contact(tmp_path):
@@ -371,10 +427,11 @@ def test_verification_z_pass_uses_only_the_physical_centre_contact(tmp_path):
         tmp_path / "calibration_result.json",
         measurement("T0", 75.0, -9.0, 0.800, 0.200),
         measurement("T1", 75.01, -9.01, 0.810, 0.400),
+        {"x": 75.0, "y": -9.0},
     )
 
     assert result["pass"] is True
-    assert result["pass_components"] == {"x": True, "y": True, "z_center": True}
+    assert all(result["pass_components"].values())
     assert result["z_diagnostics"]["periphery_mean_delta_mm"] == pytest.approx(0.2)
     assert result["z_diagnostics"]["authoritative_for_z"] is False
 

@@ -463,11 +463,25 @@ class MultiHeadZeroProbe:
             if result["no_contact_count"]:
                 result["status"] = "no_contact"
             self.last_measurement = result
+            if samples:
+                mean_x = sum(sample["x"] for sample in samples) / len(samples)
+                mean_y = sum(sample["y"] for sample in samples) / len(samples)
+                trigger_mean = "(%.6f, %.6f, %.6f)" % (
+                    mean_x,
+                    mean_y,
+                    statistics["mean"],
+                )
+            else:
+                trigger_mean = "n/a"
             gcmd.respond_info(
-                "Multi-head-zero statistics: T%d count=%d mean=%s median=%s "
-                "min=%s max=%s span=%s stddev=%s"
+                "Multi-head-zero statistics: T%d target=(%.3f, %.3f) "
+                "trigger_mean=%s count=%d mean=%s median=%s min=%s max=%s "
+                "span=%s stddev=%s"
                 % (
                     requested_tool,
+                    x,
+                    y,
+                    trigger_mean,
                     count,
                     (
                         "%.6f" % statistics["mean"]

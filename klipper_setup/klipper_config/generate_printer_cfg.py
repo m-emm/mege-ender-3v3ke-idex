@@ -373,8 +373,6 @@ def _load_idex_x_reach(data: dict[str, Any]) -> dict[str, float]:
         for key in (
             "safety_margin_mm",
             "first_contact_nozzle_separation_mm",
-            "t0_position_max",
-            "t1_position_min",
         )
     }
     if any(not math.isfinite(item) for item in values.values()):
@@ -386,6 +384,25 @@ def _load_idex_x_reach(data: dict[str, Any]) -> dict[str, float]:
             "idex_x_reach.first_contact_nozzle_separation_mm must be positive"
         )
     return values
+
+
+def _parked_tool_x_limits(
+    t0_x_endstop: float,
+    t1_x_endstop: float,
+    idex_x_reach: dict[str, float],
+) -> tuple[float, float]:
+    """Return safe single-tool limits from the measured parked-tool clearance."""
+    separation = (
+        idex_x_reach["first_contact_nozzle_separation_mm"]
+        + idex_x_reach["safety_margin_mm"]
+    )
+    t0_position_max = t1_x_endstop - separation
+    t1_position_min = t0_x_endstop + separation
+    if t0_position_max <= t0_x_endstop or t1_position_min >= t1_x_endstop:
+        raise ValueError(
+            "idex_x_reach clearance leaves no usable X travel between the parked tools"
+        )
+    return t0_position_max, t1_position_min
 
 
 def _load_multi_head_zero_probe(data: dict[str, Any]) -> dict[str, Any]:
@@ -692,8 +709,17 @@ def template_values(
     tap_mesh = calibration["tap_mesh"]
     input_shaper = calibration["input_shaper"]
     saved_mesh = calibration.get("saved_mesh")
-    idex_x_reach = calibration["idex_x_reach"]
+    idex_x_reach = calibration.get("idex_x_reach")
     multi_head_zero_probe = calibration["multi_head_zero_probe"]
+    if idex_x_reach is None:
+        # template_values() is also used by focused synthetic tests that do not
+        # model the printer's physical parked-tool clearance. Real calib.yaml
+        # input is validated by load_calibration() and always supplies it.
+        t0_x_position_max, t1_x_position_min = t1["x_endstop"], t0["x_endstop"]
+    else:
+        t0_x_position_max, t1_x_position_min = _parked_tool_x_limits(
+            t0["x_endstop"], t1["x_endstop"], idex_x_reach
+        )
 
     eddy_relative_calibration = calibration.get("eddy_relative_calibration") or {
         "nozzle_to_coil_x": -57.391,
@@ -749,8 +775,8 @@ def template_values(
         "t1_x_endstop": format_mm(t1["x_endstop"]),
         "t1_y_endstop": format_mm(t1["y_endstop"]),
         "t1_z_endstop": format_mm(t1["z_endstop"]),
-        "t0_x_position_max": format_mm(idex_x_reach["t0_position_max"]),
-        "t1_x_position_min": format_mm(idex_x_reach["t1_position_min"]),
+        "t0_x_position_max": format_mm(t0_x_position_max),
+        "t1_x_position_min": format_mm(t1_x_position_min),
         "multi_head_zero_ball_radius_mm": format_mm(
             multi_head_zero_probe["ball_diameter_mm"] / 2.0
         ),

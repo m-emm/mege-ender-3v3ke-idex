@@ -60,13 +60,13 @@ tap_mesh:
 # workflow may translate both together, but must preserve their difference.
 tools:
   t0:
-    x_endstop: -85.991
-    y_endstop: -14.995
+    x_endstop: -85.398
+    y_endstop: -15.608
     z_endstop: 291.493
   t1:
-    x_endstop: 345.036
-    y_endstop: -13.444
-    z_endstop: 290.833
+    x_endstop: 345.624
+    y_endstop: -13.973
+    z_endstop: 290.818
 
 # Measured parked-tool clearance for normal IDEX operation. With T0 at
 # X=-85.4, T1 first clears it at X=16.0: exactly 101.4 mm nozzle separation.
@@ -77,12 +77,9 @@ idex_x_reach:
   model: measured_parked_tool_clearance_v1
   safety_margin_mm: 0.000
   first_contact_nozzle_separation_mm: 101.400
-  t0_position_max: 244.538
-  t1_position_min: 15.409
 
-# Multi-head-zero's physical ball and coordinate-frame priors. The selected
-# target is intentionally nominal; the guarded calibration measures the real
-# centre. CLI bounds remain diagnostic overrides of the generated defaults.
+# Multi-head-zero's physical ball and coordinate-frame priors. The target is
+# the authoritative logical ball centre; calibration rebases both tools to it.
 multi_head_zero_probe:
   ball_diameter_mm: 10.000
   ball_front_gap_mm: 1.000
