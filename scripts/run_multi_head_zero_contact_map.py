@@ -26,8 +26,8 @@ from matplotlib import pyplot as plt
 
 
 DEFAULT_MOONRAKER_URL = "http://127.0.0.1:7125"
-DEFAULT_OUTPUT_DIR = "~/printer_data/config/multi_head_zero_probe/runs"
-DEFAULT_DASHBOARD_ROOT = "~/printer_data/vision/multi_head_zero_calibration"
+DEFAULT_OUTPUT_DIR = "~/printer_data/calibration/runs"
+DEFAULT_DASHBOARD_ROOT = "~/printer_data/calibration"
 FIT_CONDITION_LIMIT = 1.0e6
 FIT_CONCAVITY_EPSILON = 1.0e-6
 SEED_CONTACT_COUNT = 9
@@ -301,6 +301,7 @@ class DashboardPublisher:
     def __init__(self, run_id, workflow, tool_selection):
         self.root = Path(DEFAULT_DASHBOARD_ROOT).expanduser()
         self.path = self.root / "data" / "current.json"
+        batch_id = os.environ.get("IDEX_CALIBRATION_BATCH_ID", run_id)
         previous = {}
         if self.path.is_file():
             try:
@@ -308,43 +309,38 @@ class DashboardPublisher:
             except (OSError, ValueError):
                 previous = {}
         chapters = copy.deepcopy(previous.get("chapters") or {})
-        if not chapters:
-            previous_completed = previous.get("last_completed") or {}
-            previous_workflow = previous_completed.get("workflow")
-            if previous_workflow in {"calibration", "verification"}:
-                chapters[previous_workflow] = {
-                    "run_id": previous_completed.get("run_id"),
-                    "status": "completed",
-                    "finished_at": previous_completed.get("finished_at"),
-                    "runs": previous_completed.get("runs", {}),
-                }
-            if previous.get("calibration_result"):
-                chapters.setdefault("calibration", {"runs": {}})["result"] = previous[
-                    "calibration_result"
-                ]
-            if previous.get("verification"):
-                chapters.setdefault("verification", {"runs": {}})["report"] = previous[
-                    "verification"
-                ]
+        tool_alignment = chapters.setdefault("tool_alignment", {})
         if workflow == "calibration":
-            chapters = {}
-        chapters[workflow] = {
+            # A new tool-alignment run replaces Chapter 1 only.  The full
+            # coordinator starts a fresh batch snapshot before invoking us.
+            tool_alignment.clear()
+        tool_alignment[workflow] = {
             "run_id": run_id,
             "status": "preparing",
             "started_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "runs": {},
         }
         self.payload = {
-            "schema_version": 2,
-            "kind": "multi_head_zero_calibration_dashboard",
+            "schema_version": 3,
+            "kind": "idex_calibration_dashboard",
+            "batch_id": batch_id,
             "run_id": run_id,
             "workflow": workflow,
             "tool_selection": tool_selection,
             "status": "preparing",
             "started_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "updated_at": None,
-            "events": [],
+            "events": (
+                copy.deepcopy(previous.get("events") or [])
+                if previous.get("batch_id") == batch_id
+                else []
+            ),
             "chapters": chapters,
+            "readiness": {
+                "printable": False,
+                "checks": [],
+                "reasons": [],
+            },
         }
         self.publish()
 
@@ -372,7 +368,9 @@ class DashboardPublisher:
             payload["summary"] = summary
         if plot is not None:
             payload["plot"] = plot
-        self.payload["chapters"][workflow]["runs"][tool.lower()] = payload
+        self.payload["chapters"]["tool_alignment"][workflow]["runs"][
+            tool.lower()
+        ] = payload
         self.publish()
 
     def publish_plot(self, source, tool, workflow):
@@ -388,18 +386,12 @@ class DashboardPublisher:
     def finish(self, status, error=None):
         self.payload["status"] = status
         self.payload["finished_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
-        chapter = self.payload["chapters"][self.payload["workflow"]]
+        chapter = self.payload["chapters"]["tool_alignment"][self.payload["workflow"]]
         chapter["status"] = status
         chapter["finished_at"] = self.payload["finished_at"]
         if error:
             self.payload["error"] = error
             chapter["error"] = error
-        self.payload["last_completed"] = {
-            "run_id": self.payload["run_id"],
-            "workflow": self.payload["workflow"],
-            "finished_at": self.payload["finished_at"],
-            "chapters": self.payload["chapters"],
-        }
         self.publish()
 
 
@@ -1220,6 +1212,32 @@ def require_ready_and_prepare(moonraker_url):
     )
     if homing_required:
         run_gcode(moonraker_url, "G28\nM400")
+        # The Klipper extra deliberately caches the last explicitly sampled
+        # endstop state. A service restart resets that cache to UNKNOWN, so
+        # actively sample the pin before reading its status object.
+        run_gcode(moonraker_url, "QUERY_MULTI_HEAD_ZERO")
+        post_home_status = status(moonraker_url)
+        post_home_switch = post_home_status.get("multi_head_zero_probe", {}).get(
+            "state"
+        )
+        if post_home_switch != "RELEASED":
+            message = (
+                "FAULT immediately after G28: multi-head-zero must be RELEASED "
+                "with the axes at home, observed %s; aborting before calibration motion"
+                % (post_home_switch or "unknown")
+            )
+            workflow_log(moonraker_url, message)
+            raise ContactMapError(message)
+        workflow_log(
+            moonraker_url,
+            "post-home multi-head-zero safety check passed: RELEASED",
+        )
+    # The first X home after a Klipper restart proved measurably different from
+    # a subsequent X-only latch pass (up to 0.25 mm at the ball).  Repeat only
+    # X here, using the configured 1 mm/s second homing speed, so calibration
+    # and post-deployment verification start from the same settled datum.
+    workflow_log(moonraker_url, "settling X datum with one final G28 X")
+    run_gcode(moonraker_url, "G28 X\nM400")
     run_gcode(moonraker_url, "BED_MESH_CLEAR\nM400")
     prepared_status = status(moonraker_url)
     if prepared_status.get("toolhead", {}).get("homed_axes") != "xyz":
@@ -1388,12 +1406,17 @@ def main(argv):
     ).strftime("%Y%m%dT%H%M%SZ_batch_%s" % workflow)
     dashboard = DashboardPublisher(run_id, workflow, command_args.tool)
     dashboard.event("Batch requested")
-    start_status, prepared_status, homing_required = require_ready_and_prepare(
-        DEFAULT_MOONRAKER_URL
-    )
+    try:
+        start_status, prepared_status, homing_required = require_ready_and_prepare(
+            DEFAULT_MOONRAKER_URL
+        )
+    except Exception as exc:
+        dashboard.finish("aborted", str(exc))
+        raise
     priors_args = SimpleNamespace(x_min=None, x_max=None, y_min=None, y_max=None)
     priors = apply_configured_priors(priors_args, start_status)
-    batch_dir = Path(DEFAULT_OUTPUT_DIR).expanduser() / run_id
+    output_root = os.environ.get("MULTI_HEAD_ZERO_OUTPUT_DIR", DEFAULT_OUTPUT_DIR)
+    batch_dir = Path(output_root).expanduser() / run_id
     batch_dir.mkdir(parents=True, exist_ok=False)
     batch = {
         "schema_version": 1,
@@ -1409,8 +1432,10 @@ def main(argv):
     dashboard.payload["status"] = "running"
     dashboard.payload["homing_required"] = homing_required
     dashboard.payload["configured_priors"] = priors
-    dashboard.payload["chapters"][workflow]["status"] = "running"
-    dashboard.payload["chapters"][workflow]["configured_priors"] = priors
+    dashboard.payload["chapters"]["tool_alignment"][workflow]["status"] = "running"
+    dashboard.payload["chapters"]["tool_alignment"][workflow][
+        "configured_priors"
+    ] = priors
     dashboard.event("Preparation complete")
     try:
         for index, tool in enumerate(selected_tools):

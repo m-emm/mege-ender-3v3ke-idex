@@ -237,6 +237,11 @@ def test_preparation_homes_only_when_xyz_is_not_already_homed(monkeypatch):
                 "toolhead": {"homed_axes": "xyz"},
                 "multi_head_zero_probe": {"state": "RELEASED"},
             },
+            {
+                "webhooks": {"state": "ready"},
+                "toolhead": {"homed_axes": "xyz"},
+                "multi_head_zero_probe": {"state": "RELEASED"},
+            },
         )
     )
     commands = []
@@ -249,7 +254,43 @@ def test_preparation_homes_only_when_xyz_is_not_already_homed(monkeypatch):
     _, _, homing_required = runner.require_ready_and_prepare("unused")
 
     assert homing_required is True
-    assert commands == ["G28\nM400", "BED_MESH_CLEAR\nM400"]
+    assert commands == [
+        "G28\nM400",
+        "QUERY_MULTI_HEAD_ZERO",
+        "G28 X\nM400",
+        "BED_MESH_CLEAR\nM400",
+    ]
+
+
+def test_preparation_aborts_immediately_when_switch_is_triggered_after_homing(
+    monkeypatch,
+):
+    runner = load_runner()
+    statuses = iter(
+        (
+            {"webhooks": {"state": "ready"}, "toolhead": {"homed_axes": ""}},
+            {
+                "webhooks": {"state": "ready"},
+                "toolhead": {"homed_axes": "xyz"},
+                "multi_head_zero_probe": {"state": "TRIGGERED"},
+            },
+        )
+    )
+    commands = []
+    messages = []
+    monkeypatch.setattr(runner, "status", lambda _url: next(statuses))
+    monkeypatch.setattr(
+        runner, "printer_log", lambda _url, message: messages.append(message)
+    )
+    monkeypatch.setattr(
+        runner, "run_gcode", lambda _url, script: commands.append(script)
+    )
+
+    with pytest.raises(runner.ContactMapError, match="FAULT immediately after G28"):
+        runner.require_ready_and_prepare("unused")
+
+    assert commands == ["G28\nM400", "QUERY_MULTI_HEAD_ZERO"]
+    assert any("observed TRIGGERED" in message for message in messages)
 
 
 def test_tool_switch_lifts_once_and_is_skipped_for_the_active_tool(monkeypatch):
@@ -505,11 +546,13 @@ def test_dashboard_snapshot_is_atomic_and_retains_completed_run(tmp_path, monkey
     snapshot = tmp_path / "data" / "current.json"
     payload = json.loads(snapshot.read_text(encoding="utf-8"))
     assert payload["status"] == "completed"
-    assert payload["chapters"]["calibration"]["runs"]["t0"]["progress"] == {
+    assert payload["chapters"]["tool_alignment"]["calibration"]["runs"]["t0"][
+        "progress"
+    ] == {
         "completed": 1,
         "total": 18,
     }
-    assert payload["last_completed"]["run_id"] == "run-1"
+    assert payload["batch_id"] == "run-1"
     assert not list((tmp_path / "data").glob(".*.tmp"))
 
     verification = runner.DashboardPublisher("run-2", "verification", "both")
@@ -521,12 +564,16 @@ def test_dashboard_snapshot_is_atomic_and_retains_completed_run(tmp_path, monkey
         "running",
     )
     retained = json.loads(snapshot.read_text(encoding="utf-8"))
-    assert retained["schema_version"] == 2
-    assert retained["chapters"]["calibration"]["runs"]["t0"]["progress"] == {
+    assert retained["schema_version"] == 3
+    assert retained["chapters"]["tool_alignment"]["calibration"]["runs"]["t0"][
+        "progress"
+    ] == {
         "completed": 1,
         "total": 18,
     }
-    assert retained["chapters"]["verification"]["runs"]["t0"]["progress"] == {
+    assert retained["chapters"]["tool_alignment"]["verification"]["runs"]["t0"][
+        "progress"
+    ] == {
         "completed": 1,
         "total": 9,
     }
@@ -546,7 +593,7 @@ def test_dashboard_assets_render_live_and_final_sections():
     assert 'id="verification-chapter"' in html
     assert "data/current.json" in script
     assert "normaliseChapters" in script
-    assert "last_completed" in script
+    assert "tool_alignment" in script
     assert "isometricPlot" in script
     assert "plot-modal" in html
     assert "Paired verification plot" not in script

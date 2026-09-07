@@ -919,6 +919,11 @@ class SettledProbePointsHelper(probe.ProbePointsHelper):
         super()._move_next(probe_num)
         if self._settle_seconds:
             self.printer.lookup_object("toolhead").dwell(self._settle_seconds)
+        point = self.probe_points[probe_num]
+        self.gcode.respond_info(
+            "IDEX calibration mesh point %d/%d: probing X=%.3f Y=%.3f"
+            % (probe_num + 1, len(self.probe_points), point[0], point[1])
+        )
 
 
 class ProbeManager:

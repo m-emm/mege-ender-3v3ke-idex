@@ -1,4 +1,9 @@
-# IDEX Z Handling: Coordinate Model, Eddy Interaction, and Proposed Architecture
+# IDEX Z Handling: Coordinate Model, Eddy Interaction, and Proposed Architecture (legacy)
+
+> **Superseded for operation:** use
+> `klipper_setup/klipper_config/IDEX_CALIBRATION.md` for the automatic printable
+> calibration workflow. This document remains useful for low-level Eddy sensor
+> characterization and historical design rationale only.
 
 ## Status
 

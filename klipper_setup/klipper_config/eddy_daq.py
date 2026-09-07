@@ -90,10 +90,15 @@ def _float_setting(config_text: str, section_name: str, setting_name: str) -> fl
     return float(_setting(_section(config_text, section_name), setting_name).split()[0])
 
 
-def _pair_setting(config_text: str, section_name: str, setting_name: str) -> tuple[float, float]:
+def _pair_setting(
+    config_text: str, section_name: str, setting_name: str
+) -> tuple[float, float]:
     values = _setting(_section(config_text, section_name), setting_name).split(",")
     if len(values) != 2:
-        raise ValueError("%s.%s must contain two comma-separated values" % (section_name, setting_name))
+        raise ValueError(
+            "%s.%s must contain two comma-separated values"
+            % (section_name, setting_name)
+        )
     return float(values[0]), float(values[1])
 
 
@@ -168,7 +173,7 @@ def grid_points(geometry: EddyGridGeometry) -> tuple[GridPoint, ...]:
 def load_tap_threshold(calib_path: Path) -> float:
     data = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
     try:
-        return float(data["eddy_relative_calibration"]["klipper"]["tap_threshold"])
+        return float(data["eddy_tap_threshold"])
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("calib.yaml has no numeric Eddy Tap threshold") from exc
 
@@ -176,9 +181,8 @@ def load_tap_threshold(calib_path: Path) -> float:
 def load_endstop_positions(calib_path: Path) -> dict[str, float]:
     data = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
     try:
-        tools = data["tools"]
         return {
-            "%s_%s_endstop" % (tool, axis): float(tools[tool][axis + "_endstop"])
+            "%s_%s_endstop" % (tool, axis): float(data["%s_%s_endstop" % (tool, axis)])
             for tool in ("t0", "t1")
             for axis in ("x", "y", "z")
         }
@@ -287,8 +291,7 @@ def render_gcode(
                 "G1 Z%.3f F%.0f" % (safe_z, z_feed),
                 "G1 X%.6f Y%.6f F%.0f"
                 % (point.coil_nozzle_x, point.coil_nozzle_y, xy_feed),
-                "G1 Z%.6f F%.0f"
-                % (heights[0] - ASCENT_APPROACH_CLEARANCE, z_feed),
+                "G1 Z%.6f F%.0f" % (heights[0] - ASCENT_APPROACH_CLEARANCE, z_feed),
             ]
         )
         for height_index, height in enumerate(heights):

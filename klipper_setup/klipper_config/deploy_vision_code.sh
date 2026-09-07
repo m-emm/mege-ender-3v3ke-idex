@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 FILES_DIR="${REPO_ROOT}/klipper_setup/image_build/overlays/stage2/99-klipperpi/files"
 PRIORS_FILE="${SCRIPT_DIR}/priors.yaml"
+VISION_CONFIG_FILE="${SCRIPT_DIR}/vision_config.yaml"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 
 shopt -s nullglob
@@ -24,6 +25,10 @@ if [[ ! -f "${PRIORS_FILE}" ]]; then
   echo "Missing required file: ${PRIORS_FILE}" >&2
   exit 1
 fi
+if [[ ! -f "${VISION_CONFIG_FILE}" ]]; then
+  echo "Missing required file: ${VISION_CONFIG_FILE}" >&2
+  exit 1
+fi
 
 echo "Deploying ${#python_files[@]} Python files, ${#json_files[@]} JSON files, and ${#png_files[@]} PNG files to ${REMOTE_HOST}"
 
@@ -41,7 +46,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-scp "${python_files[@]}" "${json_files[@]}" ${png_files[@]+"${png_files[@]}"} "${PRIORS_FILE}" "${REMOTE_HOST}:${remote_tmp}/"
+scp "${python_files[@]}" "${json_files[@]}" ${png_files[@]+"${png_files[@]}"} "${PRIORS_FILE}" "${VISION_CONFIG_FILE}" "${REMOTE_HOST}:${remote_tmp}/"
 
 ssh "${REMOTE_HOST}" "REMOTE_TMP='${remote_tmp}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
@@ -74,6 +79,7 @@ for source in "${REMOTE_TMP}"/*.png; do
 done
 
 sudo install -m 0644 "${REMOTE_TMP}/priors.yaml" /usr/local/share/vision/priors.yaml
+sudo install -m 0644 "${REMOTE_TMP}/vision_config.yaml" /usr/local/share/vision/vision_config.yaml
 sudo rm -f /usr/local/share/vision/vision_calibration_priors.json
 
 echo "Ensuring Python vision dependencies"

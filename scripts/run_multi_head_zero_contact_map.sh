@@ -5,11 +5,16 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_HELPER='python3 ~/printer_data/config/multi_head_zero_probe/run_multi_head_zero_contact_map.py'
-LOCAL_OUT_ROOT="${LOCAL_OUT_DIR:-${REPO_ROOT}/runs/multi_head_zero_contact}"
+batch_id="${IDEX_CALIBRATION_BATCH_ID:-}"
+if [[ -n "${batch_id}" ]]; then
+  LOCAL_OUT_ROOT="${LOCAL_OUT_DIR:-${REPO_ROOT}/runs/idex_calibration/${batch_id}/tool_alignment}"
+else
+  LOCAL_OUT_ROOT="${LOCAL_OUT_DIR:-${REPO_ROOT}/runs/multi_head_zero_contact}"
+fi
 UPDATE_SCRIPT="${REPO_ROOT}/klipper_setup/klipper_config/update_menderpi.sh"
 APPLY_SCRIPT="${REPO_ROOT}/scripts/apply_multi_head_zero_maximum_calibration.py"
 VERIFY_SCRIPT="${REPO_ROOT}/scripts/verify_multi_head_zero_alignment.py"
-DASHBOARD_ROOT="/home/pi/printer_data/vision/multi_head_zero_calibration"
+DASHBOARD_ROOT="/home/pi/printer_data/calibration"
 
 tool="both"
 if [[ "$#" -eq 2 && "$1" == "--tool" && ( "$2" == "T0" || "$2" == "T1" ) ]]; then
@@ -21,6 +26,8 @@ fi
 
 timestamp="$(date '+%Y-%m-%d_%H-%M-%S')"
 mkdir -p "${LOCAL_OUT_ROOT}"
+
+"${UPDATE_SCRIPT}" --check
 
 printer_console() {
   local message="$1"
@@ -72,23 +79,15 @@ entry = {
     "data": json.loads(artifact.read_text(encoding="utf-8")),
 }
 key = os.environ["DASHBOARD_KEY"]
-chapters = state.setdefault("chapters", {})
+chapters = state.setdefault("chapters", {}).setdefault("tool_alignment", {})
 if key == "calibration_result":
     chapters.setdefault("calibration", {"runs": {}})["result"] = entry
 elif key == "verification":
     chapters.setdefault("verification", {"runs": {}})["report"] = entry
-state[key] = entry
 event = base64.b64decode(os.environ["DASHBOARD_EVENT_B64"]).decode("utf-8")
 now = dt.datetime.now(dt.timezone.utc).isoformat()
 state["events"] = (state.get("events", []) + [{"at": now, "message": event}])[-16:]
 state["updated_at"] = now
-if state.get("status") == "completed":
-    state["last_completed"] = {
-        "run_id": state.get("run_id"),
-        "workflow": state.get("workflow"),
-        "finished_at": state.get("finished_at"),
-        "chapters": chapters,
-    }
 temporary = state_path.with_name(".%s.tmp" % state_path.name)
 temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 temporary.replace(state_path)
@@ -102,14 +101,22 @@ run_remote_batch() {
   mkdir -p "${output_dir}"
   echo "Multi-head-zero ${mode} batch: ${run_id}"
   local remote_command
-  remote_command="MULTI_HEAD_ZERO_BATCH_MODE=$(printf '%q' "${mode}") MULTI_HEAD_ZERO_BATCH_RUN_ID=$(printf '%q' "${run_id}")"
+  local remote_output_root="${DASHBOARD_ROOT}/runs/${batch_id:-${run_id}}/tool_alignment"
+  remote_command="MULTI_HEAD_ZERO_BATCH_MODE=$(printf '%q' "${mode}") MULTI_HEAD_ZERO_BATCH_RUN_ID=$(printf '%q' "${run_id}") IDEX_CALIBRATION_BATCH_ID=$(printf '%q' "${batch_id:-${run_id}}") MULTI_HEAD_ZERO_OUTPUT_DIR=$(printf '%q' "${remote_output_root}")"
   remote_command+=" ${REMOTE_HELPER} --tool ${tool}"
   local remote_status
   set +e
   ssh "${REMOTE_HOST}" "${remote_command}" 2>&1 | tee "${output_dir}/remote.log"
   remote_status="${PIPESTATUS[0]}"
   set -e
-  scp -q -r "${REMOTE_HOST}:~/printer_data/config/multi_head_zero_probe/runs/${run_id}/." "${output_dir}/"
+  # Preflight failures (for example, a failed G28) happen before the helper
+  # creates its immutable run directory.  Preserve the local remote.log, but do
+  # not obscure the real printer error with a secondary scp "not found" error.
+  if ssh "${REMOTE_HOST}" "test -d '${remote_output_root}/${run_id}'"; then
+    scp -q -r "${REMOTE_HOST}:${remote_output_root}/${run_id}/." "${output_dir}/"
+  else
+    echo "Remote batch produced no artifact directory; preflight failed before acquisition." >&2
+  fi
   return "${remote_status}"
 }
 
@@ -123,18 +130,37 @@ if [[ "${tool}" != "both" ]]; then
 fi
 
 calibration_result="${calibration_dir}/calibration_result.json"
+transaction_dir="$(mktemp -d "${TMPDIR:-/tmp}/mhz-calibration.XXXXXX")"
+cp "${REPO_ROOT}/klipper_setup/klipper_config/calib.yaml" "${transaction_dir}/calib.yaml"
+cp "${REPO_ROOT}/klipper_setup/klipper_config/printer.cfg" "${transaction_dir}/printer.cfg"
+rollback_alignment() {
+  echo "Tool-alignment candidate failed; restoring source calibration..." >&2
+  cp "${transaction_dir}/calib.yaml" "${REPO_ROOT}/klipper_setup/klipper_config/calib.yaml"
+  cp "${transaction_dir}/printer.cfg" "${REPO_ROOT}/klipper_setup/klipper_config/printer.cfg"
+  "${UPDATE_SCRIPT}"
+  "${UPDATE_SCRIPT}" --check
+}
+cleanup_transaction() {
+  rm -rf -- "${transaction_dir}"
+}
+trap cleanup_transaction EXIT
 printer_console "paired calibration complete; applying absolute T0/T1 XY and T1 Z correction"
 echo "Applying absolute T0/T1 XY and T1 Z correction..."
-python "${APPLY_SCRIPT}" \
-  --t0-run "${calibration_dir}/T0" \
-  --t1-run "${calibration_dir}/T1" \
-  --result "${calibration_result}"
+if ! python "${APPLY_SCRIPT}" \
+    --t0-run "${calibration_dir}/T0" \
+    --t1-run "${calibration_dir}/T1" \
+    --result "${calibration_result}"; then
+  rollback_alignment
+  exit 1
+fi
 dashboard_publish "${calibration_result}" "${calibration_id}_calibration_result.json" "calibration_result" "Absolute XY correction calculated"
 
 printer_console "absolute XY and T1 Z correction calculated; deploying configuration"
 echo "Deploying paired calibration and checking parity..."
-"${UPDATE_SCRIPT}"
-"${UPDATE_SCRIPT}" --check
+if ! "${UPDATE_SCRIPT}" || ! "${UPDATE_SCRIPT}" --check; then
+  rollback_alignment
+  exit 1
+fi
 printer_console "configuration deployment parity passed; starting nine-contact verification"
 
 verification_id="${timestamp}_T0_T1_verification"

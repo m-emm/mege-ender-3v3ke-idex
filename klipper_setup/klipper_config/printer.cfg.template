@@ -149,10 +149,14 @@ gcode:
 # 45 mm/s leaves margin below the empirically reliable 50 mm/s no-dwell limit.
 speed: 45
 horizontal_move_z: ${tap_mesh_horizontal_move_z}
-mesh_min: 66.66,62.5
-mesh_max: 190,275
+mesh_min: ${tap_mesh_min}
+mesh_max: ${tap_mesh_max}
 probe_count: ${tap_mesh_probe_count}
-mesh_pps: 0,0
+mesh_pps: ${tap_mesh_pps}
+algorithm: ${tap_mesh_algorithm}
+bicubic_tension: ${tap_mesh_tension}
+# Keep the mesh correction exactly zero at the physical absolute-Z datum.
+zero_reference_position: ${bed_z_reference_x},${bed_z_reference_y}
 # Keep absolute Tap contact coordinates in the live transform.  At G-code Z=0,
 # the active mesh must place the nozzle at the Tap-derived bed plane.
 ${tap_mesh_saved_profile}
@@ -491,7 +495,10 @@ position_min: ${t0_x_endstop}
 position_max: ${t0_x_position_max}
 homing_positive_dir: false
 homing_speed: 25
-second_homing_speed: 3
+# The ball calibration resolves tens of micrometres.  A 3 mm/s latch pass
+# produced 0.05-0.25 mm apparent X shifts across repeated homes, so use a
+# deliberately slow final switch approach; the fast first pass is unchanged.
+second_homing_speed: 1
 homing_retract_dist: 5
 
 # Secondary IDEX carriage: X-right. Homes to the right-mounted endstop.
@@ -512,7 +519,7 @@ position_min: ${t1_x_position_min}
 position_max: ${t1_x_endstop}
 homing_positive_dir: true
 homing_speed: 25
-second_homing_speed: 3
+second_homing_speed: 1
 homing_retract_dist: 5
 # This only controls Klipper simultaneous-carriage modes. Normal IDEX operation
 # parks the inactive carriage, so the parked-tool position limits above are the

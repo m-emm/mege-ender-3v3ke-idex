@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Run the guarded IDEX Z Iteration 1 physical/sensor calibration.
+"""Legacy low-level Eddy sensor characterization and diagnostic workflow.
+
+This is not the operator print-calibration path. Use
+``scripts/run_idex_calibration.sh`` or the independent automatic bed workflow
+documented in ``IDEX_CALIBRATION.md``. This module remains available when the
+Eddy frequency/height curve or electronics themselves must be recharacterized.
 
 The script deliberately keeps measured mesh data out of the repository.  Eddy
 drive current and its height/frequency table are the only measured values that
@@ -44,6 +49,9 @@ from urllib.parse import urlencode
 
 import yaml
 
+from calibration_data import CalibrationDataError, atomic_update as atomic_update_flat
+from generate_printer_cfg import load_calibration
+
 
 _logger = logging.getLogger(__name__)
 
@@ -51,6 +59,7 @@ _logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 CALIB_PATH = SCRIPT_DIR / "calib.yaml"
+CALIB_CONFIG_PATH = SCRIPT_DIR / "calib_config.yaml"
 TEMPLATE_PATH = SCRIPT_DIR / "printer.cfg.template"
 CONFIG_PATH = SCRIPT_DIR / "printer.cfg"
 GENERATOR_PATH = SCRIPT_DIR / "generate_printer_cfg.py"
@@ -466,9 +475,7 @@ def pending_sections(pending: Any, *, _root: bool = True) -> set[str]:
     return found
 
 
-def require_only_transient_mesh_pending(
-    pending: Any, *profiles: str
-) -> None:
+def require_only_transient_mesh_pending(pending: Any, *profiles: str) -> None:
     sections = pending_sections(pending)
     expected = {f"bed_mesh {profile}" for profile in profiles}
     unexpected = sections - expected
@@ -495,7 +502,9 @@ def _parse_configured_xy_pair(value: Any, *, option: str) -> tuple[float, float]
             f"configured bed_mesh {option} must contain numeric X,Y"
         ) from exc
     if not math.isfinite(x) or not math.isfinite(y):
-        raise CalibrationError(f"configured bed_mesh {option} contains a non-finite value")
+        raise CalibrationError(
+            f"configured bed_mesh {option} contains a non-finite value"
+        )
     return x, y
 
 
@@ -598,6 +607,47 @@ def _set_block_scalar_at_path(text: str, path: Sequence[str], value: str) -> str
 
 def atomic_update_calibration(path: Path, updates: Mapping[Sequence[str], Any]) -> None:
     """Update only known scalar/table fields while preserving comments."""
+
+    flat_key_by_legacy_path = {
+        ("tools", tool, f"{axis}_endstop"): f"{tool}_{axis}_endstop"
+        for tool in ("t0", "t1")
+        for axis in ("x", "y", "z")
+    }
+    flat_key_by_legacy_path.update(
+        {
+            (
+                "eddy_relative_calibration",
+                "klipper",
+                "reg_drive_current",
+            ): "eddy_reg_drive_current",
+            (
+                "eddy_relative_calibration",
+                "klipper",
+                "calibrate",
+            ): "eddy_height_calibration",
+            (
+                "eddy_relative_calibration",
+                "klipper",
+                "tap_threshold",
+            ): "eddy_tap_threshold",
+        }
+    )
+    parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if isinstance(parsed, Mapping) and "t0_x_endstop" in parsed:
+        translated = {}
+        for legacy_path, value in updates.items():
+            key = flat_key_by_legacy_path.get(tuple(legacy_path))
+            if key is None:
+                raise CalibrationError(
+                    "legacy Eddy workflow cannot update V2 field "
+                    + ".".join(legacy_path)
+                )
+            translated[key] = value
+        try:
+            atomic_update_flat(path, translated)
+        except CalibrationDataError as exc:
+            raise CalibrationError(str(exc)) from exc
+        return
 
     original = path.read_text(encoding="utf-8")
     parsed = yaml.safe_load(original)
@@ -747,17 +797,17 @@ class ArtifactStore:
 def _config_hashes() -> dict[str, str]:
     return {
         "calib.yaml": sha256_file(CALIB_PATH),
+        "calib_config.yaml": sha256_file(CALIB_CONFIG_PATH),
         "printer.cfg.template": sha256_file(TEMPLATE_PATH),
         "printer.cfg": sha256_file(CONFIG_PATH),
     }
 
 
 def _load_raw_calibration() -> dict[str, Any]:
-    value = yaml.safe_load(CALIB_PATH.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise CalibrationError("calib.yaml must contain a mapping")
-    reject_mesh_data_in_canonical(value)
-    return value
+    try:
+        return load_calibration(CALIB_PATH, CALIB_CONFIG_PATH)
+    except (OSError, ValueError) as exc:
+        raise CalibrationError(str(exc)) from exc
 
 
 def configured_tap_threshold(calibration: Mapping[str, Any]) -> int:
@@ -809,7 +859,11 @@ def configured_tap_mesh(calibration: Mapping[str, Any]) -> dict[str, Any]:
             raise TypeError
         if isinstance(samples, bool) or not isinstance(samples, int) or samples < 1:
             raise TypeError
-        if isinstance(settle_ms, bool) or not isinstance(settle_ms, int) or settle_ms < 0:
+        if (
+            isinstance(settle_ms, bool)
+            or not isinstance(settle_ms, int)
+            or settle_ms < 0
+        ):
             raise TypeError
         if isinstance(horizontal_move_z, bool):
             raise TypeError
@@ -1180,7 +1234,9 @@ class Iteration1Runner:
                     contact_x = float(last_probe_position[0])
                     contact_y = float(last_probe_position[1])
                     if not math.isfinite(contact_x) or not math.isfinite(contact_y):
-                        raise CalibrationError("tap status contains a non-finite XY position")
+                        raise CalibrationError(
+                            "tap status contains a non-finite XY position"
+                        )
                     _logger.info(
                         "tap %d: contact_z=%.6f post_retract_toolhead_z=%.6f "
                         "retract_delta=%.6f",
@@ -1387,9 +1443,7 @@ class Iteration1Runner:
             tap_center_z,
             contact_target_z=self.tap_contact_target_z,
         )
-        assert_relative_alignment(
-            t0_old, t1_old, t0_new, t1_new, tolerance=1e-9
-        )
+        assert_relative_alignment(t0_old, t1_old, t0_new, t1_new, tolerance=1e-9)
         if self.dry_run:
             self.checkpoint(
                 Phase.ENDSTOPS,
@@ -1867,7 +1921,9 @@ class Iteration1Runner:
             raise CalibrationError("Eddy calibration did not enter manual-probe mode")
         current_z = float(manual_probe["z_position"])
         if not math.isfinite(current_z):
-            raise CalibrationError("Eddy calibration manual-probe position is non-finite")
+            raise CalibrationError(
+                "Eddy calibration manual-probe position is non-finite"
+            )
         _logger.info(
             "I1.5 manual-probe mode active at z=%.6f; targeting physical contact "
             "z=%.6f (bed_to_nozzle_gap=%.6f)",
@@ -2067,9 +2123,7 @@ class Iteration1Runner:
                         "gap_residual": residual,
                         "corrected_commanded_tap_z": corrected_commanded_tap_z,
                         "corrected_commanded_tap_z_residual": corrected_commanded_tap_z_residual,
-                        "post_retract_toolhead_z": sample[
-                            "post_retract_toolhead_z"
-                        ],
+                        "post_retract_toolhead_z": sample["post_retract_toolhead_z"],
                         "attempts": attempts,
                     }
                 )
@@ -2098,10 +2152,10 @@ class Iteration1Runner:
             except Exception as exc:
                 record["passed"] = False
                 record["error"] = str(exc)
-                failures.append(
-                    f"({point.x:.3f}, {point.y:.3f}): {record['error']}"
+                failures.append(f"({point.x:.3f}, {point.y:.3f}): {record['error']}")
+                _logger.warning(
+                    "I1.6 active Tap mesh verification failed: %s", failures[-1]
                 )
-                _logger.warning("I1.6 active Tap mesh verification failed: %s", failures[-1])
             records.append(record)
         verification = {
             "profile": profile,
@@ -2179,8 +2233,7 @@ class Iteration1Runner:
         matrix = mesh.get("mesh_matrix") or mesh.get("probed_matrix")
         if mesh.get("profile_name") != tap_profile or not matrix:
             raise CalibrationError(
-                "native Tap mesh did not leave active profile "
-                f"{tap_profile}"
+                "native Tap mesh did not leave active profile " f"{tap_profile}"
             )
         tap_verification = self.verify_active_tap_mesh(status)
         tap_artifact = {
@@ -2451,13 +2504,21 @@ def _compact_run_summary(state: RunState) -> dict[str, Any]:
     mesh = evidence.get("mesh_tap")
     if isinstance(mesh, Mapping):
         verification = mesh.get("active_profile_verification")
-        points = verification.get("points", []) if isinstance(verification, Mapping) else []
+        points = (
+            verification.get("points", []) if isinstance(verification, Mapping) else []
+        )
         summary["mesh"] = {
             "profile": mesh.get("profile"),
             "point_count": len(points) if isinstance(points, list) else None,
-            "passed": verification.get("passed") if isinstance(verification, Mapping) else None,
+            "passed": (
+                verification.get("passed")
+                if isinstance(verification, Mapping)
+                else None
+            ),
             "failure_count": (
-                verification.get("failure_count") if isinstance(verification, Mapping) else None
+                verification.get("failure_count")
+                if isinstance(verification, Mapping)
+                else None
             ),
             "residual_failure_count": (
                 verification.get("residual_failure_count")

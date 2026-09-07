@@ -7,16 +7,24 @@ import argparse
 import datetime as dt
 import json
 import math
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-import yaml
-
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
+KLIPPER_CONFIG_DIR = REPO_ROOT / "klipper_setup/klipper_config"
+sys.path.insert(0, str(KLIPPER_CONFIG_DIR))
+
+from calibration_data import (  # noqa: E402
+    CalibrationDataError,
+    atomic_update,
+    endstops as measured_endstops,
+    load_measured,
+    sha256_file,
+)
+
+
 DEFAULT_CALIB_PATH = REPO_ROOT / "klipper_setup/klipper_config/calib.yaml"
 DEFAULT_GENERATOR_PATH = (
     REPO_ROOT / "klipper_setup/klipper_config/generate_printer_cfg.py"
@@ -212,13 +220,10 @@ def generated_config_fingerprint(path):
 
 
 def calibration_endstops(calibration):
-    return {
-        tool: {
-            key: finite(calibration["tools"][tool][key], "%s.%s" % (tool, key))
-            for key in ("x_endstop", "y_endstop", "z_endstop")
-        }
-        for tool in ("t0", "t1")
-    }
+    try:
+        return measured_endstops(calibration)
+    except CalibrationDataError as exc:
+        raise CalibrationError(str(exc)) from exc
 
 
 def endstops_match(left, right):
@@ -270,42 +275,16 @@ def suggested_endstops(source, t0_run, t1_run, target):
     return measured_t1_minus_t0, target_error, applied_delta, suggested
 
 
-def rewrite_endstops(calib_path, suggested):
-    lines = calib_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    in_tools = False
-    active_tool = None
-    replaced = {tool: {key: 0 for key in values} for tool, values in suggested.items()}
-    for index, line in enumerate(lines):
-        stripped = line.rstrip("\r\n")
-        if re.match(r"^tools:\s*$", stripped):
-            in_tools, active_tool = True, None
-            continue
-        if in_tools and re.match(r"^[^ ]", line) and line.strip():
-            in_tools, active_tool = False, None
-        tool_match = re.match(r"^  (t[01]):\s*$", stripped)
-        if in_tools and tool_match:
-            active_tool = tool_match.group(1)
-            continue
-        if active_tool and re.match(r"^  [^ ]", line) and line.strip():
-            active_tool = None
-        if not active_tool or active_tool not in suggested:
-            continue
-        for key, value in suggested[active_tool].items():
-            if re.match(r"^    %s:\s*" % re.escape(key), line):
-                newline = "\r\n" if line.endswith("\r\n") else "\n"
-                lines[index] = "    %s: %.3f%s" % (key, value, newline)
-                replaced[active_tool][key] += 1
-    if any(
-        count != 1
-        for tool_counts in replaced.values()
-        for count in tool_counts.values()
-    ):
-        raise CalibrationError(
-            "could not uniquely update tools endstops: %s" % replaced
-        )
-    temporary = calib_path.with_name(".%s.%d.tmp" % (calib_path.name, os.getpid()))
-    temporary.write_text("".join(lines), encoding="utf-8")
-    os.replace(temporary, calib_path)
+def rewrite_endstops(calib_path, suggested, expected_sha256):
+    updates = {
+        f"{tool}_{axis}_endstop": suggested[tool][f"{axis}_endstop"]
+        for tool in ("t0", "t1")
+        for axis in ("x", "y", "z")
+    }
+    try:
+        atomic_update(calib_path, updates, expected_sha256=expected_sha256)
+    except CalibrationDataError as exc:
+        raise CalibrationError(str(exc)) from exc
 
 
 def write_result(
@@ -355,7 +334,11 @@ def main(argv):
     args = build_parser().parse_args(argv)
     t0_run = load_run(args.t0_run, "T0")
     t1_run = load_run(args.t1_run, "T1")
-    calibration = yaml.safe_load(args.calib.read_text(encoding="utf-8"))
+    try:
+        calibration = load_measured(args.calib)
+    except CalibrationDataError as exc:
+        raise CalibrationError(str(exc)) from exc
+    calibration_sha256 = sha256_file(args.calib)
     source, target_center = verify_sources(t0_run, t1_run)
     (
         measured_t1_minus_t0,
@@ -393,7 +376,7 @@ def main(argv):
     if args.dry_run:
         return 0
     if not current_matches_target:
-        rewrite_endstops(args.calib, suggested)
+        rewrite_endstops(args.calib, suggested, calibration_sha256)
         subprocess.run([sys.executable, str(args.generator)], check=True)
     target_config_fingerprint = generated_config_fingerprint(
         args.generator.parent / "printer.cfg"

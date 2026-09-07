@@ -35,6 +35,7 @@ class CalibDAO:
         self,
         calib_path: Path | str | None = None,
         priors_path: Path | str | None = None,
+        vision_config_path: Path | str | None = None,
     ) -> None:
         self.calib_path = (
             Path(calib_path)
@@ -45,6 +46,11 @@ class CalibDAO:
             Path(priors_path)
             if priors_path
             else _default_path("VISION_CALIBRATION_PRIORS_FILE", "priors.yaml")
+        )
+        self.vision_config_path = (
+            Path(vision_config_path)
+            if vision_config_path
+            else _default_path("VISION_CONFIGURATION_FILE", "vision_config.yaml")
         )
 
     @staticmethod
@@ -94,23 +100,15 @@ class CalibDAO:
 
     def tool_datums(self) -> dict[str, dict[str, float]]:
         calib = self._load(self.calib_path, "synchronized calibration")
-        tools = calib.get("tools")
-        if not isinstance(tools, dict):
-            raise ValueError(f"{self.calib_path} does not contain tools calibration")
         result: dict[str, dict[str, float]] = {}
         for tool in ("t0", "t1"):
-            source = tools.get(tool)
-            if not isinstance(source, dict):
-                raise ValueError(f"{self.calib_path} lacks tools.{tool}")
             result[tool] = {}
             for axis in ("x", "y", "z"):
-                key = f"{axis}_endstop"
-                value = source.get(key)
+                key = f"{tool}_{axis}_endstop"
+                value = calib.get(key)
                 if not isinstance(value, (int, float)):
-                    raise ValueError(
-                        f"{self.calib_path} lacks numeric tools.{tool}.{key}"
-                    )
-                result[tool][key] = float(value)
+                    raise ValueError(f"{self.calib_path} lacks numeric {key}")
+                result[tool][f"{axis}_endstop"] = float(value)
         return result
 
     def calib_hash(self) -> str:
@@ -119,23 +117,26 @@ class CalibDAO:
     def priors_hash(self) -> str:
         return _sha256(self.priors_path)
 
+    def vision_config(self) -> dict[str, Any]:
+        """Return isolated legacy camera configuration, never printer datums."""
+        return self._load(self.vision_config_path, "vision configuration")
+
+    def vision_config_hash(self) -> str:
+        return _sha256(self.vision_config_path)
+
     def write_candidate(
         self, path: Path | str, new_datums: dict[str, dict[str, float]]
     ) -> str:
         candidate = self._load(self.calib_path, "synchronized calibration")
-        tools = candidate.get("tools")
-        if not isinstance(tools, dict):
-            raise ValueError(f"{self.calib_path} does not contain tools calibration")
         for tool in ("t0", "t1"):
-            target = tools.get(tool)
             source = new_datums.get(tool)
-            if not isinstance(target, dict) or not isinstance(source, dict):
+            if not isinstance(source, dict):
                 raise ValueError(f"candidate requires {tool} calibration")
             for axis in ("x", "y", "z"):
                 value = source.get(axis)
                 if not isinstance(value, (int, float)):
                     raise ValueError(f"candidate requires numeric {tool}.{axis}")
-                target[f"{axis}_endstop"] = float(value)
+                candidate[f"{tool}_{axis}_endstop"] = float(value)
         destination = Path(path)
         destination.write_text(
             yaml.safe_dump(candidate, sort_keys=False), encoding="utf-8"

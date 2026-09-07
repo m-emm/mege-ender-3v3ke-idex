@@ -441,6 +441,7 @@ require_file "${FILES_DIR}/vision_red_marker_x_sweep.py"
 require_file "${FILES_DIR}/vision_rough_x_verification.py"
 require_file "${FILES_DIR}/vision_job_types.json"
 require_file "${FILES_DIR}/calib.yaml"
+require_file "${FILES_DIR}/vision_config.yaml"
 require_file "${FILES_DIR}/priors.yaml"
 require_file "${FILES_DIR}/webcam_health_probe.py"
 require_file "${FILES_DIR}/nozzle_cam_profiles.json"
@@ -476,6 +477,7 @@ install -d -m 0755 /usr/local/share/vision
 install -m 0644 "${FILES_DIR}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 install -m 0644 "${FILES_DIR}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
 install -m 0644 "${FILES_DIR}/calib.yaml" /usr/local/share/vision/calib.yaml
+install -m 0644 "${FILES_DIR}/vision_config.yaml" /usr/local/share/vision/vision_config.yaml
 install -m 0644 "${FILES_DIR}/priors.yaml" /usr/local/share/vision/priors.yaml
 install -m 0644 "${FILES_DIR}/eddy_sift_body_template.png" /usr/local/share/vision/eddy_sift_body_template.png
 setfacl -m u:www-data:--x "${USER_HOME}"

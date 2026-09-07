@@ -3,22 +3,23 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Multi-head-zero calibration</title>
+    <title>IDEX calibration</title>
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <main>
       <header>
         <div>
-          <h1>Multi-head-zero calibration</h1>
+          <h1>IDEX calibration</h1>
           <p id="headline">Loading latest calibration status…</p>
         </div>
         <time id="updated"></time>
       </header>
+      <section id="readiness" class="readiness calibrating">CALIBRATION STATE UNKNOWN</section>
       <section id="events" class="events" aria-label="Latest calibration events"></section>
       <section id="calibration-chapter" class="chapter" aria-labelledby="calibration-heading" hidden>
         <div class="chapter-heading">
-          <div><span>Chapter 1</span><h2 id="calibration-heading">26-contact calibration</h2></div>
+          <div><span>Chapter 1A</span><h2 id="calibration-heading">Ball alignment · 26 contacts per tool</h2></div>
           <strong id="calibration-state"></strong>
         </div>
         <section id="calibration-tools" class="tools" aria-label="Tool calibration measurements"></section>
@@ -26,11 +27,19 @@
       </section>
       <section id="verification-chapter" class="chapter" aria-labelledby="verification-heading" hidden>
         <div class="chapter-heading">
-          <div><span>Chapter 2</span><h2 id="verification-heading">Nine-contact verification</h2></div>
+          <div><span>Chapter 1B</span><h2 id="verification-heading">Fixed-target verification · nine contacts per tool</h2></div>
           <strong id="verification-state"></strong>
         </div>
         <section id="verification-tools" class="tools" aria-label="Tool verification measurements"></section>
         <section id="verification-outcome" class="outcome" aria-label="Verification outcome"></section>
+      </section>
+      <section id="bed-chapter" class="chapter" aria-labelledby="bed-heading" hidden>
+        <div class="chapter-heading">
+          <div><span>Chapter 2</span><h2 id="bed-heading">Eddy Tap bed reference and surface</h2></div>
+          <strong id="bed-state"></strong>
+        </div>
+        <section id="bed-reference" class="outcome" aria-label="Bed reference measurements"></section>
+        <section id="bed-mesh" class="bed-mesh" aria-label="Bed mesh measurement"></section>
       </section>
       <div id="empty" class="empty" hidden>No calibration run has been published yet.</div>
       <p class="hint">This page refreshes every second. Immutable run artifacts remain in the calibration run directory.</p>

@@ -28,8 +28,8 @@ def create_creality_endstop_holder_assembly(
 
     board = copy.deepcopy(creality_endstop_board_assembly)
 
-    pcb = board.get_named_follower("base")
-    plug = board.get_named_follower("plug")
+    pcb = board.get_named_non_production_part("base")
+    plug = board.get_named_non_production_part("plug")
     pcb_size = get_bounding_box_size(pcb)
 
     holder = create_box(
@@ -129,6 +129,8 @@ def create_creality_endstop_holder_assembly(
     assembly.add_named_follower(holder, "holder")
     for name, non_production_part in board.get_named_non_production_part_items():
         assembly.add_named_non_production_part(non_production_part, name)
+
+    assembly.set_hidden_by_default("board")
 
     assembly.add_named_cutter(pcb_cutter, "pcb_cutter")
     transform = coordinate_system_transformation_function(

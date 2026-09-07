@@ -11,6 +11,15 @@ Builder:
       - source: self
         artifact: non_production_parts
         name_template: "{name}"
+
+      - source: injected
+        assembly: z_axis_profile
+        artifact: all
+      - source: injected
+        assembly: z_axis_rail
+        artifact: leader
+        name_template: "{assembly_name}_{name}"
+
   Production:
     process_data_preset: petgcf_max_strength_high_speed_06
     process_data:
@@ -25,8 +34,8 @@ Builder:
       - source: self
         artifact: leader
         name: top_mount
-        prod_rotation_angle: 90
-        prod_rotation_axis: [0, 1, 0]
+        # prod_rotation_angle: 90
+        # prod_rotation_axis: [0, 1, 0]
 
 Parameters:
   z_axis_endstop_cable_hole_size:

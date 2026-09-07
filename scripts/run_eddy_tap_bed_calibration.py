@@ -1,0 +1,894 @@
+#!/usr/bin/env python3
+"""Automatically establish T0 bed Z=0 and persist the canonical Tap mesh."""
+
+from __future__ import annotations
+
+import base64
+import concurrent.futures
+import csv
+import datetime as dt
+import hashlib
+import json
+import math
+import os
+import re
+import shlex
+import shutil
+import statistics
+import subprocess
+import sys
+import time
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+import matplotlib
+import yaml
+
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_DIR = REPO_ROOT / "klipper_setup/klipper_config"
+sys.path.insert(0, str(CONFIG_DIR))
+
+from calibration_data import (  # noqa: E402
+    CalibrationDataError,
+    atomic_update,
+    endstops,
+    load_measured,
+    sha256_file,
+)
+from generate_printer_cfg import (  # noqa: E402
+    active_config_fingerprint,
+    compute_config_fingerprint,
+    load_calibration,
+)
+
+
+CALIB_PATH = CONFIG_DIR / "calib.yaml"
+CALIB_CONFIG_PATH = CONFIG_DIR / "calib_config.yaml"
+TEMPLATE_PATH = CONFIG_DIR / "printer.cfg.template"
+PRINTER_CFG_PATH = CONFIG_DIR / "printer.cfg"
+GENERATOR_PATH = CONFIG_DIR / "generate_printer_cfg.py"
+DEPLOY_PATH = CONFIG_DIR / "update_menderpi.sh"
+DEFAULT_MOONRAKER_URL = "http://menderpi.local:7125"
+DEFAULT_REMOTE_HOST = "pi@menderpi.local"
+REMOTE_DASHBOARD_ROOT = "/home/pi/printer_data/calibration"
+REFERENCE_TAP_COUNT = 3
+REFERENCE_MAX_SPAN_MM = 0.030
+REFERENCE_ZERO_TOLERANCE_MM = 0.030
+COMMON_Z_MAX_ADJUSTMENT_MM = 2.0
+MESH_AWARE_TOLERANCE_MM = 0.040
+
+
+class CalibrationError(RuntimeError):
+    pass
+
+
+def utc_now() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def atomic_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    os.replace(temporary, path)
+
+
+class Moonraker:
+    def __init__(self, base_url: str = DEFAULT_MOONRAKER_URL) -> None:
+        self.base_url = base_url.rstrip("/")
+
+    def request(
+        self,
+        path: str,
+        *,
+        data: dict[str, Any] | None = None,
+        timeout: float = 30.0,
+    ) -> dict[str, Any]:
+        body = None
+        headers = {}
+        if data is not None:
+            body = urllib.parse.urlencode(data).encode("utf-8")
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+        request = urllib.request.Request(
+            self.base_url + path,
+            data=body,
+            headers=headers,
+            method="POST" if body is not None else "GET",
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.load(response)
+        result = payload.get("result", payload)
+        if not isinstance(result, dict):
+            raise CalibrationError(f"unexpected Moonraker response for {path}")
+        return result
+
+    def status(self, *objects: str) -> dict[str, Any]:
+        query = "&".join(objects)
+        return self.request(f"/printer/objects/query?{query}").get("status", {})
+
+    def gcode(self, script: str, *, timeout: float = 60.0) -> None:
+        self.request("/printer/gcode/script", data={"script": script}, timeout=timeout)
+
+    def gcode_store(self, count: int = 300) -> list[dict[str, Any]]:
+        result = self.request(f"/server/gcode_store?count={count}")
+        store = result.get("gcode_store", [])
+        return store if isinstance(store, list) else []
+
+
+class DashboardPublisher:
+    def __init__(self, batch_id: str, remote_host: str) -> None:
+        self.batch_id = batch_id
+        self.remote_host = remote_host
+        self.bed: dict[str, Any] = {
+            "status": "preparing",
+            "stage": "preflight",
+            "reference": {},
+            "mesh": {},
+        }
+        self.events: list[dict[str, str]] = []
+        self.publish()
+
+    def event(self, message: str, *, status: str | None = None) -> None:
+        self.events = (self.events + [{"at": utc_now(), "message": message}])[-24:]
+        if status is not None:
+            self.bed["status"] = status
+        self.publish()
+
+    def publish(self) -> None:
+        patch = {
+            "schema_version": 3,
+            "kind": "idex_calibration_dashboard",
+            "batch_id": self.batch_id,
+            "status": self.bed.get("status", "running"),
+            "stage": f"bed_calibration.{self.bed.get('stage', 'unknown')}",
+            "updated_at": utc_now(),
+            "events": self.events,
+            "bed_calibration": self.bed,
+        }
+        encoded = base64.b64encode(json.dumps(patch).encode("utf-8")).decode("ascii")
+        script = r"""
+import base64, json, os
+from pathlib import Path
+root = Path(os.environ["DASHBOARD_ROOT"])
+root.joinpath("data").mkdir(parents=True, exist_ok=True)
+root.joinpath("artifacts").mkdir(parents=True, exist_ok=True)
+path = root / "data/current.json"
+try:
+    state = json.loads(path.read_text(encoding="utf-8"))
+except (OSError, ValueError):
+    state = {}
+patch = json.loads(base64.b64decode(os.environ["PATCH_B64"]))
+state["schema_version"] = 3
+state["kind"] = "idex_calibration_dashboard"
+state["batch_id"] = patch["batch_id"]
+state["status"] = patch["status"]
+state["stage"] = patch["stage"]
+state["updated_at"] = patch["updated_at"]
+events = state.get("events", [])
+known = {(item.get("at"), item.get("message")) for item in events}
+for item in patch.get("events", []):
+    marker = (item.get("at"), item.get("message"))
+    if marker not in known:
+        events.append(item)
+        known.add(marker)
+state["events"] = events[-24:]
+chapters = state.setdefault("chapters", {})
+chapters["bed_calibration"] = patch["bed_calibration"]
+state.setdefault("readiness", {"printable": False, "checks": [], "reasons": []})
+tmp = path.with_name("." + path.name + ".tmp")
+tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+tmp.replace(path)
+"""
+        subprocess.run(
+            [
+                "ssh",
+                self.remote_host,
+                f"DASHBOARD_ROOT='{REMOTE_DASHBOARD_ROOT}' PATCH_B64='{encoded}' python3 -",
+            ],
+            input=script,
+            text=True,
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+
+    def upload(self, source: Path, name: str) -> str:
+        relative = f"artifacts/{self.batch_id}_{name}"
+        subprocess.run(
+            [
+                "scp",
+                "-q",
+                str(source),
+                f"{self.remote_host}:{REMOTE_DASHBOARD_ROOT}/{relative}",
+            ],
+            check=True,
+            timeout=60,
+        )
+        return relative
+
+    def upload_run_evidence(self, source: Path) -> None:
+        remote = f"{REMOTE_DASHBOARD_ROOT}/runs/{self.batch_id}/bed_calibration"
+        producer = subprocess.Popen(
+            ["tar", "-C", str(source), "-cf", "-", "."],
+            stdout=subprocess.PIPE,
+        )
+        assert producer.stdout is not None
+        consumer = subprocess.run(
+            [
+                "ssh",
+                self.remote_host,
+                f"mkdir -p {shlex.quote(remote)} && "
+                f"tar -xf - -C {shlex.quote(remote)}",
+            ],
+            stdin=producer.stdout,
+            check=False,
+            timeout=120,
+        )
+        producer.stdout.close()
+        producer_status = producer.wait(timeout=30)
+        if producer_status or consumer.returncode:
+            raise CalibrationError("failed to upload immutable Eddy run evidence")
+
+
+def console(client: Moonraker, message: str) -> None:
+    safe = message.replace('"', "'")
+    client.gcode(f'RESPOND TYPE=echo MSG="IDEX calibration: {safe}"')
+    print(f"IDEX calibration: {message}", flush=True)
+
+
+def config_fingerprint(status: dict[str, Any]) -> str:
+    value = active_config_fingerprint(status)
+    if not value:
+        raise CalibrationError("live Klipper configuration fingerprint is missing")
+    return value
+
+
+def require_ready(client: Moonraker) -> dict[str, Any]:
+    status = client.status(
+        "webhooks",
+        "print_stats",
+        "toolhead",
+        "configfile",
+        "gcode_move",
+        "bed_mesh",
+        "idex_manual_tuning",
+        "multi_head_zero_probe",
+    )
+    if status.get("webhooks", {}).get("state") != "ready":
+        raise CalibrationError("Klipper is not ready")
+    if status.get("print_stats", {}).get("state") not in {"standby", "complete"}:
+        raise CalibrationError("printer is not idle")
+    return status
+
+
+def prepare_t0(client: Moonraker) -> bool:
+    status = require_ready(client)
+    homed = status.get("toolhead", {}).get("homed_axes", "")
+    needed = not all(axis in homed for axis in "xyz")
+    preparation_commands = [
+        "M140 S0",
+        "M104 T0 S0",
+        "M104 T1 S0",
+        "BED_MESH_CLEAR",
+        "SET_GCODE_OFFSET X=0 Y=0 Z=0 MOVE=0",
+    ]
+    if needed:
+        client.gcode("\n".join((*preparation_commands, "G28", "M400")), timeout=180)
+        client.gcode("QUERY_MULTI_HEAD_ZERO")
+        post_home_status = require_ready(client)
+        post_home_switch = post_home_status.get("multi_head_zero_probe", {}).get(
+            "state"
+        )
+        if post_home_switch != "RELEASED":
+            message = (
+                "FAULT immediately after G28: multi-head-zero must be RELEASED "
+                "with the axes at home, observed "
+                f"{post_home_switch or 'unknown'}; aborting before bed-calibration motion"
+            )
+            console(client, message)
+            raise CalibrationError(message)
+        console(client, "post-home multi-head-zero safety check passed: RELEASED")
+        client.gcode("T0\nM400", timeout=180)
+    else:
+        client.gcode("\n".join((*preparation_commands, "T0", "M400")), timeout=180)
+    status = require_ready(client)
+    if status.get("idex_manual_tuning", {}).get("active_tool") != 0:
+        raise CalibrationError("T0 is not physically active after preparation")
+    if (
+        abs(float(status.get("idex_manual_tuning", {}).get("manual_z_adjust", 0)))
+        > 1e-9
+    ):
+        raise CalibrationError("manual Z adjustment is not zero")
+    mesh = status.get("bed_mesh", {})
+    if mesh.get("profile_name") or any(mesh.get("mesh_matrix", [])):
+        raise CalibrationError("bed mesh remained active after BED_MESH_CLEAR")
+    return needed
+
+
+def reference_sample(
+    client: Moonraker,
+    *,
+    x: float,
+    y: float,
+    index: int,
+    phase: str,
+) -> dict[str, Any]:
+    client.gcode(
+        f"EDDY_TAP_MEASURE X={x:.3f} Y={y:.3f} COUNT=1 EDDY_MODE=none",
+        timeout=90,
+    )
+    status = client.status(
+        "eddy_tap_measure",
+        "gcode_move",
+        "toolhead",
+        "bed_mesh",
+        "idex_manual_tuning",
+        "temperature_probe btt_eddy",
+        "configfile",
+    )
+    measurement = status.get("eddy_tap_measure", {}).get("last_tap_measurement")
+    if not isinstance(measurement, dict):
+        raise CalibrationError("EDDY_TAP_MEASURE did not publish a measurement")
+    samples = measurement.get("tap", {}).get("samples")
+    if not isinstance(samples, list) or len(samples) != 1:
+        raise CalibrationError("EDDY_TAP_MEASURE did not publish exactly one tap")
+    sample = samples[0]
+    if abs(float(sample["x"]) - x) > 0.020 or abs(float(sample["y"]) - y) > 0.020:
+        raise CalibrationError("Eddy Tap contact occurred at the wrong XY coordinate")
+    if measurement.get("mesh", {}).get("active_transform_z") is not None:
+        raise CalibrationError("reference Tap unexpectedly used an active mesh")
+    tuning = status.get("idex_manual_tuning", {})
+    if (
+        tuning.get("active_tool") != 0
+        or abs(float(tuning.get("manual_z_adjust", 0))) > 1e-9
+    ):
+        raise CalibrationError("reference Tap did not use clean T0 state")
+    return {
+        "index": index,
+        "phase": phase,
+        "x": float(sample["x"]),
+        "y": float(sample["y"]),
+        "z": float(sample["z"]),
+        "temperature_c": status.get("temperature_probe btt_eddy", {}).get(
+            "temperature"
+        ),
+        "gcode_origin": status.get("gcode_move", {}).get("homing_origin"),
+        "machine_position": status.get("toolhead", {}).get("position"),
+        "config_fingerprint": config_fingerprint(status),
+    }
+
+
+def summarize(samples: list[dict[str, Any]]) -> dict[str, float]:
+    values = [float(sample["z"]) for sample in samples]
+    return {
+        "count": len(values),
+        "mean": statistics.fmean(values),
+        "median": statistics.median(values),
+        "minimum": min(values),
+        "maximum": max(values),
+        "span": max(values) - min(values),
+        "standard_deviation": statistics.pstdev(values),
+    }
+
+
+def collect_reference(
+    client: Moonraker,
+    dashboard: DashboardPublisher,
+    *,
+    x: float,
+    y: float,
+    phase: str,
+) -> dict[str, Any]:
+    samples = []
+    for index in range(REFERENCE_TAP_COUNT):
+        sample = reference_sample(client, x=x, y=y, index=index + 1, phase=phase)
+        samples.append(sample)
+        summary = summarize(samples)
+        dashboard.bed["stage"] = phase
+        dashboard.bed["reference"][phase] = {
+            "target": {"x": x, "y": y, "z": 0.0},
+            "progress": {"completed": len(samples), "total": REFERENCE_TAP_COUNT},
+            "samples": samples,
+            "summary": summary,
+        }
+        message = (
+            f"Eddy reference {phase} tap {index + 1}/{REFERENCE_TAP_COUNT}: "
+            f"Z={sample['z']:.6f} mm"
+        )
+        dashboard.event(message, status="running")
+        console(client, message)
+    summary = summarize(samples)
+    if summary["span"] > REFERENCE_MAX_SPAN_MM:
+        raise CalibrationError(
+            f"reference Tap span {summary['span']:.6f} exceeds "
+            f"{REFERENCE_MAX_SPAN_MM:.3f} mm"
+        )
+    return {
+        "target": {"x": x, "y": y, "z": 0.0},
+        "samples": samples,
+        "summary": summary,
+    }
+
+
+def _write_bytes_atomic(path: Path, content: bytes) -> None:
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.rollback")
+    temporary.write_bytes(content)
+    os.replace(temporary, path)
+
+
+def generated_fingerprint() -> str:
+    return compute_config_fingerprint(CALIB_PATH, TEMPLATE_PATH, CALIB_CONFIG_PATH)
+
+
+def deploy_candidate(
+    updates: dict[str, Any],
+    *,
+    expected_calib_sha256: str,
+    run_dir: Path,
+    label: str,
+) -> str:
+    prior_calib = CALIB_PATH.read_bytes()
+    prior_printer = PRINTER_CFG_PATH.read_bytes()
+    (run_dir / f"calib.yaml.before-{label}").write_bytes(prior_calib)
+    (run_dir / f"printer.cfg.before-{label}").write_bytes(prior_printer)
+    try:
+        atomic_update(CALIB_PATH, updates, expected_sha256=expected_calib_sha256)
+        subprocess.run([sys.executable, str(GENERATOR_PATH)], check=True)
+        subprocess.run([str(DEPLOY_PATH)], check=True)
+        subprocess.run([str(DEPLOY_PATH), "--check"], check=True)
+    except BaseException:
+        _write_bytes_atomic(CALIB_PATH, prior_calib)
+        _write_bytes_atomic(PRINTER_CFG_PATH, prior_printer)
+        try:
+            subprocess.run([str(DEPLOY_PATH)], check=True)
+            subprocess.run([str(DEPLOY_PATH), "--check"], check=True)
+        except BaseException as rollback_error:
+            raise CalibrationError(
+                f"{label} deployment failed and automatic rollback failed: "
+                f"{rollback_error}"
+            ) from rollback_error
+        raise
+    (run_dir / f"calib.yaml.after-{label}").write_bytes(CALIB_PATH.read_bytes())
+    (run_dir / f"printer.cfg.after-{label}").write_bytes(PRINTER_CFG_PATH.read_bytes())
+    return generated_fingerprint()
+
+
+def rollback_deployment(run_dir: Path, label: str) -> None:
+    """Restore and deploy the exact source snapshot for a rejected candidate."""
+    _write_bytes_atomic(
+        CALIB_PATH, (run_dir / f"calib.yaml.before-{label}").read_bytes()
+    )
+    _write_bytes_atomic(
+        PRINTER_CFG_PATH, (run_dir / f"printer.cfg.before-{label}").read_bytes()
+    )
+    subprocess.run([str(DEPLOY_PATH)], check=True)
+    subprocess.run([str(DEPLOY_PATH), "--check"], check=True)
+
+
+def matrix_hash(points: list[list[float]]) -> str:
+    canonical = json.dumps(points, separators=(",", ":"), sort_keys=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def mesh_plot(points: list[list[float]], path: Path) -> None:
+    figure, (surface_axis, heat_axis) = plt.subplots(
+        1,
+        2,
+        figsize=(13, 5.5),
+        subplot_kw={"projection": "3d"},
+    )
+    # Replace the second 3D axis with a conventional heatmap axis.
+    figure.delaxes(heat_axis)
+    heat_axis = figure.add_subplot(1, 2, 2)
+    fixed = yaml.safe_load(CALIB_CONFIG_PATH.read_text(encoding="utf-8"))
+    x_min, x_max = float(fixed["bed_mesh_min_x_mm"]), float(fixed["bed_mesh_max_x_mm"])
+    y_min, y_max = float(fixed["bed_mesh_min_y_mm"]), float(fixed["bed_mesh_max_y_mm"])
+    import numpy as np
+
+    x_values = np.linspace(x_min, x_max, len(points[0]))
+    y_values = np.linspace(y_min, y_max, len(points))
+    xx, yy = np.meshgrid(x_values, y_values)
+    zz = np.asarray(points)
+    surface_axis.plot_surface(xx, yy, zz, cmap="coolwarm", edgecolor="#334155")
+    surface_axis.set_title("Persistent Eddy-Tap bed mesh")
+    surface_axis.set_xlabel("X (mm)")
+    surface_axis.set_ylabel("Y (mm)")
+    surface_axis.set_zlabel("Z deviation (mm)")
+    image = heat_axis.imshow(
+        zz,
+        origin="lower",
+        extent=(x_min, x_max, y_min, y_max),
+        aspect="auto",
+        cmap="coolwarm",
+        vmin=-max(abs(float(zz.min())), abs(float(zz.max()))),
+        vmax=max(abs(float(zz.min())), abs(float(zz.max()))),
+    )
+    heat_axis.contour(xx, yy, zz, levels=[0.0], colors="black", linewidths=1.5)
+    heat_axis.scatter(
+        [150.0], [150.0], marker="*", s=100, color="gold", edgecolor="black"
+    )
+    heat_axis.set_title("Zero-referenced at X=150, Y=150")
+    heat_axis.set_xlabel("X (mm)")
+    heat_axis.set_ylabel("Y (mm)")
+    figure.colorbar(image, ax=heat_axis, label="Z deviation (mm)")
+    figure.tight_layout()
+    figure.savefig(path, dpi=160)
+    plt.close(figure)
+
+
+def run_mesh(
+    client: Moonraker,
+    dashboard: DashboardPublisher,
+    *,
+    fixed: dict[str, Any],
+) -> dict[str, Any]:
+    total = int(fixed["bed_mesh_x_count"]) * int(fixed["bed_mesh_y_count"])
+    dashboard.bed["stage"] = "mesh_acquisition"
+    dashboard.bed["mesh"] = {
+        "status": "running",
+        "progress": {"completed": 0, "total": total},
+    }
+    dashboard.event("Eddy Tap mesh acquisition started", status="running")
+    console(client, f"mesh acquisition started: 0/{total} points")
+    previous = {
+        (entry.get("time"), entry.get("type"), entry.get("message"))
+        for entry in client.gcode_store()
+    }
+    command = (
+        f"BED_MESH_CALIBRATE SAMPLES={int(fixed['bed_mesh_samples'])} "
+        f"SETTLE_MS={int(fixed['bed_mesh_settle_ms'])}"
+    )
+    pattern = re.compile(
+        r"IDEX calibration mesh point (\d+)/(\d+): probing X=([-0-9.]+) Y=([-0-9.]+)"
+    )
+    seen: set[tuple[Any, Any, Any]] = set(previous)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(client.gcode, command, timeout=1200)
+        while not future.done():
+            for entry in client.gcode_store():
+                marker = (entry.get("time"), entry.get("type"), entry.get("message"))
+                if marker in seen:
+                    continue
+                seen.add(marker)
+                match = pattern.search(str(entry.get("message", "")))
+                if not match:
+                    continue
+                index = int(match.group(1))
+                dashboard.bed["mesh"]["progress"] = {
+                    "completed": max(0, index - 1),
+                    "current": index,
+                    "total": int(match.group(2)),
+                }
+                dashboard.bed["mesh"]["latest_point"] = {
+                    "x": float(match.group(3)),
+                    "y": float(match.group(4)),
+                }
+                dashboard.publish()
+            time.sleep(0.75)
+        future.result()
+
+    status = client.status("bed_mesh", "configfile", "save_config_pending_items")
+    mesh = status.get("bed_mesh", {})
+    profile = str(fixed["bed_mesh_profile"])
+    if mesh.get("profile_name") != profile:
+        raise CalibrationError(f"new mesh did not activate profile {profile}")
+    matrix = mesh.get("probed_matrix") or mesh.get("mesh_matrix")
+    if not isinstance(matrix, list) or len(matrix) != int(fixed["bed_mesh_y_count"]):
+        raise CalibrationError("new mesh has the wrong Y dimension")
+    points = [[float(value) for value in row] for row in matrix]
+    if any(len(row) != int(fixed["bed_mesh_x_count"]) for row in points):
+        raise CalibrationError("new mesh has the wrong X dimension")
+    if any(not math.isfinite(value) for row in points for value in row):
+        raise CalibrationError("new mesh contains non-finite values")
+    config_bed_mesh = (
+        status.get("configfile", {}).get("settings", {}).get("bed_mesh", {})
+    )
+    zero_reference = config_bed_mesh.get("zero_reference_position")
+    if [round(float(value), 6) for value in zero_reference or []] != [150.0, 150.0]:
+        raise CalibrationError("active mesh is not zero-referenced at X=150 Y=150")
+    flat = [value for row in points for value in row]
+    result = {
+        "status": "completed",
+        "profile": profile,
+        "points": points,
+        "point_count": len(flat),
+        "minimum": min(flat),
+        "maximum": max(flat),
+        "range": max(flat) - min(flat),
+        "mean": statistics.fmean(flat),
+        "matrix_sha256": matrix_hash(points),
+        "zero_reference_position": [150.0, 150.0],
+    }
+    dashboard.bed["mesh"].update(result)
+    dashboard.bed["mesh"]["progress"] = {"completed": total, "total": total}
+    dashboard.publish()
+    return result
+
+
+def verify_persistent_mesh(
+    client: Moonraker,
+    *,
+    expected: list[list[float]],
+    profile: str,
+    fixed: dict[str, Any],
+) -> dict[str, Any]:
+    prepare_t0(client)
+    client.gcode(f"BED_MESH_PROFILE LOAD={profile}\nM400")
+    status = client.status("bed_mesh", "configfile", "gcode_move", "idex_manual_tuning")
+    mesh = status.get("bed_mesh", {})
+    points = mesh.get("profiles", {}).get(profile, {}).get("points")
+    points = [[float(value) for value in row] for row in points or []]
+    if points != expected:
+        raise CalibrationError("deployed persistent mesh differs from accepted matrix")
+    if mesh.get("profile_name") != profile:
+        raise CalibrationError("persistent default mesh is not active")
+    return {
+        "status": "passed",
+        "profile": profile,
+        "matrix_sha256": matrix_hash(points),
+        "active": True,
+        "manual_z_adjust": status.get("idex_manual_tuning", {}).get("manual_z_adjust"),
+    }
+
+
+def verify_active_mesh_contacts(
+    client: Moonraker, fixed: dict[str, Any]
+) -> dict[str, Any]:
+    x_min = float(fixed["bed_mesh_min_x_mm"])
+    x_max = float(fixed["bed_mesh_max_x_mm"])
+    y_min = float(fixed["bed_mesh_min_y_mm"])
+    y_max = float(fixed["bed_mesh_max_y_mm"])
+    reference_x = float(fixed["eddy_bed_reference_x_mm"])
+    reference_y = float(fixed["eddy_bed_reference_y_mm"])
+    verification_points = (
+        (reference_x, reference_y),
+        (x_min, y_min),
+        (x_max, y_min),
+        (x_min, y_max),
+        (x_max, y_max),
+    )
+    residuals = []
+    for x, y in verification_points:
+        client.gcode(
+            f"EDDY_TAP_MEASURE X={x:.3f} Y={y:.3f} COUNT=1 EDDY_MODE=none",
+            timeout=90,
+        )
+        measurement = (
+            client.status("eddy_tap_measure")
+            .get("eddy_tap_measure", {})
+            .get("last_tap_measurement")
+        )
+        if not isinstance(measurement, dict):
+            raise CalibrationError("mesh-aware Tap did not publish a measurement")
+        residual = measurement.get("mesh", {}).get("commanded_z_for_tap_median")
+        if residual is None:
+            raise CalibrationError("mesh-aware Tap did not use the active mesh")
+        residual = float(residual)
+        residuals.append({"x": x, "y": y, "logical_contact_z": residual})
+        if abs(residual) > MESH_AWARE_TOLERANCE_MM:
+            raise CalibrationError(
+                f"mesh-aware contact at X={x:.3f} Y={y:.3f} is "
+                f"Z={residual:+.6f}, outside {MESH_AWARE_TOLERANCE_MM:.3f} mm"
+            )
+    return {
+        "status": "passed",
+        "physical_checks": residuals,
+        "physical_check_tolerance_mm": MESH_AWARE_TOLERANCE_MM,
+    }
+
+
+def main(argv: list[str]) -> int:
+    if argv:
+        raise CalibrationError(
+            "this prescribed workflow accepts no command-line options"
+        )
+    batch_id = os.environ.get("IDEX_CALIBRATION_BATCH_ID") or dt.datetime.now(
+        dt.timezone.utc
+    ).strftime("%Y%m%dT%H%M%SZ")
+    run_dir = Path(
+        os.environ.get(
+            "IDEX_BED_CALIBRATION_RUN_DIR",
+            REPO_ROOT / "runs/idex_calibration" / batch_id / "bed_calibration",
+        )
+    )
+    run_dir.mkdir(parents=True, exist_ok=False)
+    remote_host = os.environ.get("MENDERPI_HOST", DEFAULT_REMOTE_HOST)
+    client = Moonraker(os.environ.get("MOONRAKER_URL", DEFAULT_MOONRAKER_URL))
+    dashboard = DashboardPublisher(batch_id, remote_host)
+    measured = load_measured(CALIB_PATH)
+    fixed = yaml.safe_load(CALIB_CONFIG_PATH.read_text(encoding="utf-8"))
+    source_sha = sha256_file(CALIB_PATH)
+    source_fingerprint = generated_fingerprint()
+    shutil.copy2(CALIB_PATH, run_dir / "calib.yaml.source")
+    shutil.copy2(CALIB_CONFIG_PATH, run_dir / "calib_config.yaml.source")
+    shutil.copy2(PRINTER_CFG_PATH, run_dir / "printer.cfg.source")
+    manifest: dict[str, Any] = {
+        "schema_version": 1,
+        "workflow": "idex_eddy_tap_bed_calibration_v2",
+        "batch_id": batch_id,
+        "started_at": utc_now(),
+        "status": "running",
+        "source_calib_sha256": source_sha,
+        "source_config_fingerprint": source_fingerprint,
+        "source_endstops": endstops(measured),
+        "reference": {
+            "x": float(fixed["eddy_bed_reference_x_mm"]),
+            "y": float(fixed["eddy_bed_reference_y_mm"]),
+            "z": 0.0,
+        },
+    }
+    atomic_json(run_dir / "manifest.json", manifest)
+    try:
+        live = require_ready(client)
+        if config_fingerprint(live) != source_fingerprint:
+            raise CalibrationError(
+                "live configuration does not match local calibration source"
+            )
+        homed = prepare_t0(client)
+        dashboard.bed["homing_required"] = homed
+        dashboard.event("Eddy bed calibration preflight passed", status="running")
+        console(client, f"Eddy bed calibration started; homing_required={homed}")
+
+        x, y = manifest["reference"]["x"], manifest["reference"]["y"]
+        before = collect_reference(client, dashboard, x=x, y=y, phase="before_rebase")
+        atomic_json(run_dir / "reference_before.json", before)
+        common_delta = -float(before["summary"]["median"])
+        if abs(common_delta) > COMMON_Z_MAX_ADJUSTMENT_MM:
+            raise CalibrationError(
+                f"refusing common Z correction {common_delta:+.6f} mm"
+            )
+        source = endstops(load_measured(CALIB_PATH))
+        target_t0 = round(source["t0"]["z_endstop"] + common_delta, 3)
+        target_t1 = round(source["t1"]["z_endstop"] + common_delta, 3)
+        source_difference = source["t1"]["z_endstop"] - source["t0"]["z_endstop"]
+        target_difference = target_t1 - target_t0
+        if abs(source_difference - target_difference) > 1.0e-9:
+            raise CalibrationError("common Z rebase would change T1-T0 Z difference")
+        rebase = {
+            "source_endstops": source,
+            "common_delta_mm": common_delta,
+            "target_endstops": {
+                "t0_z_endstop": target_t0,
+                "t1_z_endstop": target_t1,
+            },
+            "source_t1_minus_t0_mm": source_difference,
+            "target_t1_minus_t0_mm": target_difference,
+            "difference_preserved": True,
+        }
+        dashboard.bed["reference"]["rebase"] = rebase
+        atomic_json(run_dir / "z_rebase_result.json", rebase)
+        dashboard.bed["stage"] = "reference_deployment"
+        dashboard.event(
+            f"Applying common Z delta {common_delta:+.6f} mm to T0 and T1",
+            status="running",
+        )
+        console(
+            client,
+            f"common Z delta={common_delta:+.6f} mm; T1-T0 difference preserved",
+        )
+        target_fingerprint = deploy_candidate(
+            {"t0_z_endstop": target_t0, "t1_z_endstop": target_t1},
+            expected_calib_sha256=source_sha,
+            run_dir=run_dir,
+            label="z-rebase",
+        )
+        dashboard.bed["reference"]["rebase"][
+            "target_config_fingerprint"
+        ] = target_fingerprint
+        atomic_json(run_dir / "z_rebase_result.json", rebase)
+        prepare_t0(client)
+        after = collect_reference(client, dashboard, x=x, y=y, phase="after_rebase")
+        atomic_json(run_dir / "reference_after.json", after)
+        residual = float(after["summary"]["median"])
+        if abs(residual) > REFERENCE_ZERO_TOLERANCE_MM:
+            rollback_deployment(run_dir, "z-rebase")
+            raise CalibrationError(
+                f"post-rebase reference Z {residual:+.6f} exceeds "
+                f"{REFERENCE_ZERO_TOLERANCE_MM:.3f} mm"
+            )
+        dashboard.bed["reference"]["result"] = {
+            "status": "passed",
+            "residual_mm": residual,
+        }
+        dashboard.event(
+            f"Post-deploy bed reference passed: Z={residual:+.6f} mm",
+            status="running",
+        )
+        console(client, f"bed reference passed at Z={residual:+.6f} mm")
+
+        mesh = run_mesh(client, dashboard, fixed=fixed)
+        mesh["active_physical_verification"] = verify_active_mesh_contacts(
+            client, fixed
+        )
+        dashboard.bed["mesh"].update(mesh)
+        dashboard.publish()
+        mesh_path = run_dir / "mesh_points.csv"
+        with mesh_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerows(mesh["points"])
+        plot_path = run_dir / "mesh.png"
+        mesh_plot(mesh["points"], plot_path)
+        dashboard.bed["mesh"]["plot"] = dashboard.upload(plot_path, "bed_mesh.png")
+        atomic_json(run_dir / "mesh_result.json", mesh)
+        dashboard.publish()
+        mesh_source_sha = sha256_file(CALIB_PATH)
+        dashboard.bed["stage"] = "mesh_deployment"
+        dashboard.event("Persisting and deploying accepted bed mesh", status="running")
+        console(client, "persisting and deploying accepted bed mesh")
+        mesh_fingerprint = deploy_candidate(
+            {"bed_mesh_points": mesh["points"]},
+            expected_calib_sha256=mesh_source_sha,
+            run_dir=run_dir,
+            label="mesh",
+        )
+        verification = verify_persistent_mesh(
+            client,
+            expected=mesh["points"],
+            profile=str(fixed["bed_mesh_profile"]),
+            fixed=fixed,
+        )
+        verification["target_config_fingerprint"] = mesh_fingerprint
+        atomic_json(run_dir / "mesh_verification.json", verification)
+        dashboard.bed["mesh"]["verification"] = verification
+        dashboard.bed["mesh"]["status"] = "passed"
+        dashboard.bed["stage"] = "completed"
+        dashboard.bed["status"] = "completed"
+        dashboard.event(
+            "Persistent Eddy Tap mesh deployed and active", status="completed"
+        )
+        console(client, "persistent Eddy Tap mesh deployed and active")
+        manifest.update(
+            {
+                "status": "completed",
+                "finished_at": utc_now(),
+                "reference_before": before,
+                "z_rebase": rebase,
+                "reference_after": after,
+                "mesh": mesh,
+                "mesh_verification": verification,
+                "target_config_fingerprint": mesh_fingerprint,
+            }
+        )
+    except BaseException as exc:
+        manifest.update(
+            {"status": "failed", "finished_at": utc_now(), "error": str(exc)}
+        )
+        dashboard.bed["stage"] = "failed"
+        dashboard.bed["status"] = "failed"
+        dashboard.bed["error"] = str(exc)
+        try:
+            dashboard.event(f"Eddy bed calibration FAILED: {exc}", status="failed")
+            console(client, f"Eddy bed calibration FAILED: {exc}")
+        except BaseException:
+            pass
+        atomic_json(run_dir / "manifest.json", manifest)
+        try:
+            dashboard.upload_run_evidence(run_dir)
+        except BaseException:
+            pass
+        raise
+    atomic_json(run_dir / "manifest.json", manifest)
+    atomic_json(run_dir / "bed_calibration_result.json", manifest)
+    dashboard.upload_run_evidence(run_dir)
+    print(f"Eddy bed calibration complete: {run_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except (
+        CalibrationError,
+        CalibrationDataError,
+        subprocess.CalledProcessError,
+    ) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(1)

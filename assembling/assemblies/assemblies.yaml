@@ -3397,12 +3397,12 @@ assemblies:
       - z_axis_profile_left_assembly
       - z_axis_left_rail_assembly
       - z_axis_threaded_rod_left_assembly
-      - z_axis_top_mount_endstop_holder_assembly
+      - creality_endstop_board_assembly
     inject_parts:
       z_axis_profile: z_axis_profile_left_assembly
       z_axis_rail: z_axis_left_rail_assembly
       z_axis_threaded_rod: z_axis_threaded_rod_left_assembly
-      endstop_holder_assembly: z_axis_top_mount_endstop_holder_assembly
+      creality_endstop_board_assembly: creality_endstop_board_assembly
     parameters:
       z_axis_endstop_cable_hole_size: !Ref z_axis_endstop_cable_hole_size
       z_axis_endstop_profile_clearance: !Ref z_axis_endstop_profile_clearance
@@ -3430,12 +3430,12 @@ assemblies:
       - z_axis_profile_right_assembly
       - z_axis_right_rail_assembly
       - z_axis_threaded_rod_right_assembly
-      - z_axis_top_mount_endstop_holder_assembly
+      - creality_endstop_board_assembly
     inject_parts:
       z_axis_profile: z_axis_profile_right_assembly
       z_axis_rail: z_axis_right_rail_assembly
       z_axis_threaded_rod: z_axis_threaded_rod_right_assembly
-      endstop_holder_assembly: z_axis_top_mount_endstop_holder_assembly
+      creality_endstop_board_assembly: creality_endstop_board_assembly
     parameters:
       z_axis_endstop_cable_hole_size: !Ref z_axis_endstop_cable_hole_size
       z_axis_endstop_profile_clearance: !Ref z_axis_endstop_profile_clearance

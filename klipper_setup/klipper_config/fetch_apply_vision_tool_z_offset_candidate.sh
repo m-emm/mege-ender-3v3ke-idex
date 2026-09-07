@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+cat >&2 <<'EOF'
+This legacy vision helper is diagnostic-only and no longer writes calib.yaml.
+Authoritative T0/T1 Z alignment is performed by:
+  scripts/run_idex_calibration.sh
+See klipper_setup/klipper_config/IDEX_CALIBRATION.md.
+EOF
+exit 2
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
 REMOTE_ROOT="${VISION_CALIBRATION_REMOTE_ROOT:-/home/pi/printer_data/vision/calibration}"

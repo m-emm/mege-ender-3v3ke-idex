@@ -1,0 +1,28 @@
+# Legacy and diagnostic vision configuration. Vision does not participate in
+# the authoritative multi-head-zero plus Eddy-Tap print calibration chain.
+
+nozzle_cam_image_width_px: 1920
+nozzle_cam_image_height_px: 1080
+nozzle_cam_image_profile: analysis
+
+rough_nozzle_t0_capture_x_mm: 185.000
+rough_nozzle_t0_capture_y_mm: -14.000
+rough_nozzle_t0_capture_z_mm: 3.000
+rough_nozzle_t1_capture_x_mm: 195.000
+rough_nozzle_t1_capture_y_mm: -14.000
+rough_nozzle_t1_capture_z_mm: 3.000
+rough_nozzle_auto_exposure: 1
+rough_nozzle_exposure_time_absolute: 1200
+rough_nozzle_white_balance_automatic: 0
+rough_nozzle_white_balance_temperature: 6500
+rough_nozzle_lighting: [0.30, 0.08, 0.00, 0.00, 0.08, 0.30, 0.30, 0.30]
+
+eddy_fiducial_capture_tool: T0
+eddy_fiducial_capture_x_mm: 230.000
+eddy_fiducial_capture_y_mm: -14.000
+eddy_fiducial_capture_z_mm: 3.000
+eddy_fiducial_auto_exposure: 1
+eddy_fiducial_exposure_time_absolute: 1200
+eddy_fiducial_white_balance_automatic: 0
+eddy_fiducial_white_balance_temperature: 6500
+eddy_fiducial_lighting: [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]

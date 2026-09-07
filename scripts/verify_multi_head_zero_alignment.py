@@ -11,11 +11,7 @@ import math
 import sys
 from pathlib import Path
 
-import matplotlib
 import numpy as np
-
-matplotlib.use("Agg")
-from matplotlib import pyplot as plt
 
 
 XY_LIMIT_MM = 0.05
@@ -246,7 +242,6 @@ def write_report(output_dir, result, t0, t1):
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "verification_report.json"
     csv_path = output_dir / "verification_report.csv"
-    plot_path = output_dir / "T0_T1_verification.png"
     json_path.write_text(
         json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -265,86 +260,7 @@ def write_report(output_dir, result, t0, t1):
             )
             for direction, point in measurement["ring"].items():
                 writer.writerow({"tool": tool, "sample": direction, **point})
-    figure, (xy_axis, z_axis) = plt.subplots(
-        1, 2, figsize=(12, 5.5), constrained_layout=True
-    )
-    xy_axis.scatter(
-        [t0["x"]], [t0["y"]], marker="o", s=110, color="tab:blue", label="T0"
-    )
-    xy_axis.scatter(
-        [t1["x"]], [t1["y"]], marker="s", s=110, color="tab:orange", label="T1"
-    )
-    target = result["target_center"]
-    xy_axis.scatter(
-        [target["x"]],
-        [target["y"]],
-        marker="*",
-        s=180,
-        color="tab:green",
-        edgecolors="black",
-        linewidths=0.5,
-        label="Target",
-    )
-    xy_axis.plot([t0["x"], t1["x"]], [t0["y"], t1["y"]], color="0.4", linewidth=1)
-    xy_axis.set_aspect("equal", adjustable="box")
-    xy_axis.set_xlabel("Estimated ball-centre X (mm)")
-    xy_axis.set_ylabel("Estimated ball-centre Y (mm)")
-    xy_axis.set_title("Eight-ring harmonic XY")
-    xy_axis.legend()
-    xy_axis.grid(True, alpha=0.3)
-    residual = result["t1_minus_t0"]
-    micrometres = 1000.0
-    xy_axis.text(
-        0.03,
-        0.03,
-        "T0 error: X=%+.1f Y=%+.1f µm\nT1 error: X=%+.1f Y=%+.1f µm\nPaired: X=%+.1f Y=%+.1f µm"
-        % (
-            result["target_error_mm"]["t0"]["x"] * micrometres,
-            result["target_error_mm"]["t0"]["y"] * micrometres,
-            result["target_error_mm"]["t1"]["x"] * micrometres,
-            result["target_error_mm"]["t1"]["y"] * micrometres,
-            residual["x"] * micrometres,
-            residual["y"] * micrometres,
-        ),
-        transform=xy_axis.transAxes,
-        va="bottom",
-        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
-    )
-    directions = list(VERIFICATION_DIRECTIONS)
-    ring_deltas = [
-        value * micrometres for value in result["z_diagnostics"]["periphery_deltas_mm"]
-    ]
-    z_axis.axhspan(
-        -Z_LIMIT_MM * micrometres,
-        Z_LIMIT_MM * micrometres,
-        color="tab:green",
-        alpha=0.12,
-    )
-    z_axis.axhline(0.0, color="black", linewidth=0.8)
-    z_axis.plot(directions, ring_deltas, marker="o", label="Paired ring ΔZ")
-    z_axis.axhline(
-        result["z_diagnostics"]["centre_delta_mm"] * micrometres,
-        color="tab:orange",
-        linestyle="--",
-        label="Centre ΔZ",
-    )
-    z_axis.axhline(
-        result["z_diagnostics"]["periphery_mean_delta_mm"] * micrometres,
-        color="tab:blue",
-        linestyle=":",
-        label="Periphery mean ΔZ (diagnostic)",
-    )
-    z_axis.tick_params(axis="x", rotation=35)
-    z_axis.set_ylabel("T1 − T0 logical Z (µm)")
-    z_axis.set_title("Centre Z result and raw periphery diagnostic")
-    z_axis.grid(True, alpha=0.3)
-    z_axis.legend(fontsize=8)
-    figure.suptitle(
-        "T0/T1 nine-contact verification: %s" % ("PASS" if result["pass"] else "FAIL")
-    )
-    figure.savefig(plot_path, dpi=200)
-    plt.close(figure)
-    return json_path, csv_path, plot_path
+    return json_path, csv_path
 
 
 def paired_result(calibration_result_path, t0, t1, target):
@@ -425,7 +341,7 @@ def main(argv):
     periphery_mean_delta = result["z_diagnostics"]["periphery_mean_delta_mm"]
     radial_xy = result["radial_xy_mm"]
     passed = result["pass"]
-    json_path, csv_path, plot_path = write_report(args.output_dir, result, t0, t1)
+    json_path, csv_path = write_report(args.output_dir, result, t0, t1)
     print(
         "Target errors: T0 X=%+.1f Y=%+.1f; T1 X=%+.1f Y=%+.1f µm. "
         "T1-minus-T0: X=%+.1f Y=%+.1f centre Z=%+.1f periphery-mean Z=%+.1f µm; radial XY=%.1f µm"
@@ -442,7 +358,7 @@ def main(argv):
         )
     )
     print("Verification: %s" % ("PASS" if passed else "FAIL"))
-    print("Report: %s\nCSV: %s\nPlot: %s" % (json_path, csv_path, plot_path))
+    print("Report: %s\nCSV: %s" % (json_path, csv_path))
     return 0 if passed else 1
 
 

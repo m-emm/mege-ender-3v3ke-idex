@@ -11,6 +11,10 @@ header { display: flex; justify-content: space-between; gap: 16px; align-items: 
 h1 { margin: 0; font-size: 1.5rem; }
 p { color: #aab7c5; }
 time, .hint { color: #8190a1; font-size: .86rem; }
+.readiness { margin-top: 14px; padding: 10px 14px; border: 1px solid #5e7186; border-radius: 7px; font-size: 1rem; font-weight: 800; letter-spacing: .04em; }
+.readiness.ready { color: #87e3ad; border-color: #4ba878; background: #14291f; }
+.readiness.failed { color: #ff928d; border-color: #bc635f; background: #2b1919; }
+.readiness.calibrating { color: #ffd479; border-color: #a67c2b; background: #2a2417; }
 .events { margin: 14px 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .event { background: #202934; border-radius: 5px; padding: 6px 9px; font-size: .84rem; }
 .chapter { margin-top: 18px; padding-top: 14px; border-top: 1px solid #2b3745; }
@@ -60,5 +64,9 @@ svg { width: 100%; height: 345px; background: #10161d; border-radius: 5px; }
 .offset-table th, .offset-table td { padding: 5px 2px; border-bottom: 1px solid #2b3745; text-align: right; }
 .offset-table th:first-child, .offset-table td:first-child { text-align: left; }
 .offset-table th { color: #8e9cab; font-size: .75rem; font-weight: 500; }
+.bed-mesh { margin-top: 16px; }
+.bed-mesh .outcome-card { max-width: none; }
+.mesh-progress { height: 10px; overflow: hidden; border-radius: 6px; background: #10161d; margin: 10px 0; }
+.mesh-progress > span { display: block; height: 100%; background: #55b8ef; }
 .empty { padding: 22px; background: #18202a; border-radius: 8px; }
 @media (max-width: 700px) { main { padding: 14px; } header, .chapter-heading { display: block; } .tools { grid-template-columns: 1fr; } .plot-modal { width: 100vw; height: 100vh; border-radius: 0; } }

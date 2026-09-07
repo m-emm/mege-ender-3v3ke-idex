@@ -4,6 +4,12 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
 
+CONTACT_CONFIRM_SECONDS = 0.050
+RELEASE_SETTLE_SECONDS = 1.000
+RELEASE_POLL_SECONDS = 0.100
+TRANSIENT_REPEAT_TOLERANCE_MM = 0.050
+
+
 class MultiHeadZeroProbe:
     """Perform guarded vertical contacts with the multi-head-zero switch."""
 
@@ -82,6 +88,17 @@ class MultiHeadZeroProbe:
         )
         self.last_state = state
         return state
+
+    def _wait_for_state(self, toolhead, expected, timeout):
+        state = self._switch_state(toolhead)
+        waited = 0.0
+        while state != expected and waited < timeout:
+            duration = min(RELEASE_POLL_SECONDS, timeout - waited)
+            toolhead.dwell(duration)
+            toolhead.wait_moves()
+            waited += duration
+            state = self._switch_state(toolhead)
+        return state, waited
 
     def _require_homed_idle(self, command_name):
         eventtime = self.printer.get_reactor().monotonic()
@@ -319,36 +336,147 @@ class MultiHeadZeroProbe:
             self._retract_to_start(toolhead, preparation["machine_start_z"])
         else:
             trigger_position = [float(value) for value in trigger_position]
-            logical_trigger = self._machine_to_logical(
-                trigger_position, preparation["gcode_origin"]
-            )
-            measurement.update(
-                {
-                    "status": "completed",
-                    "tap_start_position": start_position,
-                    "target_position": [float(value) for value in target_position],
-                    "trigger_position": trigger_position,
-                    "halt_position": [
-                        float(value) for value in toolhead.get_position()
-                    ],
-                    "trigger_x": trigger_position[0],
-                    "trigger_y": trigger_position[1],
-                    "trigger_z": trigger_position[2],
-                    "logical_trigger_x": logical_trigger[0],
-                    "logical_trigger_y": logical_trigger[1],
-                    "logical_trigger_z": logical_trigger[2],
-                }
-            )
+            toolhead.dwell(CONTACT_CONFIRM_SECONDS)
+            toolhead.wait_moves()
+            confirmed_trigger_state = self._switch_state(toolhead)
+            confirmation_mode = "held_trigger"
+            first_transient_trigger = None
+            retry_no_contact = False
+            if confirmed_trigger_state != "TRIGGERED":
+                first_transient_trigger = list(trigger_position)
+                self._retract_to_start(toolhead, preparation["machine_start_z"])
+                release_state, release_wait = self._wait_for_state(
+                    toolhead, "RELEASED", RELEASE_SETTLE_SECONDS
+                )
+                if release_state != "RELEASED":
+                    _, recovery_position = self._lift_to_recovery(toolhead)
+                    release_state, recovery_wait = self._wait_for_state(
+                        toolhead, "RELEASED", RELEASE_SETTLE_SECONDS
+                    )
+                    release_wait += recovery_wait
+                    if release_state != "RELEASED":
+                        raise self.gcode.error(
+                            "MULTI_HEAD_ZERO_CONTACT transient-trigger retry "
+                            "could not recover a released NC switch at machine "
+                            "Z=%.3f" % recovery_position[2]
+                        )
+                retry_start_position = [
+                    float(value) for value in toolhead.get_position()
+                ]
+                try:
+                    retry_trigger = self.printer.lookup_object("homing").probing_move(
+                        self.mcu_endstop, target_position, self.probe_speed
+                    )
+                except self.printer.command_error as exc:
+                    if not (
+                        allow_no_contact
+                        and str(exc) == "No trigger on probe after full movement"
+                    ):
+                        raise
+                    retry_no_contact = True
+                    confirmation_mode = "transient_discarded_no_contact"
+                    measurement.update(
+                        {
+                            "status": "no_contact",
+                            "no_contact_reason": "transient_discarded_target_reached",
+                            "tap_start_position": start_position,
+                            "retry_start_position": retry_start_position,
+                            "first_transient_trigger_position": first_transient_trigger,
+                            "target_position": [
+                                float(value) for value in target_position
+                            ],
+                            "halt_position": [
+                                float(value) for value in toolhead.get_position()
+                            ],
+                            "confirmation_mode": confirmation_mode,
+                            "transient_release_wait_seconds": release_wait,
+                        }
+                    )
+                else:
+                    trigger_position = [float(value) for value in retry_trigger]
+                    toolhead.dwell(CONTACT_CONFIRM_SECONDS)
+                    toolhead.wait_moves()
+                    confirmed_trigger_state = self._switch_state(toolhead)
+                    if confirmed_trigger_state == "TRIGGERED":
+                        confirmation_mode = "stable_retry"
+                    elif (
+                        abs(trigger_position[2] - first_transient_trigger[2])
+                        <= TRANSIENT_REPEAT_TOLERANCE_MM
+                    ):
+                        confirmation_mode = "repeatable_transient"
+                    else:
+                        self._retract_to_start(toolhead, preparation["machine_start_z"])
+                        difference = abs(
+                            trigger_position[2] - first_transient_trigger[2]
+                        )
+                        raise self.gcode.error(
+                            "MULTI_HEAD_ZERO_CONTACT rejected inconsistent "
+                            "transient triggers at machine Z=%.6f and %.6f "
+                            "(difference %.6f mm exceeds %.3f mm); inspect the "
+                            "switch wiring"
+                            % (
+                                first_transient_trigger[2],
+                                trigger_position[2],
+                                difference,
+                                TRANSIENT_REPEAT_TOLERANCE_MM,
+                            )
+                        )
+            if not retry_no_contact:
+                logical_trigger = self._machine_to_logical(
+                    trigger_position, preparation["gcode_origin"]
+                )
+                measurement.update(
+                    {
+                        "status": "completed",
+                        "tap_start_position": start_position,
+                        "target_position": [float(value) for value in target_position],
+                        "trigger_position": trigger_position,
+                        "halt_position": [
+                            float(value) for value in toolhead.get_position()
+                        ],
+                        "trigger_x": trigger_position[0],
+                        "trigger_y": trigger_position[1],
+                        "trigger_z": trigger_position[2],
+                        "logical_trigger_x": logical_trigger[0],
+                        "logical_trigger_y": logical_trigger[1],
+                        "logical_trigger_z": logical_trigger[2],
+                        "confirmed_trigger_state": confirmed_trigger_state,
+                        "contact_confirm_seconds": CONTACT_CONFIRM_SECONDS,
+                        "confirmation_mode": confirmation_mode,
+                        "first_transient_trigger_position": first_transient_trigger,
+                        "transient_repeat_tolerance_mm": (
+                            TRANSIENT_REPEAT_TOLERANCE_MM
+                        ),
+                    }
+                )
             self._retract_to_start(toolhead, preparation["machine_start_z"])
         measurement["post_retract_position"] = [
             float(value) for value in toolhead.get_position()
         ]
-        measurement["post_retract_state"] = self._switch_state(toolhead)
+        post_retract_state, post_retract_wait = self._wait_for_state(
+            toolhead, "RELEASED", RELEASE_SETTLE_SECONDS
+        )
+        measurement["post_retract_state"] = post_retract_state
+        measurement["post_retract_release_wait_seconds"] = post_retract_wait
         if measurement["post_retract_state"] != "RELEASED":
-            raise self.gcode.error(
-                "MULTI_HEAD_ZERO_CONTACT retract left the switch %s"
-                % measurement["post_retract_state"]
+            recovery_lifted, recovery_position = self._lift_to_recovery(toolhead)
+            recovery_state, recovery_wait = self._wait_for_state(
+                toolhead, "RELEASED", RELEASE_SETTLE_SECONDS
             )
+            measurement.update(
+                {
+                    "post_retract_recovery_lifted": recovery_lifted,
+                    "post_retract_recovery_position": recovery_position,
+                    "post_retract_recovery_state": recovery_state,
+                    "post_retract_recovery_wait_seconds": recovery_wait,
+                }
+            )
+            if recovery_state != "RELEASED":
+                raise self.gcode.error(
+                    "MULTI_HEAD_ZERO_CONTACT switch remains %s after retract "
+                    "and upward recovery to machine Z=%.3f; inspect the ball "
+                    "contact or NC wiring" % (recovery_state, recovery_position[2])
+                )
         return measurement
 
     @staticmethod

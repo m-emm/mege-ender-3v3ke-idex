@@ -8,12 +8,15 @@ import math
 import re
 from pathlib import Path
 
-import yaml
-
-
 ROOT = Path(__file__).resolve().parents[1]
 CALIB_PATH = ROOT / "klipper_setup/klipper_config/calib.yaml"
+CALIB_CONFIG_PATH = ROOT / "klipper_setup/klipper_config/calib_config.yaml"
 CONFIG_PATH = ROOT / "klipper_setup/klipper_config/printer.cfg"
+
+import sys
+
+sys.path.insert(0, str(CALIB_PATH.parent))
+from generate_printer_cfg import load_calibration  # noqa: E402
 
 
 def probe_settings():
@@ -35,10 +38,15 @@ def path_length(points):
 
 
 def main():
-    calib = yaml.safe_load(CALIB_PATH.read_text(encoding="utf-8"))
-    priors = calib["multi_head_zero_probe"]
-    bounds = priors["seed_bounds"]
-    target = priors["target"]
+    calibration = load_calibration(CALIB_PATH, CALIB_CONFIG_PATH)
+    priors = calibration["multi_head_zero_probe"]
+    bounds = {
+        "x_min": priors["seed_x_min"],
+        "x_max": priors["seed_x_max"],
+        "y_min": priors["seed_y_min"],
+        "y_max": priors["seed_y_max"],
+    }
+    target = {"x": priors["target_x"], "y": priors["target_y"]}
     ring_radius = float(priors["refinement_ring_radius_mm"])
     seed = []
     for row, y in enumerate(
@@ -65,14 +73,20 @@ def main():
         "workflow": "prescribed_t0_then_t1_calibration",
         "tools": 2,
         "tool_switches": 1,
-        "contacts_per_tool": {"seed": 9, "summit": 1, "ring": 8, "total": 18},
-        "contacts_total": 36,
+        "contacts_per_tool": {
+            "seed": 9,
+            "summit": 1,
+            "phase_2_ring": 8,
+            "phase_3_ring": 8,
+            "total": 26,
+        },
+        "contacts_total": 52,
         "verification": {
             "contacts_per_tool": {"centre": 1, "ring": 8, "total": 9},
             "contacts_total": 18,
-            "full_calibration_and_verification_contacts": 54,
+            "full_calibration_and_verification_contacts": 70,
             "max_seconds_total": 18 * max_tap_seconds,
-            "full_calibration_and_verification_max_seconds": 54 * max_tap_seconds,
+            "full_calibration_and_verification_max_seconds": 70 * max_tap_seconds,
         },
         "seed_order": seed,
         "xy_path_mm_per_tool": {
@@ -86,16 +100,16 @@ def main():
             ),
             "seed_to_nominal_summit": math.dist(seed[-1], summit),
             "ring": math.dist(summit, ring[0]) + path_length(ring),
-            "total_nominal": path_length(seed + [summit] + ring),
+            "total_nominal": path_length(seed + [summit] + ring + ring),
         },
         "z_motion": {
             "per_contact": ["guarded descent", "fast retract to START_Z"],
             "guarded_descent_max_mm": abs(settings["start_z"] - settings["target_z"]),
-            "guarded_descent_max_seconds_total": 36
+            "guarded_descent_max_seconds_total": 52
             * abs(settings["start_z"] - settings["target_z"])
             / settings["probe_speed"],
             "max_seconds_per_contact": max_tap_seconds,
-            "max_seconds_total": 36 * max_tap_seconds,
+            "max_seconds_total": 52 * max_tap_seconds,
         },
         "switch_safety": "One machine-Z=10.000 recovery before preparation; no per-tap tool switches.",
     }

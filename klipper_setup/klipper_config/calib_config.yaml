@@ -1,0 +1,31 @@
+# Fixed printer geometry and the prescribed calibration workflow. Change these
+# values only when the machine design or calibration procedure changes.
+
+bed_grid_zero_x_mm: 113.300
+bed_grid_zero_y_mm: 107.000
+eddy_bed_reference_x_mm: 150.000
+eddy_bed_reference_y_mm: 150.000
+
+parked_tool_clearance_mm: 101.400
+
+multi_head_zero_target_x_mm: 75.000
+multi_head_zero_target_y_mm: -9.000
+multi_head_zero_seed_min_x_mm: 72.000
+multi_head_zero_seed_max_x_mm: 78.000
+multi_head_zero_seed_min_y_mm: -12.000
+multi_head_zero_seed_max_y_mm: -6.000
+
+bed_mesh_profile: default
+bed_mesh_samples: 1
+bed_mesh_settle_ms: 500
+bed_mesh_horizontal_move_z_mm: 5.000
+bed_mesh_min_x_mm: 66.660
+bed_mesh_max_x_mm: 189.960
+bed_mesh_min_y_mm: 62.500
+bed_mesh_max_y_mm: 274.960
+bed_mesh_x_count: 7
+bed_mesh_y_count: 7
+bed_mesh_x_pps: 0
+bed_mesh_y_pps: 0
+bed_mesh_algorithm: lagrange
+bed_mesh_tension: 0.200

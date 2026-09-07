@@ -17,12 +17,48 @@ import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_CALIB_PATH = SCRIPT_DIR / "calib.yaml"
+DEFAULT_CALIB_CONFIG_PATH = SCRIPT_DIR / "calib_config.yaml"
 DEFAULT_TEMPLATE_PATH = SCRIPT_DIR / "printer.cfg.template"
 DEFAULT_OUTPUT_PATH = SCRIPT_DIR / "printer.cfg"
-FINGERPRINT_INPUT_VERSION = "idex-klipper-config-fingerprint-v1"
+FINGERPRINT_INPUT_VERSION = "idex-klipper-config-fingerprint-v2"
 FINGERPRINT_MACRO_SECTION = "gcode_macro _IDEX_CONFIG_FINGERPRINT"
 FINGERPRINT_CONFIG_OPTION = "variable_source_sha256"
 FINGERPRINT_SETTINGS_KEY = "source_sha256"
+
+# These are deliberately code constants: V2 supports one prescribed contact
+# algorithm, not a family of user-tunable variants.
+MULTI_HEAD_ZERO_BALL_RADIUS_MM = 5.0
+# Keep the X/Y measurement near the crown.  Live 2.8 mm rings imposed enough
+# lateral load to move the ball/mount between T0 and T1 by roughly 0.2 mm.
+# At 1.5 mm the sphere still provides ample harmonic slope while the contact
+# force is predominantly vertical.
+MULTI_HEAD_ZERO_RING_RADIUS_MM = 1.5
+MULTI_HEAD_ZERO_BALL_FRONT_GAP_MM = 1.0
+MULTI_HEAD_ZERO_Y_ZERO_BEHIND_FRONT_EDGE_MM = 3.0
+MEASURED_CALIBRATION_KEYS = frozenset(
+    {
+        "t0_x_endstop",
+        "t0_y_endstop",
+        "t0_z_endstop",
+        "t1_x_endstop",
+        "t1_y_endstop",
+        "t1_z_endstop",
+        "input_shaper_t0_x_type",
+        "input_shaper_t0_x_frequency_hz",
+        "input_shaper_t1_x_type",
+        "input_shaper_t1_x_frequency_hz",
+        "input_shaper_y_type",
+        "input_shaper_y_frequency_hz",
+        "eddy_nozzle_to_coil_x_mm",
+        "eddy_nozzle_to_coil_y_mm",
+        "eddy_nozzle_to_coil_z_mm",
+        "eddy_temperature_calibration_c",
+        "eddy_reg_drive_current",
+        "eddy_tap_threshold",
+        "eddy_height_calibration",
+        "bed_mesh_points",
+    }
+)
 
 
 def _require_mapping(value: Any, path: str) -> dict[str, Any]:
@@ -453,7 +489,7 @@ def _load_multi_head_zero_probe(data: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def load_calibration(calib_path: Path) -> dict[str, Any]:
+def _load_legacy_calibration(calib_path: Path) -> dict[str, Any]:
     data = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
     data = _require_mapping(data, "calib.yaml")
 
@@ -554,6 +590,286 @@ def load_calibration(calib_path: Path) -> dict[str, Any]:
     }
 
 
+def _require_int(mapping: dict[str, Any], key: str, path: str) -> int:
+    if key not in mapping:
+        raise ValueError(f"Missing {path}.{key}")
+    value = mapping[key]
+    if isinstance(value, bool):
+        raise ValueError(f"{path}.{key} must be an integer")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{path}.{key} must be an integer") from None
+    if parsed != value:
+        raise ValueError(f"{path}.{key} must be an integer")
+    return parsed
+
+
+def _load_flat_calibration(
+    calib_path: Path,
+    calib_config_path: Path,
+) -> dict[str, Any]:
+    measured = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
+    measured = _require_mapping(measured, "calib.yaml")
+    extra = set(measured).difference(MEASURED_CALIBRATION_KEYS)
+    if extra:
+        raise ValueError(f"calib.yaml contains non-measurement keys: {sorted(extra)}")
+    fixed = yaml.safe_load(calib_config_path.read_text(encoding="utf-8"))
+    fixed = _require_mapping(fixed, "calib_config.yaml")
+
+    supported_types = {"zv", "mzv", "zvd", "ei", "2hump_ei", "3hump_ei"}
+    for key in (
+        "input_shaper_t0_x_type",
+        "input_shaper_t1_x_type",
+        "input_shaper_y_type",
+    ):
+        if measured.get(key) not in supported_types:
+            raise ValueError(
+                f"calib.yaml.{key} must be one of: "
+                f"{', '.join(sorted(supported_types))}"
+            )
+
+    x_count = _require_int(fixed, "bed_mesh_x_count", "calib_config.yaml")
+    y_count = _require_int(fixed, "bed_mesh_y_count", "calib_config.yaml")
+    if x_count < 3 or y_count < 3:
+        raise ValueError("calib_config.yaml bed mesh counts must be at least 3")
+    points = measured.get("bed_mesh_points")
+    if not isinstance(points, list) or len(points) != y_count:
+        raise ValueError("calib.yaml.bed_mesh_points must have one row per Y point")
+    normalized_points = []
+    for row in points:
+        if not isinstance(row, list) or len(row) != x_count:
+            raise ValueError(
+                "calib.yaml.bed_mesh_points must have one value per X point"
+            )
+        normalized_row = []
+        for value in row:
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                raise ValueError(
+                    "calib.yaml.bed_mesh_points must contain numeric values"
+                ) from None
+            if not math.isfinite(value):
+                raise ValueError(
+                    "calib.yaml.bed_mesh_points must contain finite values"
+                )
+            normalized_row.append(value)
+        normalized_points.append(tuple(normalized_row))
+
+    profile = fixed.get("bed_mesh_profile")
+    algorithm = fixed.get("bed_mesh_algorithm")
+    if not isinstance(profile, str) or not profile.strip():
+        raise ValueError("calib_config.yaml.bed_mesh_profile must be non-empty")
+    if not isinstance(algorithm, str) or not algorithm.strip():
+        raise ValueError("calib_config.yaml.bed_mesh_algorithm must be non-empty")
+
+    eddy_curve = measured.get("eddy_height_calibration")
+    if not isinstance(eddy_curve, str) or not eddy_curve.strip():
+        raise ValueError("calib.yaml.eddy_height_calibration must be non-empty")
+    eddy_curve = _normalize_eddy_calibrate(eddy_curve)
+    pairs = [item.strip() for item in eddy_curve.split(",") if item.strip()]
+    if len(pairs) < 9:
+        raise ValueError(
+            "calib.yaml.eddy_height_calibration must contain at least 9 pairs"
+        )
+    for pair in pairs:
+        try:
+            height, frequency = pair.split(":", 1)
+            float(height)
+            float(frequency)
+        except (TypeError, ValueError):
+            raise ValueError(
+                "calib.yaml.eddy_height_calibration contains an invalid pair: "
+                f"{pair!r}"
+            ) from None
+
+    tap_threshold = _require_int(measured, "eddy_tap_threshold", "calib.yaml")
+    drive_current = _require_int(measured, "eddy_reg_drive_current", "calib.yaml")
+    if tap_threshold <= 0:
+        raise ValueError("calib.yaml.eddy_tap_threshold must be positive")
+    if not 0 <= drive_current <= 31:
+        raise ValueError("calib.yaml.eddy_reg_drive_current must be 0..31")
+
+    samples = _require_int(fixed, "bed_mesh_samples", "calib_config.yaml")
+    settle_ms = _require_int(fixed, "bed_mesh_settle_ms", "calib_config.yaml")
+    if samples < 1 or settle_ms < 0:
+        raise ValueError(
+            "bed mesh samples must be positive and settle time non-negative"
+        )
+    x_pps = _require_int(fixed, "bed_mesh_x_pps", "calib_config.yaml")
+    y_pps = _require_int(fixed, "bed_mesh_y_pps", "calib_config.yaml")
+
+    target_x = _require_float(fixed, "multi_head_zero_target_x_mm", "calib_config.yaml")
+    target_y = _require_float(fixed, "multi_head_zero_target_y_mm", "calib_config.yaml")
+    seed_x_min = _require_float(
+        fixed, "multi_head_zero_seed_min_x_mm", "calib_config.yaml"
+    )
+    seed_x_max = _require_float(
+        fixed, "multi_head_zero_seed_max_x_mm", "calib_config.yaml"
+    )
+    seed_y_min = _require_float(
+        fixed, "multi_head_zero_seed_min_y_mm", "calib_config.yaml"
+    )
+    seed_y_max = _require_float(
+        fixed, "multi_head_zero_seed_max_y_mm", "calib_config.yaml"
+    )
+    if seed_x_min >= seed_x_max or seed_y_min >= seed_y_max:
+        raise ValueError("multi-head-zero seed bounds must have a positive span")
+
+    clearance = _require_float(fixed, "parked_tool_clearance_mm", "calib_config.yaml")
+    if not math.isfinite(clearance) or clearance <= 0:
+        raise ValueError("calib_config.yaml.parked_tool_clearance_mm must be positive")
+
+    def measured_float(key: str) -> float:
+        value = _require_float(measured, key, "calib.yaml")
+        if not math.isfinite(value):
+            raise ValueError(f"calib.yaml.{key} must be finite")
+        return value
+
+    return {
+        # Compatibility for old read-only diagnostics. V2 establishes contact
+        # Z=0 directly and deliberately does not store this as calibration.
+        "bed_to_nozzle_gap": 0.0,
+        "bed_grid_zero": {
+            "x": _require_float(fixed, "bed_grid_zero_x_mm", "calib_config.yaml"),
+            "y": _require_float(fixed, "bed_grid_zero_y_mm", "calib_config.yaml"),
+        },
+        "bed_z_reference": {
+            "x": _require_float(fixed, "eddy_bed_reference_x_mm", "calib_config.yaml"),
+            "y": _require_float(fixed, "eddy_bed_reference_y_mm", "calib_config.yaml"),
+        },
+        "input_shaper": {
+            "carriages": {
+                "t0": {
+                    "x": {
+                        "type": measured["input_shaper_t0_x_type"],
+                        "frequency_hz": measured_float(
+                            "input_shaper_t0_x_frequency_hz"
+                        ),
+                    }
+                },
+                "t1": {
+                    "x": {
+                        "type": measured["input_shaper_t1_x_type"],
+                        "frequency_hz": measured_float(
+                            "input_shaper_t1_x_frequency_hz"
+                        ),
+                    }
+                },
+            },
+            "y": {
+                "type": measured["input_shaper_y_type"],
+                "frequency_hz": measured_float("input_shaper_y_frequency_hz"),
+            },
+        },
+        "tap_mesh": {
+            "profile": profile.strip(),
+            "samples": samples,
+            "settle_ms": settle_ms,
+            "horizontal_move_z": _require_float(
+                fixed, "bed_mesh_horizontal_move_z_mm", "calib_config.yaml"
+            ),
+            "probe_count": (x_count, y_count),
+        },
+        "saved_mesh": {
+            "version": 1,
+            "points": tuple(normalized_points),
+            "mesh_params": {
+                "min_x": _require_float(
+                    fixed, "bed_mesh_min_x_mm", "calib_config.yaml"
+                ),
+                "max_x": _require_float(
+                    fixed, "bed_mesh_max_x_mm", "calib_config.yaml"
+                ),
+                "min_y": _require_float(
+                    fixed, "bed_mesh_min_y_mm", "calib_config.yaml"
+                ),
+                "max_y": _require_float(
+                    fixed, "bed_mesh_max_y_mm", "calib_config.yaml"
+                ),
+                "x_count": x_count,
+                "y_count": y_count,
+                "mesh_x_pps": x_pps,
+                "mesh_y_pps": y_pps,
+                "algo": algorithm.strip(),
+                "tension": _require_float(
+                    fixed, "bed_mesh_tension", "calib_config.yaml"
+                ),
+            },
+        },
+        "idex_x_reach": {
+            "safety_margin_mm": 0.0,
+            "first_contact_nozzle_separation_mm": clearance,
+        },
+        "multi_head_zero_probe": {
+            "ball_diameter_mm": MULTI_HEAD_ZERO_BALL_RADIUS_MM * 2.0,
+            "ball_front_gap_mm": MULTI_HEAD_ZERO_BALL_FRONT_GAP_MM,
+            "y_zero_behind_front_edge_mm": (
+                MULTI_HEAD_ZERO_Y_ZERO_BEHIND_FRONT_EDGE_MM
+            ),
+            "target_x": target_x,
+            "target_y": target_y,
+            "seed_x_min": seed_x_min,
+            "seed_x_max": seed_x_max,
+            "seed_y_min": seed_y_min,
+            "seed_y_max": seed_y_max,
+            "refinement_ring_radius_mm": MULTI_HEAD_ZERO_RING_RADIUS_MM,
+        },
+        "tools": {
+            "t0": {
+                "x_endstop": measured_float("t0_x_endstop"),
+                "y_endstop": measured_float("t0_y_endstop"),
+                "z_endstop": measured_float("t0_z_endstop"),
+            },
+            "t1": {
+                "x_endstop": measured_float("t1_x_endstop"),
+                "y_endstop": measured_float("t1_y_endstop"),
+                "z_endstop": measured_float("t1_z_endstop"),
+            },
+        },
+        "eddy_relative_calibration": {
+            "nozzle_to_coil_x": measured_float("eddy_nozzle_to_coil_x_mm"),
+            "nozzle_to_coil_y": measured_float("eddy_nozzle_to_coil_y_mm"),
+            "nozzle_to_coil_z": measured_float("eddy_nozzle_to_coil_z_mm"),
+            "nozzle_to_coil": {
+                "x": measured_float("eddy_nozzle_to_coil_x_mm"),
+                "y": measured_float("eddy_nozzle_to_coil_y_mm"),
+                "z": measured_float("eddy_nozzle_to_coil_z_mm"),
+            },
+            "reg_drive_current": drive_current,
+            "calibrate": eddy_curve,
+            "tap_threshold": tap_threshold,
+            "klipper": {
+                "reg_drive_current": drive_current,
+                "calibrate": eddy_curve,
+                "tap_threshold": tap_threshold,
+            },
+            "capture": None,
+            "temperature_calibration_temp": measured_float(
+                "eddy_temperature_calibration_c"
+            ),
+        },
+    }
+
+
+def load_calibration(
+    calib_path: Path,
+    calib_config_path: Path | None = None,
+) -> dict[str, Any]:
+    """Load the V2 flat schema, retaining legacy-fixture compatibility."""
+    data = yaml.safe_load(calib_path.read_text(encoding="utf-8"))
+    data = _require_mapping(data, "calib.yaml")
+    if "t0_x_endstop" not in data:
+        return _load_legacy_calibration(calib_path)
+    if calib_config_path is None:
+        candidate = calib_path.with_name("calib_config.yaml")
+        calib_config_path = (
+            candidate if candidate.is_file() else DEFAULT_CALIB_CONFIG_PATH
+        )
+    return _load_flat_calibration(calib_path, calib_config_path)
+
+
 def format_mm(value: float) -> str:
     return f"{value:.3f}"
 
@@ -604,10 +920,17 @@ def _hash_file(
 def compute_config_fingerprint(
     calib_path: Path,
     template_path: Path,
+    calib_config_path: Path | None = None,
 ) -> str:
+    if calib_config_path is None:
+        candidate = calib_path.with_name("calib_config.yaml")
+        calib_config_path = (
+            candidate if candidate.is_file() else DEFAULT_CALIB_CONFIG_PATH
+        )
     hasher = hashlib.sha256()
     hasher.update(f"{FINGERPRINT_INPUT_VERSION}\n".encode("utf-8"))
     _hash_file(hasher, "calib.yaml", calib_path)
+    _hash_file(hasher, "calib_config.yaml", calib_config_path)
     _hash_file(hasher, "printer.cfg.template", template_path)
     return hasher.hexdigest()
 
@@ -711,6 +1034,25 @@ def template_values(
     saved_mesh = calibration.get("saved_mesh")
     idex_x_reach = calibration.get("idex_x_reach")
     multi_head_zero_probe = calibration["multi_head_zero_probe"]
+    if saved_mesh is None:
+        # Focused callers may exercise pure template relationships without a
+        # stored profile. Real V2 source loading always supplies these values.
+        saved_mesh = {
+            "version": 1,
+            "points": (),
+            "mesh_params": {
+                "min_x": 66.66,
+                "max_x": 189.96,
+                "min_y": 62.5,
+                "max_y": 274.96,
+                "x_count": tap_mesh["probe_count"][0],
+                "y_count": tap_mesh["probe_count"][1],
+                "mesh_x_pps": 0,
+                "mesh_y_pps": 0,
+                "algo": "lagrange",
+                "tension": 0.2,
+            },
+        }
     if idex_x_reach is None:
         # template_values() is also used by focused synthetic tests that do not
         # model the printer's physical parked-tool clearance. Real calib.yaml
@@ -800,6 +1142,20 @@ def template_values(
         "tap_mesh_settle_ms": str(tap_mesh["settle_ms"]),
         "tap_mesh_horizontal_move_z": format_mm(tap_mesh["horizontal_move_z"]),
         "tap_mesh_probe_count": ",".join(str(item) for item in tap_mesh["probe_count"]),
+        "tap_mesh_min": (
+            f"{saved_mesh['mesh_params']['min_x']:.3f},"
+            f"{saved_mesh['mesh_params']['min_y']:.3f}"
+        ),
+        "tap_mesh_max": (
+            f"{saved_mesh['mesh_params']['max_x']:.3f},"
+            f"{saved_mesh['mesh_params']['max_y']:.3f}"
+        ),
+        "tap_mesh_pps": (
+            f"{saved_mesh['mesh_params']['mesh_x_pps']},"
+            f"{saved_mesh['mesh_params']['mesh_y_pps']}"
+        ),
+        "tap_mesh_algorithm": saved_mesh["mesh_params"]["algo"],
+        "tap_mesh_tension": f"{saved_mesh['mesh_params']['tension']:.3f}",
         "input_shaper_t0_x_type": input_shaper["carriages"]["t0"]["x"]["type"],
         "input_shaper_t0_x_frequency": (
             f"{input_shaper['carriages']['t0']['x']['frequency_hz']:.3f}"
@@ -836,11 +1192,13 @@ def template_values(
 def render_config(
     calib_path: Path,
     template_path: Path,
+    calib_config_path: Path | None = None,
 ) -> str:
-    calibration = load_calibration(calib_path)
+    calibration = load_calibration(calib_path, calib_config_path)
     config_fingerprint = compute_config_fingerprint(
         calib_path,
         template_path,
+        calib_config_path,
     )
     template = Template(template_path.read_text(encoding="utf-8"))
     return template.substitute(
@@ -864,6 +1222,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--template",
         type=Path,
         default=DEFAULT_TEMPLATE_PATH,
+    )
+    parser.add_argument(
+        "--calib-config",
+        type=Path,
+        default=DEFAULT_CALIB_CONFIG_PATH,
     )
     parser.add_argument(
         "--output",
@@ -896,6 +1259,7 @@ def main(argv: list[str] | None = None) -> int:
             compute_config_fingerprint(
                 args.calib,
                 args.template,
+                args.calib_config,
             )
         )
         return 0
@@ -903,6 +1267,7 @@ def main(argv: list[str] | None = None) -> int:
     rendered = render_config(
         args.calib,
         args.template,
+        args.calib_config,
     )
 
     if args.stdout:

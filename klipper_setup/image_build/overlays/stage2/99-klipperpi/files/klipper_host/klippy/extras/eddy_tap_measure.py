@@ -521,8 +521,8 @@ class EddyTapMeasure:
         threshold = gcmd.get_float("THRESHOLD", self.tap_threshold, above=0.0)
         count = gcmd.get_int("COUNT", self.default_count, minval=1, maxval=100)
         eddy_mode = gcmd.get("EDDY_MODE", "probe").lower()
-        if eddy_mode not in ("probe", "scan"):
-            raise gcmd.error("EDDY_MODE must be probe or scan")
+        if eddy_mode not in ("none", "probe", "scan"):
+            raise gcmd.error("EDDY_MODE must be none, probe, or scan")
         xy_speed = gcmd.get_float("XY_SPEED", self.move_speed, above=0.0)
         scan_count = gcmd.get_int("SCAN_COUNT", 3, minval=1, maxval=20)
         scan_height = gcmd.get_float("SCAN_HEIGHT", 2.0, above=0.0)
@@ -638,6 +638,9 @@ class EddyTapMeasure:
             },
         }
         self.last_tap_measurement = measurement
+
+        if eddy_mode == "none":
+            return
 
         probe = self.printer.lookup_object("probe")
         coil_pose, requested_pose, bounds = self._coil_over_target_pose(

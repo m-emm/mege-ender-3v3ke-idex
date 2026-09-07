@@ -1,4 +1,9 @@
-# Klipper XYZ Contact Probing — Two-stage Tool Calibration
+# Klipper XYZ Contact Probing — Two-stage Tool Calibration (legacy history)
+
+> **Superseded:** this document records the evolution of the ball and earlier
+> vision-assisted calibration work. The authoritative architecture is
+> `CONCEPT_IDEX_CALIBRATION_V2.md`; the operator procedure is
+> `IDEX_CALIBRATION.md`. Vision is no longer part of print calibration.
 
 ## Purpose
 

@@ -9,6 +9,11 @@ const verificationChapter = document.querySelector("#verification-chapter");
 const verificationState = document.querySelector("#verification-state");
 const verificationTools = document.querySelector("#verification-tools");
 const verificationOutcome = document.querySelector("#verification-outcome");
+const readiness = document.querySelector("#readiness");
+const bedChapter = document.querySelector("#bed-chapter");
+const bedState = document.querySelector("#bed-state");
+const bedReference = document.querySelector("#bed-reference");
+const bedMesh = document.querySelector("#bed-mesh");
 const empty = document.querySelector("#empty");
 const plotModal = document.querySelector("#plot-modal");
 const plotModalImage = document.querySelector("#plot-modal-image");
@@ -34,6 +39,23 @@ function formatMicrometres(value, digits = 1) {
   return Number.isFinite(Number(value))
     ? `${(Number(value) * 1000).toFixed(digits)} µm`
     : "—";
+}
+
+function conciseError(error) {
+  if (!error) return "";
+  const text = String(error);
+  const jsonStart = text.indexOf("{");
+  if (jsonStart >= 0) {
+    try {
+      const payload = JSON.parse(text.slice(jsonStart));
+      const message = payload?.error?.message;
+      if (message) return String(message);
+    } catch (_) {
+      // Fall back to the first line below for non-JSON failures.
+    }
+  }
+  const firstLine = text.split("\n", 1)[0].trim();
+  return firstLine.length > 180 ? `${firstLine.slice(0, 177)}…` : firstLine;
 }
 
 function escapeHtml(value) {
@@ -289,7 +311,16 @@ function verificationCards(entry) {
 }
 
 function normaliseChapters(data) {
-  if (data.chapters) return data.chapters;
+  if (data.chapters?.tool_alignment) return data.chapters;
+  if (data.chapters) {
+    return {
+      tool_alignment: {
+        calibration: data.chapters.calibration,
+        verification: data.chapters.verification,
+      },
+      bed_calibration: data.chapters.bed_calibration,
+    };
+  }
   const completed = data.status === "completed" ? data : (data.last_completed || data);
   const chapters = {};
   const workflow = completed.workflow || data.workflow;
@@ -304,7 +335,61 @@ function normaliseChapters(data) {
     chapters.verification ||= { runs: {} };
     chapters.verification.report = data.verification || completed.verification;
   }
-  return chapters;
+  return { tool_alignment: chapters };
+}
+
+function referenceCard(reference) {
+  if (!reference || !Object.keys(reference).length) return "";
+  const before = reference.before_rebase?.summary || {};
+  const after = reference.after_rebase?.summary || {};
+  const rebase = reference.rebase || {};
+  const target = reference.before_rebase?.target || reference.after_rebase?.target || {};
+  return `<article class="outcome-card"><h2>Absolute bed Z datum</h2><dl>
+    <dt>Reference</dt><dd>X=${format(target.x, 3)}, Y=${format(target.y, 3)}, target Z=0</dd>
+    <dt>Before median</dt><dd>${formatMicrometres(before.median)}</dd>
+    <dt>Before span</dt><dd>${formatMicrometres(before.span)}</dd>
+    <dt>Common T0/T1 delta</dt><dd>${formatMicrometres(rebase.common_delta_mm)}</dd>
+    <dt>After median</dt><dd>${formatMicrometres(after.median)}</dd>
+    <dt>After span</dt><dd>${formatMicrometres(after.span)}</dd>
+    <dt>Relative Z preserved</dt><dd>${rebase.difference_preserved === true ? "YES" : "—"}</dd>
+  </dl></article>`;
+}
+
+function referenceSamples(reference) {
+  return ["before_rebase", "after_rebase"].map((name) => {
+    const item = reference?.[name];
+    if (!item) return "";
+    const rows = (item.samples || []).map((sample) => `<tr><td>${sample.index}</td><td>${format(sample.x, 3)}</td><td>${format(sample.y, 3)}</td><td>${formatMicrometres(sample.z)}</td></tr>`).join("");
+    return `<article class="outcome-card"><h2>${name === "before_rebase" ? "Before common Z rebase" : "After deployment"}</h2>
+      <table class="offset-table"><thead><tr><th>Tap</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody>${rows}</tbody></table></article>`;
+  }).join("");
+}
+
+function meshCard(mesh) {
+  if (!mesh || !Object.keys(mesh).length) return "";
+  const progress = mesh.progress || {};
+  const complete = Number(progress.completed || 0);
+  const total = Number(progress.total || 0);
+  const percent = total ? Math.min(100, 100 * complete / total) : 0;
+  const verification = mesh.verification || {};
+  return `<article class="outcome-card"><h2>Persistent Tap mesh</h2>
+    <p>${escapeHtml(mesh.status || "preparing")} · ${complete}/${total || "?"} points${mesh.latest_point ? ` · latest X=${format(mesh.latest_point.x)} Y=${format(mesh.latest_point.y)}` : ""}</p>
+    <div class="mesh-progress"><span style="width:${percent}%"></span></div><dl>
+      <dt>Minimum</dt><dd>${formatMicrometres(mesh.minimum)}</dd>
+      <dt>Maximum</dt><dd>${formatMicrometres(mesh.maximum)}</dd>
+      <dt>Peak to peak</dt><dd>${formatMicrometres(mesh.range)}</dd>
+      <dt>Zero reference</dt><dd>${Array.isArray(mesh.zero_reference_position) ? mesh.zero_reference_position.join(", ") : "—"}</dd>
+      <dt>Matrix hash</dt><dd>${escapeHtml(String(mesh.matrix_sha256 || "—").slice(0, 12))}</dd>
+      <dt>Deployed and active</dt><dd>${verification.active === true ? "YES" : "—"}</dd>
+    </dl>${mesh.plot ? plotButton(mesh.plot, "Eddy Tap bed mesh") : ""}</article>`;
+}
+
+function renderBedChapter(entry) {
+  bedChapter.hidden = !entry;
+  if (!entry) return;
+  bedState.textContent = entry.status || "recorded";
+  bedReference.innerHTML = `${referenceCard(entry.reference)}${referenceSamples(entry.reference)}`;
+  bedMesh.innerHTML = meshCard(entry.mesh);
 }
 
 function renderChapter(chapterElement, stateElement, toolsElement, outcomeElement, entry, priors, outcomeHtml) {
@@ -320,14 +405,21 @@ function renderChapter(chapterElement, stateElement, toolsElement, outcomeElemen
 }
 
 function render(data) {
-  headline.textContent = `${data.status || "unknown"}: ${data.workflow || "multi-head-zero calibration"}${data.error ? ` — ${data.error}` : ""}`;
+  const error = conciseError(data.error);
+  headline.textContent = `${data.status || "unknown"}: ${data.stage || data.workflow || "IDEX calibration"}${error ? ` — ${error}` : ""}`;
   updated.textContent = data.updated_at ? `Updated ${new Date(data.updated_at).toLocaleTimeString()}` : "";
   events.innerHTML = (data.events || []).slice(-6).reverse().map((event) => `<span class="event">${escapeHtml(event.message)}</span>`).join("");
   const chapters = normaliseChapters(data);
+  const alignment = chapters.tool_alignment || {};
   const priors = data.configured_priors;
-  renderChapter(calibrationChapter, calibrationState, calibrationTools, calibrationOutcome, chapters.calibration, priors, calibrationCards(chapters.calibration));
-  renderChapter(verificationChapter, verificationState, verificationTools, verificationOutcome, chapters.verification, priors, `${verificationCentreProgressCard(chapters.verification)}${verificationCards(chapters.verification)}`);
-  empty.hidden = Boolean(chapters.calibration || chapters.verification);
+  renderChapter(calibrationChapter, calibrationState, calibrationTools, calibrationOutcome, alignment.calibration, priors, calibrationCards(alignment.calibration));
+  renderChapter(verificationChapter, verificationState, verificationTools, verificationOutcome, alignment.verification, priors, `${verificationCentreProgressCard(alignment.verification)}${verificationCards(alignment.verification)}`);
+  renderBedChapter(chapters.bed_calibration);
+  const printable = data.readiness?.printable === true;
+  const failed = data.status === "failed" || (data.readiness?.reasons || []).length > 0;
+  readiness.className = `readiness ${printable ? "ready" : (failed ? "failed" : "calibrating")}`;
+  readiness.textContent = printable ? "READY TO PRINT" : (failed ? "NOT READY TO PRINT" : "CALIBRATING");
+  empty.hidden = Boolean(alignment.calibration || alignment.verification || chapters.bed_calibration);
 }
 
 function closePlot() { plotModal.close(); }

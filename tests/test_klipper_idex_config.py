@@ -338,45 +338,14 @@ def test_eddy_probe_geometry_and_visualization_mesh_are_generated_from_calib():
     assert _setting_float(mesh, "horizontal_move_z") > 0
 
 
-def test_global_bed_to_nozzle_gap_is_required_finite_and_signed(
-    tmp_path,
-):
+def test_fixed_bed_to_nozzle_gap_is_rejected_from_measured_calibration(tmp_path):
     generator = _load_generator_module()
     source = CALIB_PATH.read_text(encoding="utf-8")
 
-    missing_gap = tmp_path / "missing-gap.yaml"
-    missing_gap.write_text(
-        re.sub(r"(?m)^bed_to_nozzle_gap:.*\n", "", source), encoding="utf-8"
-    )
-    with pytest.raises(ValueError, match="bed_to_nozzle_gap"):
-        generator.load_calibration(missing_gap)
-
-    for index, value in enumerate(("0", "-0.200")):
-        signed_gap = tmp_path / f"signed-gap-{index}.yaml"
-        signed_gap.write_text(
-            re.sub(
-                r"(?m)^bed_to_nozzle_gap:.*$",
-                f"bed_to_nozzle_gap: {value}",
-                source,
-            ),
-            encoding="utf-8",
-        )
-        assert generator.load_calibration(signed_gap)[
-            "bed_to_nozzle_gap"
-        ] == pytest.approx(float(value))
-
-    for index, value in enumerate((".nan", ".inf", "-.inf", "true")):
-        invalid_gap = tmp_path / f"invalid-gap-{index}.yaml"
-        invalid_gap.write_text(
-            re.sub(
-                r"(?m)^bed_to_nozzle_gap:.*$",
-                f"bed_to_nozzle_gap: {value}",
-                source,
-            ),
-            encoding="utf-8",
-        )
-        with pytest.raises(ValueError, match="finite real"):
-            generator.load_calibration(invalid_gap)
+    invalid = tmp_path / "fixed-gap-in-measured.yaml"
+    invalid.write_text(source + "\nbed_to_nozzle_gap: 0.0\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="non-measurement keys"):
+        generator.load_calibration(invalid)
 
 
 def test_legacy_tap_offset_is_rejected(tmp_path):
@@ -384,15 +353,8 @@ def test_legacy_tap_offset_is_rejected(tmp_path):
     source = CALIB_PATH.read_text(encoding="utf-8")
 
     legacy_offset = tmp_path / "legacy-offset.yaml"
-    legacy_offset.write_text(
-        re.sub(
-            r"(?m)^(\s+tap_threshold:.*)$",
-            r"\1\n    tap_z_offset: 0.000",
-            source,
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(ValueError, match="no longer"):
+    legacy_offset.write_text(source + "\ntap_z_offset: 0.000\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="non-measurement keys"):
         generator.load_calibration(legacy_offset)
 
 

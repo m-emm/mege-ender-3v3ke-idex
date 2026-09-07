@@ -18,7 +18,7 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 SOURCE_DIR="${SCRIPT_DIR}/calibration_dashboard"
 SOURCE_NGINX="${REPO_ROOT}/klipper_setup/image_build/overlays/stage2/99-klipperpi/files/nginx-mainsail.conf"
 REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
-REMOTE_DASHBOARD_DIR="/home/pi/printer_data/vision/multi_head_zero_calibration"
+REMOTE_DASHBOARD_DIR="/home/pi/printer_data/calibration"
 REMOTE_NGINX="/etc/nginx/sites-available/mainsail"
 ASSETS=(index.html style.css app.js)
 
@@ -87,9 +87,9 @@ if [[ "${MODE}" == "check" ]]; then
   exit 0
 fi
 
-remote_tmp="$(ssh "${REMOTE_HOST}" "mktemp -d /tmp/multi-head-zero-dashboard.XXXXXX")"
+remote_tmp="$(ssh "${REMOTE_HOST}" "mktemp -d /tmp/idex-calibration-dashboard.XXXXXX")"
 case "${remote_tmp}" in
-  /tmp/multi-head-zero-dashboard.*) ;;
+  /tmp/idex-calibration-dashboard.*) ;;
   *) echo "Refusing unexpected remote temporary directory: ${remote_tmp}" >&2; exit 1 ;;
 esac
 cleanup() {
@@ -115,8 +115,8 @@ temporary = path.with_name(".%s.initial.tmp" % path.name)
 temporary.write_text(
     json.dumps(
         {
-            "schema_version": 2,
-            "kind": "multi_head_zero_calibration_dashboard",
+            "schema_version": 3,
+            "kind": "idex_calibration_dashboard",
             "status": "idle",
             "workflow": "awaiting calibration",
             "events": [{"message": "No calibration run has been published yet."}],

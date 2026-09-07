@@ -1,230 +1,68 @@
-bed_grid_zero:
-  x: 113.300
-  y: 107.000
-# Canonical absolute Z datum for the Iteration 1 T0 tap workflow.
-bed_z_reference:
-  x: 150.000
-  y: 150.000
-# Signed physical nozzle-to-bed datum at G-code Z=0 for both tools: positive
-# is above the bed, zero is contact, and negative is below it. Raw Tap contact
-# is intentionally targeted at -bed_to_nozzle_gap.
-bed_to_nozzle_gap: 0.0
-# Measured on 2026-09-03 at X=117.5, Y=117.5, Z=20 using the left
-# toolhead ADXL345. Klipper stores X shaping per IDEX carriage; until T1 is
-# remeasured, the latest T0 X result is intentionally applied to both.
-input_shaper:
-  carriages:
-    t0:
-      x: { type: mzv, frequency_hz: 31.6 }
-    t1:
-      x: { type: mzv, frequency_hz: 31.6 }
-  y: { type: 2hump_ei, frequency_hz: 44.2 }
-# The single source of truth for the managed GUI/workflow Tap mesh command.
-# The generated printer.cfg and calibration runner both consume these values.
-tap_mesh:
-  profile: default
-  # One contact per grid point is the managed default.  A caller may still
-  # request a larger explicit SAMPLES value for a diagnostic run.
-  samples: 1
-  # Tap needs a post-XY-move mechanical settle. At the intermittent
-  # insufficient-slope point X=169.408, Y=62.506, a 3x3 native mesh and
-  # repeated single taps were stable with a 500 ms dwell on 2026-08-28.
-  settle_ms: 500
-  horizontal_move_z: 5.0
-  probe_count: [7, 7]
-  # Source-controlled copy of the mesh measured after the complete Z-axis
-  # rebuild on 2026-09-04. The live 7x7 Tap matrix passed five independent
-  # single-Tap checks at the center and all four mesh corners.
-  saved_mesh:
-    version: 1
-    points:
-      - [0.034864, 0.068636, 0.100114, 0.123343, 0.111136, 0.118888, 0.106404]
-      - [-0.006511, 0.028297, 0.089920, 0.076861, 0.104693, 0.104095, 0.117214]
-      - [-0.023787, -0.015292, 0.011099, 0.038776, 0.064049, 0.089172, 0.123154]
-      - [-0.154275, -0.091129, -0.039946, -0.004316, 0.025513, 0.093869, 0.079019]
-      - [-0.226111, -0.187519, -0.129170, -0.083119, -0.023318, 0.015393, 0.062862]
-      - [-0.326370, -0.267344, -0.194413, -0.173617, -0.116504, -0.029769, 0.005660]
-      - [-0.424954, -0.364903, -0.295710, -0.242285, -0.187549, -0.119580, -0.021884]
-    mesh_params:
-      min_x: 66.66
-      max_x: 189.96
-      min_y: 62.5
-      max_y: 274.96
-      x_count: 7
-      y_count: 7
-      mesh_x_pps: 0
-      mesh_y_pps: 0
-      algo: lagrange
-      tension: 0.2
-# The T0/T1 Z relationship is derived from the two endstops below. The Eddy/Tap
-# workflow may translate both together, but must preserve their difference.
-tools:
-  t0:
-    x_endstop: -85.082
-    y_endstop: -15.578
-    z_endstop: 291.493
-  t1:
-    x_endstop: 345.563
-    y_endstop: -13.962
-    z_endstop: 290.816
+# Measured printer calibration only. Measurement workflows update this file
+# atomically. Fixed geometry and workflow settings live in calib_config.yaml;
+# camera configuration lives in vision_config.yaml.
 
-# Measured parked-tool clearance for normal IDEX operation. With T0 at
-# X=-85.4, T1 first clears it at X=16.0: exactly 101.4 mm nozzle separation.
-# This is deliberately separate from Klipper's dual_carriage.safe_distance,
-# which only governs simultaneous carriage modes that this printer does not use
-# in normal operation.
-idex_x_reach:
-  model: measured_parked_tool_clearance_v1
-  safety_margin_mm: 0.000
-  first_contact_nozzle_separation_mm: 101.400
+t0_x_endstop: -85.228
+t0_y_endstop: -15.580
+t0_z_endstop: 291.493
+t1_x_endstop: 345.265
+t1_y_endstop: -14.145
+t1_z_endstop: 290.833
 
-# Multi-head-zero's physical ball and coordinate-frame priors. The target is
-# the authoritative logical ball centre; calibration rebases both tools to it.
-multi_head_zero_probe:
-  ball_diameter_mm: 10.000
-  ball_front_gap_mm: 1.000
-  y_zero_behind_front_edge_mm: 3.000
-  target: { x: 75.000, y: -9.000 }
-  seed_bounds:
-    x_min: 72.000
-    x_max: 78.000
-    y_min: -12.000
-    y_max: -6.000
-  refinement_ring_radius_mm: 2.800
+input_shaper_t0_x_type: mzv
+input_shaper_t0_x_frequency_hz: 31.600
+input_shaper_t1_x_type: mzv
+input_shaper_t1_x_frequency_hz: 31.600
+input_shaper_y_type: 2hump_ei
+input_shaper_y_frequency_hz: 44.200
 
-eddy_relative_calibration:
-  temperature_probe:
-    calibration_temp: 39.374745
-  # Vision-measured 2026-07-31 (idex_eddy_t0_xyz_offset job).
-  # The vector is from the nozzle center to the Eddy coil/fiducial center
-  # in printer coordinates.
-  nozzle_to_coil:
-    x: -57.391
-    y: -18.997
-    z: 1.399
-  klipper:
-    reg_drive_current: 15
-    # Known-good printer threshold; Iteration 1 does not discover or mutate it.
-    tap_threshold: 7500
-    calibrate: |
-        0.050000:3261436.931,0.090000:3260176.040,0.130000:3258971.083,
-        0.170000:3257602.593,0.210000:3256498.801,0.250000:3255329.233,
-        0.290000:3254224.560,0.330000:3252996.142,0.370000:3251949.529,
-        0.410000:3250795.624,0.450000:3249744.136,0.490000:3248610.022,
-        0.530000:3247625.063,0.570000:3246599.530,0.610000:3245676.973,
-        0.650000:3244663.990,0.690000:3243781.914,0.730000:3242830.340,
-        0.770000:3241936.905,0.810000:3240981.558,0.850000:3240146.483,
-        0.890000:3239217.652,0.930000:3238433.407,0.970000:3237509.774,
-        1.010000:3236743.990,1.050000:3235900.091,1.090000:3235118.343,
-        1.130000:3234226.410,1.170000:3233439.495,1.210000:3232599.941,
-        1.250000:3231811.293,1.290000:3230977.989,1.330000:3230279.180,
-        1.370000:3229490.679,1.410000:3228765.732,1.450000:3227964.726,
-        1.490000:3227272.799,1.530000:3226518.211,1.570000:3225796.777,
-        1.610000:3225026.071,1.650000:3224354.569,1.690000:3223639.423,
-        1.730000:3222971.620,1.770000:3222247.084,1.810000:3221609.002,
-        1.850000:3220917.517,1.890000:3220284.907,1.930000:3219616.648,
-        1.970000:3219018.164,2.010000:3218381.752,2.050000:3217777.555,
-        2.090000:3217132.071,2.130000:3216569.524,2.170000:3215967.165,
-        2.210000:3215413.067,2.250000:3214811.770,2.290000:3214280.534,
-        2.330000:3213728.124,2.370000:3213208.567,2.410000:3212640.969,
-        2.450000:3212152.617,2.490000:3211638.509,2.530000:3211154.184,
-        2.570000:3210629.399,2.610000:3210185.089,2.650000:3209695.007,
-        2.690000:3209236.644,2.730000:3208744.955,2.770000:3208324.163,
-        2.810000:3207849.819,2.850000:3207436.301,2.890000:3206988.014,
-        2.930000:3206611.986,2.970000:3206176.333,3.010000:3205795.533,
-        3.050000:3205365.327,3.090000:3205009.782,3.130000:3204611.624,
-        3.170000:3204248.784,3.210000:3203845.891,3.250000:3203505.085,
-        3.290000:3203124.889,3.330000:3202758.714,3.370000:3202393.185,
-        3.410000:3202073.009,3.450000:3201700.138,3.490000:3201380.032,
-        3.530000:3201007.846,3.570000:3200694.338,3.610000:3200352.164,
-        3.650000:3200030.672,3.690000:3199687.184,3.730000:3199404.379,
-        3.770000:3199098.238,3.810000:3198808.752,3.850000:3198495.284,
-        3.890000:3198230.468,3.930000:3197924.964,3.970000:3197650.860,
-        4.010000:3197346.787,4.050000:3197095.869
-    capture:
-      # Calibration at nozzle X=180 Y=35.
-      # After ACCEPT: nozzle moves to (237.4, 16.0), eddy sweeps at (180, 35).
-      # Bed front edge ~Y=24mm; eddy at Y=35 is 11mm inside the edge.
-      # The manual Eddy reference is accepted at the configured physical
-      # contact target (-bed_to_nozzle_gap), established by center Tap.
-      status: pending_calibration
-      method: accept_at_tap_contact_target
-      cold_only: true
-      drive_current:
-        chip: btt_eddy
-        coil_height_mm: 20.000
-        nozzle_command_position: { x: 180.000, y: 35.000, z: 20.000 }
-      height_mapping:
-        chip: btt_eddy
-        nozzle_start_position: { x: 180.000, y: 35.000, z: 0.000 }
-        required_usable_height_mm: 3.000
-      smoke_checks:
-        stationary_scan:
-          command: PROBE_ACCURACY METHOD=scan SAMPLES=50
-          result: pending
-        repeated_descent:
-          command: PROBE_ACCURACY SAMPLES=20 PROBE_SPEED=2 SAMPLE_RETRACT_DIST=1
-          result: pending
-cameras:
-  nozzle_cam:
-    image:
-      width_px: 1920
-      height_px: 1080
-      profile: analysis
-    targets:
-      rough_nozzle:
-        fixed_manual: true
-        capture_pose:
-          t0: { x: 185.000, y: -14.000, z: 3.000 }
-          t1: { x: 195.000, y: -14.000, z: 3.000 }
-        profile: analysis
-        camera_controls:
-          auto_exposure: 1
-          exposure_time_absolute: 1200
-          white_balance_automatic: 0
-          white_balance_temperature: 6500
-        lighting:
-          type: dotstar
-          pixels:
-            1: 0.30
-            2: 0.08
-            3: 0.00
-            4: 0.00
-            5: 0.08
-            6: 0.30
-            7: 0.30
-            8: 0.30
-        quality:
-          accepted: false
-          status: rebuild_pending
-        provenance:
-          source: rough calibration rebuild anchors
-      eddy_fiducial:
-        fixed_manual: true
-        capture_pose:
-          tool: T0
-          x: 230.000
-          y: -14.000
-          z: 3.000
-        profile: analysis
-        camera_controls:
-          auto_exposure: 1
-          exposure_time_absolute: 1200
-          white_balance_automatic: 0
-          white_balance_temperature: 6500
-        lighting:
-          type: dotstar
-          pixels:
-            1: 0.00
-            2: 0.00
-            3: 0.00
-            4: 0.00
-            5: 0.00
-            6: 0.00
-            7: 0.00
-            8: 0.00
-        quality:
-          accepted: false
-          status: lighting_sweep_required
-        provenance:
-          source: post-mechanical-change diagnostic anchor
+eddy_nozzle_to_coil_x_mm: -57.391
+eddy_nozzle_to_coil_y_mm: -18.997
+eddy_nozzle_to_coil_z_mm: 1.399
+eddy_temperature_calibration_c: 39.374745
+eddy_reg_drive_current: 15
+eddy_tap_threshold: 7500
+eddy_height_calibration: |
+  0.050000:3261436.931,0.090000:3260176.040,0.130000:3258971.083,
+  0.170000:3257602.593,0.210000:3256498.801,0.250000:3255329.233,
+  0.290000:3254224.560,0.330000:3252996.142,0.370000:3251949.529,
+  0.410000:3250795.624,0.450000:3249744.136,0.490000:3248610.022,
+  0.530000:3247625.063,0.570000:3246599.530,0.610000:3245676.973,
+  0.650000:3244663.990,0.690000:3243781.914,0.730000:3242830.340,
+  0.770000:3241936.905,0.810000:3240981.558,0.850000:3240146.483,
+  0.890000:3239217.652,0.930000:3238433.407,0.970000:3237509.774,
+  1.010000:3236743.990,1.050000:3235900.091,1.090000:3235118.343,
+  1.130000:3234226.410,1.170000:3233439.495,1.210000:3232599.941,
+  1.250000:3231811.293,1.290000:3230977.989,1.330000:3230279.180,
+  1.370000:3229490.679,1.410000:3228765.732,1.450000:3227964.726,
+  1.490000:3227272.799,1.530000:3226518.211,1.570000:3225796.777,
+  1.610000:3225026.071,1.650000:3224354.569,1.690000:3223639.423,
+  1.730000:3222971.620,1.770000:3222247.084,1.810000:3221609.002,
+  1.850000:3220917.517,1.890000:3220284.907,1.930000:3219616.648,
+  1.970000:3219018.164,2.010000:3218381.752,2.050000:3217777.555,
+  2.090000:3217132.071,2.130000:3216569.524,2.170000:3215967.165,
+  2.210000:3215413.067,2.250000:3214811.770,2.290000:3214280.534,
+  2.330000:3213728.124,2.370000:3213208.567,2.410000:3212640.969,
+  2.450000:3212152.617,2.490000:3211638.509,2.530000:3211154.184,
+  2.570000:3210629.399,2.610000:3210185.089,2.650000:3209695.007,
+  2.690000:3209236.644,2.730000:3208744.955,2.770000:3208324.163,
+  2.810000:3207849.819,2.850000:3207436.301,2.890000:3206988.014,
+  2.930000:3206611.986,2.970000:3206176.333,3.010000:3205795.533,
+  3.050000:3205365.327,3.090000:3205009.782,3.130000:3204611.624,
+  3.170000:3204248.784,3.210000:3203845.891,3.250000:3203505.085,
+  3.290000:3203124.889,3.330000:3202758.714,3.370000:3202393.185,
+  3.410000:3202073.009,3.450000:3201700.138,3.490000:3201380.032,
+  3.530000:3201007.846,3.570000:3200694.338,3.610000:3200352.164,
+  3.650000:3200030.672,3.690000:3199687.184,3.730000:3199404.379,
+  3.770000:3199098.238,3.810000:3198808.752,3.850000:3198495.284,
+  3.890000:3198230.468,3.930000:3197924.964,3.970000:3197650.860,
+  4.010000:3197346.787,4.050000:3197095.869
+
+bed_mesh_points:
+  - [0.034864, 0.068636, 0.100114, 0.123343, 0.111136, 0.118888, 0.106404]
+  - [-0.006511, 0.028297, 0.089920, 0.076861, 0.104693, 0.104095, 0.117214]
+  - [-0.023787, -0.015292, 0.011099, 0.038776, 0.064049, 0.089172, 0.123154]
+  - [-0.154275, -0.091129, -0.039946, -0.004316, 0.025513, 0.093869, 0.079019]
+  - [-0.226111, -0.187519, -0.129170, -0.083119, -0.023318, 0.015393, 0.062862]
+  - [-0.326370, -0.267344, -0.194413, -0.173617, -0.116504, -0.029769, 0.005660]
+  - [-0.424954, -0.364903, -0.295710, -0.242285, -0.187549, -0.119580, -0.021884]

@@ -53,7 +53,7 @@ def create_z_axis_top_mount_assembly(
     z_axis_profile,
     z_axis_rail,
     z_axis_threaded_rod,
-    endstop_holder_assembly,
+    creality_endstop_board_assembly,
     BIG_THING,
     z_axis_endstop_cable_hole_size,
     z_axis_endstop_profile_clearance,
@@ -80,104 +80,156 @@ def create_z_axis_top_mount_assembly(
     rail = _get_part(z_axis_rail)
     threaded_rod = _get_part(z_axis_threaded_rod)
 
-    top_mount_profile_mount_plates = PartCollector()
-    for lr in [Alignment.RIGHT]:
-        profile_mount_plate = create_profile_mount_plate(
-            profile_mount_width=z_axis_top_mount_profile_mount_width,
-            z_axis_profile_mount_plate_thickness=z_axis_profile_mount_plate_thickness,
-            z_axis_profile_mount_plate_height=z_axis_top_profile_mount_plate_height,
-            z_axis_profile_mount_plate_fillet_radius=z_axis_profile_mount_plate_fillet_radius,
-            BIG_THING=BIG_THING,
-            num_holes=z_axis_profile_mount_plate_num_holes,
-            screw_inset=z_axis_profile_mount_plate_screw_inset,
-        )
-        profile_mount_plate = rotate(90)(profile_mount_plate)
-        profile_mount_plate = align(
-            profile_mount_plate,
-            profile,
-            Alignment.CENTER,
-        )
-        profile_mount_plate = align(profile_mount_plate, profile, Alignment.TOP)
-        profile_mount_plate = align(
-            profile_mount_plate,
-            profile,
-            lr.stack_alignment,
-            stack_gap=z_axis_profile_mount_plate_clearance,
-        )
-        top_mount_profile_mount_plates = top_mount_profile_mount_plates.fuse(
-            profile_mount_plate
-        )
+    endstop_holder_thickness = 3.5
+    endstop_rail_clearance = 0.3
+    endstop_holder_extra_length = 6
+    endstop_holder_extra_front_size = 14
+    endstop_holder_extra_front_overlap = 3
+    mount_guide_width = 1.5
+    mount_gap = 1
+    mount_boss_diameter = 7
+    nut_slack = 0.1
 
-    top_mount_plate = top_mount_profile_mount_plates
+    long_hole_width = 3.5
 
-    endstop_holder = copy.deepcopy(endstop_holder_assembly)
+    endstop_board = copy.deepcopy(creality_endstop_board_assembly)
 
-    endstop_holder = rotate(-90)(endstop_holder)
+    endstop_board = rotate(180)(endstop_board)
+    endstop_board = rotate(90, axis=(1, 0, 0))(endstop_board)
+    endstop_board = rotate(-90)(endstop_board)
 
-    endstop_holder_board_size = get_bounding_box_size(
-        endstop_holder.get_non_production_part_by_name("board")
+    endstop_board = align(endstop_board, rail, Alignment.CENTER)
+    endstop_board = endstop_board.aligned_from_non_production_part(
+        "base", profile, Alignment.STACK_TOP
     )
-
-    top_mount_plate_extension = create_box(
-        z_axis_profile_mount_plate_thickness,
-        endstop_holder_board_size[1] + 14,
-        endstop_holder_board_size[2],
+    endstop_board = align(
+        endstop_board,
+        rail,
+        Alignment.STACK_LEFT,
+        stack_gap=endstop_holder_thickness + mount_gap,
     )
+    endstop_board = align(endstop_board, rail, Alignment.BACK)
+    endstop_board_base = endstop_board.get_named_non_production_part("base")
 
-    top_mount_plate_extension = align(
-        top_mount_plate_extension,
-        top_mount_plate,
-        Alignment.CENTER,
-    )
-    top_mount_plate_extension = align(
-        top_mount_plate_extension,
-        top_mount_plate,
-        Alignment.STACK_FRONT,
-    )
-    top_mount_plate_extension = align(
-        top_mount_plate_extension,
-        top_mount_plate,
-        Alignment.TOP,
-    )
+    endstop_board_size = get_bounding_box_size(endstop_board)
 
-    top_mount_plate = top_mount_plate.fuse(top_mount_plate_extension)
+    endstop_holder = materialize_bounding_box(
+        rail,
+        x_enlargement=2 * endstop_holder_thickness,
+        y_enlargement=2 * endstop_holder_thickness,
+        z_size=endstop_board_size[2] + endstop_holder_extra_length,
+    )
+    endstop_holder = align(endstop_holder, endstop_board_base, Alignment.BOTTOM)
 
-    endstop_holder = align(
+    endstop_holder_front_extension = materialize_bounding_box(
         endstop_holder,
-        top_mount_plate,
-        Alignment.TOP,
+        y_size=endstop_holder_extra_front_size,
+        x_size=endstop_holder_thickness,
     )
-    endstop_holder = align(
-        endstop_holder,
-        top_mount_plate,
-        Alignment.CENTER,
-        axes=[0],
+    endstop_holder_front_extension = align(
+        endstop_holder_front_extension, endstop_board_base, Alignment.FRONT
+    )
+    endstop_holder_front_extension = align(
+        endstop_holder_front_extension, endstop_holder, Alignment.LEFT
+    )
+    endstop_holder_front_extension = translate(
+        0, -endstop_holder_extra_front_overlap, 0
+    )(endstop_holder_front_extension)
+
+    endstop_holder = endstop_holder.fuse(endstop_holder_front_extension)
+
+    endstop_holder_size = get_bounding_box_size(endstop_holder)
+
+    long_hole_cutter = create_rounded_slab(
+        endstop_holder_size[2] - 3 * long_hole_width,
+        long_hole_width,
+        BIG_THING,
+        round_radius=long_hole_width / 2,
     )
 
-    endstop_holder = align(
-        endstop_holder,
-        top_mount_plate,
-        Alignment.FRONT,
+    long_hole_cutter = rotate(90)(long_hole_cutter)
+    long_hole_cutter = rotate(90, axis=(1, 0, 0))(long_hole_cutter)
+
+    long_hole_cutter = align(long_hole_cutter, endstop_holder, Alignment.CENTER)
+
+    endstop_holder = endstop_holder.cut(long_hole_cutter)
+
+    rail_cutter = materialize_bounding_box(
+        rail,
+        x_enlargement=2 * endstop_rail_clearance,
+        y_enlargement=2 * endstop_rail_clearance,
     )
-    endstop_holder = align(
-        endstop_holder,
-        top_mount_plate,
-        Alignment.RIGHT,
-    )
 
-    endstop_holder_cutter = materialize_bounding_box(endstop_holder, x_enlargement=5)
-    top_mount_plate = top_mount_plate.cut(endstop_holder_cutter)
+    endstop_holder = endstop_holder.cut(rail_cutter)
 
-    # endstop_holder = translate(
-    #     0,
-    #     -z_axis_endstop_profile_clearance,
-    #     0,
-    # )(endstop_holder)
+    mount_guides = PartCollector()
+    for fb in [Alignment.FRONT, Alignment.BACK]:
+        mount_guide = materialize_bounding_box(
+            endstop_board_base,
+            x_size=mount_gap,
+            y_size=mount_guide_width,
+            z_enlargement=-4,
+        )
+        mount_guide = align(mount_guide, endstop_board_base, fb)
+        mount_guide = align(mount_guide, endstop_holder, Alignment.STACK_LEFT)
+        mount_guide = align(mount_guide, endstop_board_base, Alignment.BOTTOM)
+        mount_guides = mount_guides.fuse(mount_guide)
 
-    top_mount_plate = top_mount_plate.fuse(endstop_holder.leader)
+    mount_bosses = PartCollector()
+    mount_hole_cutters = PartCollector()
+    square_nuts = []
+    for cutter in endstop_board.cutters:
+        cutter = align(
+            cutter,
+            endstop_holder,
+            Alignment.STACK_LEFT,
+            stack_gap=-2 * endstop_holder_thickness,
+        )
 
-    retval = LeaderFollowersCuttersPart(leader=top_mount_plate)
-    for name, part in endstop_holder.get_named_non_production_part_items():
-        retval.add_named_non_production_part(part, f"endstop_{name}")
+        mount_boss = create_box(
+            mount_boss_diameter, mount_boss_diameter, mount_gap
+        )  # create_cylinder(mount_boss_diameter/2, mount_gap)
+        mount_boss = rotate(45)(mount_boss)
+        mount_boss = rotate(90, axis=(0, 1, 0))(mount_boss)
+        mount_boss = align(mount_boss, cutter, Alignment.CENTER)
+        mount_boss = align(mount_boss, endstop_holder, Alignment.STACK_LEFT)
+        mount_bosses = mount_bosses.fuse(mount_boss)
+
+        square_nut_cutter = create_square_nut(
+            "M3", slack=nut_slack, height=2 * endstop_holder_thickness, no_hole=True
+        )
+        square_nut_cutter = rotate(45)(square_nut_cutter)
+        square_nut_cutter = rotate(90, axis=(0, 1, 0))(square_nut_cutter)
+        square_nut_cutter = align(square_nut_cutter, cutter, Alignment.CENTER)
+        square_nut_cutter = align(
+            square_nut_cutter,
+            endstop_holder,
+            Alignment.STACK_LEFT,
+            stack_gap=-2.5 * endstop_holder_thickness,
+        )
+
+        mount_hole_cutters = mount_hole_cutters.fuse(square_nut_cutter)
+        mount_hole_cutters = mount_hole_cutters.fuse(cutter)
+
+        square_nut = create_square_nut("M3")
+        square_nut = rotate(45)(square_nut)
+        square_nut = rotate(90, axis=(0, 1, 0))(square_nut)
+        square_nut = align(square_nut, square_nut_cutter, Alignment.CENTER)
+        square_nut = align(square_nut, square_nut_cutter, Alignment.LEFT)
+
+        square_nuts.append(square_nut)
+
+    endstop_holder = endstop_holder.fuse(mount_guides)
+    endstop_holder = endstop_holder.fuse(mount_bosses)
+    endstop_holder = endstop_holder.cut(mount_hole_cutters)
+
+    retval = LeaderFollowersCuttersPart(leader=endstop_holder)
+    for i, square_nut in enumerate(square_nuts):
+        retval.add_named_non_production_part(square_nut, f"square_nut_{i}")
+    for name, part in endstop_board.get_named_non_production_part_items():
+        full_name = f"endstop_{name}"
+        retval.add_named_non_production_part(part, full_name)
+        if name == "board":
+            retval.set_hidden_by_default(full_name)
 
     return retval

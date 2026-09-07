@@ -50,6 +50,10 @@ if [[ ! -f "${SCRIPT_DIR}/priors.yaml" ]]; then
   echo "Missing required file: ${SCRIPT_DIR}/priors.yaml" >&2
   exit 1
 fi
+if [[ ! -f "${SCRIPT_DIR}/vision_config.yaml" ]]; then
+  echo "Missing required file: ${SCRIPT_DIR}/vision_config.yaml" >&2
+  exit 1
+fi
 
 echo "Checking cameras on ${REMOTE_HOST}:"
 echo "  primary: ${PRIMARY_CAMERA_DEVICE}"
@@ -104,6 +108,7 @@ scp \
   "${FILES_DIR}/vision-capture.service" \
   "${FILES_DIR}/vision-capture-nozzle-cam.service" \
   "${SCRIPT_DIR}/calib.yaml" \
+  "${SCRIPT_DIR}/vision_config.yaml" \
   "${SCRIPT_DIR}/priors.yaml" \
   "${REMOTE_HOST}:${remote_tmp}/"
 
@@ -239,6 +244,7 @@ sudo install -m 0755 "${REMOTE_TMP}/webcam_health_probe.py" /usr/local/bin/webca
 sudo install -m 0644 "${REMOTE_TMP}/nozzle_cam_profiles.json" /usr/local/share/vision/nozzle_cam_profiles.json
 sudo install -m 0644 "${REMOTE_TMP}/vision_job_types.json" /usr/local/share/vision/vision_job_types.json
 sudo install -m 0644 "${REMOTE_TMP}/calib.yaml" /usr/local/share/vision/calib.yaml
+sudo install -m 0644 "${REMOTE_TMP}/vision_config.yaml" /usr/local/share/vision/vision_config.yaml
 sudo install -m 0644 "${REMOTE_TMP}/priors.yaml" /usr/local/share/vision/priors.yaml
 sudo rm -f /usr/local/share/vision/vision_calibration_priors.json
 sudo rm -f \

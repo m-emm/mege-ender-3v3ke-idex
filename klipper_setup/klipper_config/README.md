@@ -3,7 +3,10 @@
 This directory has one active printer configuration:
 
 - `printer.cfg` is THE config for the active printer.
-- `printer.cfg.template` plus `calib.yaml` generate `printer.cfg`.
+- `printer.cfg.template`, measured-only `calib.yaml`, and fixed
+  `calib_config.yaml` generate `printer.cfg`.
+- `vision_config.yaml` contains diagnostic camera configuration only. Vision is
+  not part of the authoritative print-calibration chain.
 - `wiring/` is THE active wiring source for the custom Pico/TMC wiring.
 - `../klipper_host/` is THE active Klipper host-extra source and contains the
   managed heater baseline plus the Tap-aware `bed_mesh.py` override. The
@@ -22,8 +25,9 @@ cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
 
 ## Daily Workflow
 
-Edit `calib.yaml`, `printer.cfg.template`, or active wiring YAMLs, check the
-generated config and wiring consistency, then deploy when needed:
+Do not hand-edit measured values as a calibration workflow. Run the fully
+automatic procedure documented in `IDEX_CALIBRATION.md`. Template/design work
+can still be checked and deployed with:
 
 ```bash
 cd /Users/mege/git/mege-ender-3v3ke-idex/klipper_setup/klipper_config
@@ -76,7 +80,11 @@ scripts/run_resonance_plot.sh Y --measure-at-x=150 --measure-at-z=150
 The wrapper copies the complete Pi-side run directory locally, including the
 raw resonance CSV, calibration CSV, plot, summary, and latest aliases.
 
-## Vision Code Development, Deployment, and Artifact Download
+## Legacy Vision Code Development, Deployment, and Artifact Download
+
+> **Legacy diagnostic subsystem:** vision calibration is retained for imaging
+> experiments and historical evidence. It does not establish print readiness
+> and must not write the authoritative endstops or bed mesh.
 
 The commands in this section assume the current directory is already the
 repository root:
@@ -117,22 +125,12 @@ If a new Python module is added, also add it to the required-file, `scp`, and
 `install` lists in
 `klipper_setup/klipper_config/deploy_webcam_vision.sh`.
 
-### Apply the latest vision tool-XY candidate locally
+### Legacy vision tool-XY candidate
 
-After successful `idex_tool_xy_measure_t0` and `idex_tool_xy_measure_t1` jobs,
-deploy the current vision code and run:
-
-```bash
-klipper_setup/klipper_config/fetch_apply_vision_tool_xy_candidate.sh
-```
-
-The script runs the compute-only `idex_tool_xy_candidate` job against the two
-latest published datum facts, fetches its hashed candidate, verifies that the
-local versioned `calib.yaml` still contains the acquisition-time T0/T1 X/Y
-endstops, updates only `tools.t1.{x,y}_endstop`, and regenerates the versioned
-`printer.cfg`. It does not deploy or restart the printer. Review the diff, then
-use `update_menderpi.sh` to deploy the generated Klipper config and
-`deploy_webcam_vision.sh` to synchronize the DAO copy of `calib.yaml`.
+The former `fetch_apply_vision_tool_xy_candidate.sh` helper is disabled. Vision
+measurements remain useful diagnostics, but they cannot write the authoritative
+tool endstops. Run `scripts/run_idex_calibration.sh` for physical ball-based
+T0/T1 alignment.
 
 After deployment, a changed tool endstop invalidates the old XY image prior.
 Refresh both priors and verify their provenance with:
@@ -362,18 +360,9 @@ rows are then fitted to a shared robust quadratic slope-versus-physical-Z curve
 with a bounded T1 Z shift. Poor-correlation rows and MAD-detected curve outliers
 are excluded and documented; the resulting T1 Z delta remains diagnostic only.
 
-After reviewing an accepted shared-curve result, fetch and apply its local T1
-Z-endstop candidate with:
-
-```bash
-./fetch_apply_vision_tool_z_offset_candidate.sh
-```
-
-The helper verifies that local T0/T1 Z endstops still match the sweep's
-acquisition snapshot, then applies `new T1 z_endstop = old z_endstop + fitted
-T1 Z delta` and regenerates `printer.cfg`. Because Z homes at the top, a
-negative fitted delta reduces `z_endstop` and raises the T1 nozzle. The helper
-only edits the local source-of-truth files; deployment remains explicit.
+The former `fetch_apply_vision_tool_z_offset_candidate.sh` helper is also
+disabled. Its result is diagnostic evidence only; physical T1 Z alignment is
+owned by the multi-head-zero chapter of `scripts/run_idex_calibration.sh`.
 
 > Calibration boundary (2026-08-23): the accepted T0/T1 XY state is the end
 > calibration state for the IDEX tools. The XZ sweep implementation is retained
