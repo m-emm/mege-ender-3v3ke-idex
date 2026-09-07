@@ -80,17 +80,19 @@ def create_z_axis_top_mount_assembly(
     rail = _get_part(z_axis_rail)
     threaded_rod = _get_part(z_axis_threaded_rod)
 
-    endstop_holder_thickness = 3.5
-    endstop_rail_clearance = 0.3
+    endstop_holder_thickness = 4.5
+    endstop_rail_clearance = 0.2
     endstop_holder_extra_length = 6
-    endstop_holder_extra_front_size = 14
+    endstop_holder_extra_front_size = 25
     endstop_holder_extra_front_overlap = 3
     mount_guide_width = 1.5
-    mount_gap = 1
+    mount_gap = 2
     mount_boss_diameter = 7
-    nut_slack = 0.1
+    nut_slack = 0.2
 
     long_hole_width = 3.5
+
+    endstop_y_offset = -11
 
     endstop_board = copy.deepcopy(creality_endstop_board_assembly)
 
@@ -109,6 +111,8 @@ def create_z_axis_top_mount_assembly(
         stack_gap=endstop_holder_thickness + mount_gap,
     )
     endstop_board = align(endstop_board, rail, Alignment.BACK)
+    endstop_board = translate(0, endstop_y_offset, 0)(endstop_board)
+
     endstop_board_base = endstop_board.get_named_non_production_part("base")
 
     endstop_board_size = get_bounding_box_size(endstop_board)
