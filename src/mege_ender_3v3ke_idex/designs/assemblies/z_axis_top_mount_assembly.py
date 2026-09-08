@@ -23,7 +23,7 @@ def create_profile_mount_plate(
         # no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
     )
 
-    hole_drill_diameter = MScrew.from_size("M5").clearance_hole_loose
+    hole_drill_diameter = MScrew.from_size("M5").clearance_hole_loose + 0.1
 
     hole_drills = PartCollector()
     hole_pitch = (
@@ -99,6 +99,8 @@ def create_z_axis_top_mount_assembly(
     mount_nut_front_wall = 1.2
 
     square_nut_wall_thickness = 2
+
+    endstop_mount_hole_diameter = MScrew.from_size("M3").clearance_hole_loose
 
     endstop_board = copy.deepcopy(creality_endstop_board_assembly)
 
@@ -219,6 +221,15 @@ def create_z_axis_top_mount_assembly(
     mount_hole_cutters = PartCollector()
     square_nuts = []
     for cutter in endstop_board.cutters:
+
+        cutter_size = get_bounding_box_size(cutter)
+
+        new_cutter = create_cylinder(endstop_mount_hole_diameter / 2, cutter_size[0])
+        new_cutter = rotate(90, axis=(0, 1, 0))(new_cutter)
+        new_cutter = align(new_cutter, cutter, Alignment.CENTER)
+
+        cutter = new_cutter
+
         cutter = align(
             cutter,
             endstop_holder,
