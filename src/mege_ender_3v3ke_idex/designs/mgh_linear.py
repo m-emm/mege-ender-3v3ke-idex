@@ -143,7 +143,7 @@ def create_mgn12h_rail(length_mm: float):
     """Create the MGN12H rail part."""
 
     width = 12
-    height = 8.5
+    height = 8
     hole_pitch = 25
     top_hole_diameter = 8
     bottom_hole_diameter = 4.5

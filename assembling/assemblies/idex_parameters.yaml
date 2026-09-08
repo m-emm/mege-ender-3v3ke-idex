@@ -635,7 +635,7 @@ globals:
   multi_head_zero_mount_clamp_thread_inset_extra_radius: 1.5
   multi_head_zero_mount_clamp_thread_inset_hole_radius_adjustment: -0.1
   multi_head_zero_mount_screw_mount_clearance_type: "loose"
-  multi_head_zero_ball_stack_gap: 1.0
+  multi_head_zero_ball_stack_gap: 2.5
 
   electric_switchboard_height: 100
   electric_switchboard_width: 40

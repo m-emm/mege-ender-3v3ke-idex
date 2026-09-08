@@ -81,7 +81,8 @@ def create_z_axis_top_mount_assembly(
     threaded_rod = _get_part(z_axis_threaded_rod)
 
     endstop_holder_thickness = 4.5
-    endstop_rail_clearance = 0.2
+    endstop_holder_front_thickness = 5.5
+    endstop_rail_clearance = 0.1
     endstop_holder_extra_length = 6
     endstop_holder_extra_front_size = 25
     endstop_holder_extra_front_overlap = 3
@@ -90,9 +91,14 @@ def create_z_axis_top_mount_assembly(
     mount_boss_diameter = 7
     nut_slack = 0.2
 
-    long_hole_width = 3.5
+    long_hole_width = 3.1
 
     endstop_y_offset = -11
+
+    mount_nut_slack = 0.1
+    mount_nut_front_wall = 1.2
+
+    square_nut_wall_thickness = 2
 
     endstop_board = copy.deepcopy(creality_endstop_board_assembly)
 
@@ -119,11 +125,15 @@ def create_z_axis_top_mount_assembly(
 
     endstop_holder = materialize_bounding_box(
         rail,
-        x_enlargement=2 * endstop_holder_thickness,
-        y_enlargement=2 * endstop_holder_thickness,
+        x_enlargement=endstop_holder_thickness,
+        y_enlargement=endstop_holder_front_thickness + endstop_holder_thickness,
         z_size=endstop_board_size[2] + endstop_holder_extra_length,
     )
     endstop_holder = align(endstop_holder, endstop_board_base, Alignment.BOTTOM)
+    endstop_holder = align(endstop_holder, rail, Alignment.RIGHT)
+
+    endstop_holder = align(endstop_holder, rail, Alignment.BACK)
+    endstop_holder = translate(0, endstop_holder_thickness, 0)(endstop_holder)
 
     endstop_holder_front_extension = materialize_bounding_box(
         endstop_holder,
@@ -140,8 +150,6 @@ def create_z_axis_top_mount_assembly(
         0, -endstop_holder_extra_front_overlap, 0
     )(endstop_holder_front_extension)
 
-    endstop_holder = endstop_holder.fuse(endstop_holder_front_extension)
-
     endstop_holder_size = get_bounding_box_size(endstop_holder)
 
     long_hole_cutter = create_rounded_slab(
@@ -155,8 +163,36 @@ def create_z_axis_top_mount_assembly(
     long_hole_cutter = rotate(90, axis=(1, 0, 0))(long_hole_cutter)
 
     long_hole_cutter = align(long_hole_cutter, endstop_holder, Alignment.CENTER)
+    long_hole_cutter = align(long_hole_cutter, rail, Alignment.CENTER, axes=[0])
+
+    square_mount_nut = create_square_nut("M3")
+    square_mount_nut = rotate(90, axis=(1, 0, 0))(square_mount_nut)
+
+    mount_nut_groove_cutter = materialize_bounding_box(
+        square_mount_nut,
+        x_enlargement=2 * mount_nut_slack,
+        y_enlargement=2 * mount_nut_slack,
+        z_size=500,
+    )
+
+    mount_nut_groove_cutter = align(
+        mount_nut_groove_cutter, long_hole_cutter, Alignment.CENTER
+    )
+    mount_nut_groove_cutter = align(
+        mount_nut_groove_cutter, long_hole_cutter, Alignment.BOTTOM
+    )
+    mount_nut_groove_cutter = align(
+        mount_nut_groove_cutter, endstop_holder, Alignment.FRONT
+    )
+    square_mount_nut_size = get_bounding_box_size(square_mount_nut)
+    mount_nut_groove_cutter = translate(
+        0, mount_nut_front_wall, -square_mount_nut_size[2] / 2
+    )(mount_nut_groove_cutter)
+
+    endstop_holder = endstop_holder.fuse(endstop_holder_front_extension)
 
     endstop_holder = endstop_holder.cut(long_hole_cutter)
+    endstop_holder = endstop_holder.cut(mount_nut_groove_cutter)
 
     rail_cutter = materialize_bounding_box(
         rail,
@@ -200,7 +236,7 @@ def create_z_axis_top_mount_assembly(
         mount_bosses = mount_bosses.fuse(mount_boss)
 
         square_nut_cutter = create_square_nut(
-            "M3", slack=nut_slack, height=2 * endstop_holder_thickness, no_hole=True
+            "M3", slack=nut_slack, height=endstop_holder_thickness, no_hole=True
         )
         square_nut_cutter = rotate(45)(square_nut_cutter)
         square_nut_cutter = rotate(90, axis=(0, 1, 0))(square_nut_cutter)
@@ -208,9 +244,23 @@ def create_z_axis_top_mount_assembly(
         square_nut_cutter = align(
             square_nut_cutter,
             endstop_holder,
-            Alignment.STACK_LEFT,
-            stack_gap=-2.5 * endstop_holder_thickness,
+            Alignment.LEFT,
         )
+
+        square_nut_cutter = translate(square_nut_wall_thickness, 0, 0)(
+            square_nut_cutter
+        )
+
+        cutter_shortener = create_box(500, 500, 500)
+        cutter_shortener = align(cutter_shortener, cutter, Alignment.CENTER)
+        cutter_shortener = align(
+            cutter_shortener,
+            mount_boss,
+            Alignment.STACK_RIGHT,
+            stack_gap=endstop_holder_thickness,
+        )
+
+        cutter = cutter.cut(cutter_shortener)
 
         mount_hole_cutters = mount_hole_cutters.fuse(square_nut_cutter)
         mount_hole_cutters = mount_hole_cutters.fuse(cutter)
