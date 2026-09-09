@@ -57,11 +57,26 @@ DEPLOY_PATH = CONFIG_DIR / "update_menderpi.sh"
 DEFAULT_MOONRAKER_URL = "http://menderpi.local:7125"
 DEFAULT_REMOTE_HOST = "pi@menderpi.local"
 REMOTE_DASHBOARD_ROOT = "/home/pi/printer_data/calibration"
-REFERENCE_TAP_COUNT = 3
+REFERENCE_TAP_COUNT = 5
 REFERENCE_MAX_SPAN_MM = 0.030
 REFERENCE_ZERO_TOLERANCE_MM = 0.030
-COMMON_Z_MAX_ADJUSTMENT_MM = 2.0
+DISCOVERY_START_Z_MM = 10.0
+DISCOVERY_BAND_MM = 2.0
+# Move the two-millimetre window down by only one millimetre at a time.  Thus
+# every height (including an exact band boundary) is covered by two discovery
+# attempts instead of depending on one endpoint's trigger timing.
+DISCOVERY_OVERLAP_MM = 1.0
+DISCOVERY_FINAL_Z_MM = -2.2
+NARROW_START_MARGIN_MM = 2.0
+NARROW_BELOW_CONTACT_MM = 1.0
+# The Eddy fit needs a sufficiently long pullback sample window.  This is
+# deliberately independent of the two-millimetre height margin: the nozzle
+# starts two millimetres above the discovered contact, but retracts four
+# millimetres after a trigger so the fit has enough data to validate it.
+DISCOVERY_RETRACT_MM = 4.0
+NARROW_RETRACT_MM = 4.0
 MESH_AWARE_TOLERANCE_MM = 0.040
+VALID_PHASES = {"full", "reference", "mesh"}
 
 
 class CalibrationError(RuntimeError):
@@ -106,12 +121,22 @@ class Moonraker:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.load(response)
         result = payload.get("result", payload)
+        # Moonraker's gcode-script endpoint legitimately returns a JSON null
+        # result after accepting the command.  Treat that acknowledgement as
+        # success; query endpoints still return their normal mappings.
+        if result is None or (path == "/printer/gcode/script" and result == "ok"):
+            return {}
         if not isinstance(result, dict):
             raise CalibrationError(f"unexpected Moonraker response for {path}")
         return result
 
     def status(self, *objects: str) -> dict[str, Any]:
-        query = "&".join(objects)
+        # Object names may contain spaces (for example ``temperature_probe
+        # btt_eddy``); quote each query value while preserving Moonraker's
+        # ampersand-separated object list.
+        query = "&".join(
+            urllib.parse.quote(object_name, safe="") for object_name in objects
+        )
         return self.request(f"/printer/objects/query?{query}").get("status", {})
 
     def gcode(self, script: str, *, timeout: float = 60.0) -> None:
@@ -320,9 +345,16 @@ def reference_sample(
     y: float,
     index: int,
     phase: str,
+    start_z: float,
+    target_z: float,
+    retract: float,
+    allow_rejected: bool = False,
 ) -> dict[str, Any]:
+    rejected = " ALLOW_REJECTED=1" if allow_rejected else ""
     client.gcode(
-        f"EDDY_TAP_MEASURE X={x:.3f} Y={y:.3f} COUNT=1 EDDY_MODE=none",
+        f"_EDDY_TAP_MEASURE X={x:.3f} Y={y:.3f} COUNT=1 EDDY_MODE=none "
+        f"START_Z={start_z:.6f} TAP_TARGET_Z={target_z:.6f} "
+        f"SAMPLE_RETRACT_DIST={retract:.6f}{rejected}",
         timeout=90,
     )
     status = client.status(
@@ -337,7 +369,32 @@ def reference_sample(
     measurement = status.get("eddy_tap_measure", {}).get("last_tap_measurement")
     if not isinstance(measurement, dict):
         raise CalibrationError("EDDY_TAP_MEASURE did not publish a measurement")
-    samples = measurement.get("tap", {}).get("samples")
+    tap = measurement.get("tap", {})
+    if tap.get("status") == "no_trigger":
+        return {
+            "status": "no_trigger",
+            "index": index,
+            "phase": phase,
+            "x": x,
+            "y": y,
+            "start_z": float(start_z),
+            "target_z": float(target_z),
+            "retract": float(retract),
+        }
+    if tap.get("status") == "rejected":
+        return {
+            "status": "rejected",
+            "index": index,
+            "phase": phase,
+            "x": x,
+            "y": y,
+            "start_z": float(start_z),
+            "target_z": float(target_z),
+            "retract": float(retract),
+            "error": tap.get("error", "rejected tap"),
+            "diagnostics": tap.get("diagnostics", {}),
+        }
+    samples = tap.get("samples")
     if not isinstance(samples, list) or len(samples) != 1:
         raise CalibrationError("EDDY_TAP_MEASURE did not publish exactly one tap")
     sample = samples[0]
@@ -352,6 +409,7 @@ def reference_sample(
     ):
         raise CalibrationError("reference Tap did not use clean T0 state")
     return {
+        "status": "contact",
         "index": index,
         "phase": phase,
         "x": float(sample["x"]),
@@ -364,6 +422,107 @@ def reference_sample(
         "machine_position": status.get("toolhead", {}).get("position"),
         "config_fingerprint": config_fingerprint(status),
     }
+
+
+def discover_reference(
+    client: Moonraker,
+    dashboard: DashboardPublisher,
+    *,
+    x: float,
+    y: float,
+    phase: str,
+) -> dict[str, Any]:
+    """Find one valid physical tap in fixed, descending 2 mm bands."""
+    status = client.status("toolhead")
+    toolhead = status.get("toolhead", {})
+    axis_minimum = toolhead.get("axis_minimum")
+    if not isinstance(axis_minimum, list) or len(axis_minimum) < 3:
+        raise CalibrationError("cannot determine the live Z minimum for staged search")
+    z_min = float(axis_minimum[2])
+    if abs(z_min - DISCOVERY_FINAL_Z_MM) > 1.0e-6:
+        raise CalibrationError(
+            f"live Z minimum {z_min:.6f} differs from required "
+            f"{DISCOVERY_FINAL_Z_MM:.6f}"
+        )
+    bands = []
+    start_z = DISCOVERY_START_Z_MM
+    band_index = 0
+    while start_z > z_min + 1.0e-9:
+        # Keep the final band aligned with the documented Z=0 handoff; it is
+        # intentionally 2.2 mm wide rather than introducing a second
+        # overlapping window below zero.
+        target_z = z_min if start_z <= 0.0 else max(z_min, start_z - DISCOVERY_BAND_MM)
+        band_index += 1
+        message = (
+            f"Eddy reference {phase} discovery band {band_index}: "
+            f"Z={start_z:.3f}->{target_z:.3f}"
+        )
+        dashboard.event(message, status="running")
+        console(client, message)
+        sample = reference_sample(
+            client,
+            x=x,
+            y=y,
+            index=band_index,
+            phase=f"{phase}_discovery",
+            start_z=start_z,
+            target_z=target_z,
+            retract=DISCOVERY_RETRACT_MM,
+            allow_rejected=True,
+        )
+        band = {
+            "index": band_index,
+            "start_z": start_z,
+            "target_z": target_z,
+            "status": sample["status"],
+        }
+        bands.append(band)
+        if sample["status"] == "contact":
+            found_z = float(sample["z"])
+            console(
+                client, f"Eddy reference {phase} discovery contact Z={found_z:+.6f}"
+            )
+            dashboard.event(
+                f"Eddy reference {phase} discovery contact Z={found_z:+.6f}",
+                status="running",
+            )
+            return {
+                "target": {"x": x, "y": y, "z": 0.0},
+                "bands": bands,
+                "contact": sample,
+                "found_z": found_z,
+                "z_min": z_min,
+            }
+        if sample["status"] == "rejected":
+            diagnostics = sample.get("diagnostics", {})
+            trigger_z = diagnostics.get("trigger_z")
+            endpoint_tolerance = 0.010
+            if (
+                trigger_z is not None
+                and abs(float(trigger_z) - target_z) <= endpoint_tolerance
+                and target_z > z_min + 1.0e-9
+            ):
+                band["status"] = "boundary_rejected"
+                band["trigger_z"] = float(trigger_z)
+                message = (
+                    f"Eddy reference {phase} boundary trigger at "
+                    f"Z={float(trigger_z):+.6f}; retrying in next overlapping band"
+                )
+                console(client, message)
+                dashboard.event(message, status="running")
+            else:
+                raise CalibrationError(
+                    f"Eddy reference {phase} rejected tap in band "
+                    f"{start_z:.3f}->{target_z:.3f}: {sample.get('error', 'unknown error')}"
+                )
+        # Descend by one millimetre while retaining a two-millimetre guarded
+        # window.  The final clamped band is emitted once and then terminates.
+        if target_z <= z_min + 1.0e-9:
+            break
+        start_z = target_z + DISCOVERY_OVERLAP_MM
+    raise CalibrationError(
+        f"Eddy reference {phase} staged search reached Z minimum without a valid tap"
+    )
 
 
 def summarize(samples: list[dict[str, Any]]) -> dict[str, float]:
@@ -386,15 +545,40 @@ def collect_reference(
     x: float,
     y: float,
     phase: str,
+    discovery: dict[str, Any],
 ) -> dict[str, Any]:
+    discovery_z = float(discovery["found_z"])
+    start_z = discovery_z + NARROW_START_MARGIN_MM
+    target_z = max(float(discovery["z_min"]), discovery_z - NARROW_BELOW_CONTACT_MM)
+    window = {
+        "start_z": start_z,
+        "target_z": target_z,
+        "retract": NARROW_RETRACT_MM,
+    }
     samples = []
     for index in range(REFERENCE_TAP_COUNT):
-        sample = reference_sample(client, x=x, y=y, index=index + 1, phase=phase)
+        sample = reference_sample(
+            client,
+            x=x,
+            y=y,
+            index=index + 1,
+            phase=phase,
+            start_z=start_z,
+            target_z=target_z,
+            retract=NARROW_RETRACT_MM,
+        )
+        if sample["status"] != "contact":
+            raise CalibrationError(
+                f"{phase} reference tap {index + 1}/{REFERENCE_TAP_COUNT} "
+                "did not trigger"
+            )
         samples.append(sample)
         summary = summarize(samples)
         dashboard.bed["stage"] = phase
         dashboard.bed["reference"][phase] = {
             "target": {"x": x, "y": y, "z": 0.0},
+            "discovery": discovery,
+            "window": window,
             "progress": {"completed": len(samples), "total": REFERENCE_TAP_COUNT},
             "samples": samples,
             "summary": summary,
@@ -413,6 +597,8 @@ def collect_reference(
         )
     return {
         "target": {"x": x, "y": y, "z": 0.0},
+        "discovery": discovery,
+        "window": window,
         "samples": samples,
         "summary": summary,
     }
@@ -685,6 +871,56 @@ def verify_active_mesh_contacts(
     }
 
 
+def persist_mesh(
+    client: Moonraker,
+    dashboard: DashboardPublisher,
+    *,
+    run_dir: Path,
+    fixed: dict[str, Any],
+    mesh: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist an accepted live mesh and prove the deployed profile matches it."""
+    mesh_path = run_dir / "mesh_points.csv"
+    with mesh_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerows(mesh["points"])
+    plot_path = run_dir / "mesh.png"
+    mesh_plot(mesh["points"], plot_path)
+    dashboard.bed["mesh"]["plot"] = dashboard.upload(plot_path, "bed_mesh.png")
+    atomic_json(run_dir / "mesh_result.json", mesh)
+    dashboard.publish()
+    mesh_source_sha = sha256_file(CALIB_PATH)
+    dashboard.bed["stage"] = "mesh_deployment"
+    dashboard.event("Persisting and deploying accepted bed mesh", status="running")
+    console(client, "persisting and deploying accepted bed mesh")
+    mesh_fingerprint = deploy_candidate(
+        {"bed_mesh_points": mesh["points"]},
+        expected_calib_sha256=mesh_source_sha,
+        run_dir=run_dir,
+        label="mesh",
+    )
+    verification = verify_persistent_mesh(
+        client,
+        expected=mesh["points"],
+        profile=str(fixed["bed_mesh_profile"]),
+        fixed=fixed,
+    )
+    verification["target_config_fingerprint"] = mesh_fingerprint
+    atomic_json(run_dir / "mesh_verification.json", verification)
+    dashboard.bed["mesh"]["verification"] = verification
+    dashboard.bed["mesh"]["status"] = "passed"
+    dashboard.bed["stage"] = "completed"
+    dashboard.bed["status"] = "completed"
+    dashboard.event("Persistent Eddy Tap mesh deployed and active", status="completed")
+    console(client, "persistent Eddy Tap mesh deployed and active")
+    dashboard.publish()
+    return {
+        "mesh": mesh,
+        "mesh_verification": verification,
+        "target_config_fingerprint": mesh_fingerprint,
+    }
+
+
 def main(argv: list[str]) -> int:
     if argv:
         raise CalibrationError(
@@ -693,6 +929,11 @@ def main(argv: list[str]) -> int:
     batch_id = os.environ.get("IDEX_CALIBRATION_BATCH_ID") or dt.datetime.now(
         dt.timezone.utc
     ).strftime("%Y%m%dT%H%M%SZ")
+    phase = os.environ.get("IDEX_EDDY_PHASE", "full").strip().lower()
+    if phase not in VALID_PHASES:
+        raise CalibrationError(
+            f"unsupported IDEX_EDDY_PHASE {phase!r}; expected full, reference, or mesh"
+        )
     run_dir = Path(
         os.environ.get(
             "IDEX_BED_CALIBRATION_RUN_DIR",
@@ -712,7 +953,8 @@ def main(argv: list[str]) -> int:
     shutil.copy2(PRINTER_CFG_PATH, run_dir / "printer.cfg.source")
     manifest: dict[str, Any] = {
         "schema_version": 1,
-        "workflow": "idex_eddy_tap_bed_calibration_v2",
+        "workflow": f"idex_eddy_tap_bed_calibration_v2_{phase}",
+        "phase": phase,
         "batch_id": batch_id,
         "started_at": utc_now(),
         "status": "running",
@@ -732,131 +974,166 @@ def main(argv: list[str]) -> int:
             raise CalibrationError(
                 "live configuration does not match local calibration source"
             )
-        homed = prepare_t0(client)
-        dashboard.bed["homing_required"] = homed
-        dashboard.event("Eddy bed calibration preflight passed", status="running")
-        console(client, f"Eddy bed calibration started; homing_required={homed}")
-
-        x, y = manifest["reference"]["x"], manifest["reference"]["y"]
-        before = collect_reference(client, dashboard, x=x, y=y, phase="before_rebase")
-        atomic_json(run_dir / "reference_before.json", before)
-        common_delta = -float(before["summary"]["median"])
-        if abs(common_delta) > COMMON_Z_MAX_ADJUSTMENT_MM:
-            raise CalibrationError(
-                f"refusing common Z correction {common_delta:+.6f} mm"
+        if phase == "mesh":
+            homed = prepare_t0(client)
+            dashboard.bed["homing_required"] = homed
+            dashboard.event("Eddy mesh preflight passed", status="running")
+            console(client, f"Eddy mesh stage started; homing_required={homed}")
+            mesh = run_mesh(client, dashboard, fixed=fixed)
+            mesh["active_physical_verification"] = verify_active_mesh_contacts(
+                client, fixed
             )
-        source = endstops(load_measured(CALIB_PATH))
-        target_t0 = round(source["t0"]["z_endstop"] + common_delta, 3)
-        target_t1 = round(source["t1"]["z_endstop"] + common_delta, 3)
-        source_difference = source["t1"]["z_endstop"] - source["t0"]["z_endstop"]
-        target_difference = target_t1 - target_t0
-        if abs(source_difference - target_difference) > 1.0e-9:
-            raise CalibrationError("common Z rebase would change T1-T0 Z difference")
-        rebase = {
-            "source_endstops": source,
-            "common_delta_mm": common_delta,
-            "target_endstops": {
-                "t0_z_endstop": target_t0,
-                "t1_z_endstop": target_t1,
-            },
-            "source_t1_minus_t0_mm": source_difference,
-            "target_t1_minus_t0_mm": target_difference,
-            "difference_preserved": True,
-        }
-        dashboard.bed["reference"]["rebase"] = rebase
-        atomic_json(run_dir / "z_rebase_result.json", rebase)
-        dashboard.bed["stage"] = "reference_deployment"
-        dashboard.event(
-            f"Applying common Z delta {common_delta:+.6f} mm to T0 and T1",
-            status="running",
-        )
-        console(
-            client,
-            f"common Z delta={common_delta:+.6f} mm; T1-T0 difference preserved",
-        )
-        target_fingerprint = deploy_candidate(
-            {"t0_z_endstop": target_t0, "t1_z_endstop": target_t1},
-            expected_calib_sha256=source_sha,
-            run_dir=run_dir,
-            label="z-rebase",
-        )
-        dashboard.bed["reference"]["rebase"][
-            "target_config_fingerprint"
-        ] = target_fingerprint
-        atomic_json(run_dir / "z_rebase_result.json", rebase)
-        prepare_t0(client)
-        after = collect_reference(client, dashboard, x=x, y=y, phase="after_rebase")
-        atomic_json(run_dir / "reference_after.json", after)
-        residual = float(after["summary"]["median"])
-        if abs(residual) > REFERENCE_ZERO_TOLERANCE_MM:
-            rollback_deployment(run_dir, "z-rebase")
-            raise CalibrationError(
-                f"post-rebase reference Z {residual:+.6f} exceeds "
-                f"{REFERENCE_ZERO_TOLERANCE_MM:.3f} mm"
+            dashboard.bed["mesh"].update(mesh)
+            dashboard.publish()
+            persisted = persist_mesh(
+                client, dashboard, run_dir=run_dir, fixed=fixed, mesh=mesh
             )
-        dashboard.bed["reference"]["result"] = {
-            "status": "passed",
-            "residual_mm": residual,
-        }
-        dashboard.event(
-            f"Post-deploy bed reference passed: Z={residual:+.6f} mm",
-            status="running",
-        )
-        console(client, f"bed reference passed at Z={residual:+.6f} mm")
+            manifest.update(
+                {
+                    "status": "completed",
+                    "finished_at": utc_now(),
+                    "mesh": mesh,
+                    "mesh_verification": persisted["mesh_verification"],
+                    "target_config_fingerprint": persisted["target_config_fingerprint"],
+                }
+            )
+        else:
+            homed = prepare_t0(client)
+            dashboard.bed["homing_required"] = homed
+            dashboard.event("Eddy bed reference preflight passed", status="running")
+            console(client, f"Eddy bed reference started; homing_required={homed}")
 
-        mesh = run_mesh(client, dashboard, fixed=fixed)
-        mesh["active_physical_verification"] = verify_active_mesh_contacts(
-            client, fixed
-        )
-        dashboard.bed["mesh"].update(mesh)
-        dashboard.publish()
-        mesh_path = run_dir / "mesh_points.csv"
-        with mesh_path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.writer(handle)
-            writer.writerows(mesh["points"])
-        plot_path = run_dir / "mesh.png"
-        mesh_plot(mesh["points"], plot_path)
-        dashboard.bed["mesh"]["plot"] = dashboard.upload(plot_path, "bed_mesh.png")
-        atomic_json(run_dir / "mesh_result.json", mesh)
-        dashboard.publish()
-        mesh_source_sha = sha256_file(CALIB_PATH)
-        dashboard.bed["stage"] = "mesh_deployment"
-        dashboard.event("Persisting and deploying accepted bed mesh", status="running")
-        console(client, "persisting and deploying accepted bed mesh")
-        mesh_fingerprint = deploy_candidate(
-            {"bed_mesh_points": mesh["points"]},
-            expected_calib_sha256=mesh_source_sha,
-            run_dir=run_dir,
-            label="mesh",
-        )
-        verification = verify_persistent_mesh(
-            client,
-            expected=mesh["points"],
-            profile=str(fixed["bed_mesh_profile"]),
-            fixed=fixed,
-        )
-        verification["target_config_fingerprint"] = mesh_fingerprint
-        atomic_json(run_dir / "mesh_verification.json", verification)
-        dashboard.bed["mesh"]["verification"] = verification
-        dashboard.bed["mesh"]["status"] = "passed"
-        dashboard.bed["stage"] = "completed"
-        dashboard.bed["status"] = "completed"
-        dashboard.event(
-            "Persistent Eddy Tap mesh deployed and active", status="completed"
-        )
-        console(client, "persistent Eddy Tap mesh deployed and active")
-        manifest.update(
-            {
-                "status": "completed",
-                "finished_at": utc_now(),
+            x, y = manifest["reference"]["x"], manifest["reference"]["y"]
+            before_discovery = discover_reference(
+                client, dashboard, x=x, y=y, phase="before_rebase"
+            )
+            before = collect_reference(
+                client,
+                dashboard,
+                x=x,
+                y=y,
+                phase="before_rebase",
+                discovery=before_discovery,
+            )
+            atomic_json(run_dir / "reference_before.json", before)
+            common_delta = -float(before["summary"]["median"])
+            if not -DISCOVERY_START_Z_MM <= common_delta <= -DISCOVERY_FINAL_Z_MM:
+                raise CalibrationError(
+                    f"refusing common Z correction {common_delta:+.6f} mm; "
+                    "outside the staged-search envelope"
+                )
+            source = endstops(load_measured(CALIB_PATH))
+            target_t0 = round(source["t0"]["z_endstop"] + common_delta, 3)
+            target_t1 = round(source["t1"]["z_endstop"] + common_delta, 3)
+            source_difference = source["t1"]["z_endstop"] - source["t0"]["z_endstop"]
+            target_difference = target_t1 - target_t0
+            if abs(source_difference - target_difference) > 1.0e-9:
+                raise CalibrationError(
+                    "common Z rebase would change T1-T0 Z difference"
+                )
+            rebase = {
+                "source_endstops": source,
+                "common_delta_mm": common_delta,
+                "target_endstops": {
+                    "t0_z_endstop": target_t0,
+                    "t1_z_endstop": target_t1,
+                },
+                "source_t1_minus_t0_mm": source_difference,
+                "target_t1_minus_t0_mm": target_difference,
+                "difference_preserved": True,
+            }
+            dashboard.bed["reference"]["rebase"] = rebase
+            atomic_json(run_dir / "z_rebase_result.json", rebase)
+            dashboard.bed["stage"] = "reference_deployment"
+            dashboard.event(
+                f"Applying common Z delta {common_delta:+.6f} mm to T0 and T1",
+                status="running",
+            )
+            console(
+                client,
+                f"common Z delta={common_delta:+.6f} mm; T1-T0 difference preserved",
+            )
+            target_fingerprint = deploy_candidate(
+                {"t0_z_endstop": target_t0, "t1_z_endstop": target_t1},
+                expected_calib_sha256=source_sha,
+                run_dir=run_dir,
+                label="z-rebase",
+            )
+            dashboard.bed["reference"]["rebase"][
+                "target_config_fingerprint"
+            ] = target_fingerprint
+            atomic_json(run_dir / "z_rebase_result.json", rebase)
+            prepare_t0(client)
+            after_discovery = discover_reference(
+                client, dashboard, x=x, y=y, phase="after_rebase"
+            )
+            after = collect_reference(
+                client,
+                dashboard,
+                x=x,
+                y=y,
+                phase="after_rebase",
+                discovery=after_discovery,
+            )
+            atomic_json(run_dir / "reference_after.json", after)
+            residual = float(after["summary"]["median"])
+            if abs(residual) > REFERENCE_ZERO_TOLERANCE_MM:
+                rollback_deployment(run_dir, "z-rebase")
+                raise CalibrationError(
+                    f"post-rebase reference Z {residual:+.6f} exceeds "
+                    f"{REFERENCE_ZERO_TOLERANCE_MM:.3f} mm"
+                )
+            dashboard.bed["reference"]["result"] = {
+                "status": "passed",
+                "residual_mm": residual,
+            }
+            dashboard.event(
+                f"Post-deploy bed reference passed: Z={residual:+.6f} mm",
+                status="running",
+            )
+            console(client, f"bed reference passed at Z={residual:+.6f} mm")
+            reference_result = {
                 "reference_before": before,
                 "z_rebase": rebase,
                 "reference_after": after,
-                "mesh": mesh,
-                "mesh_verification": verification,
-                "target_config_fingerprint": mesh_fingerprint,
+                "target_config_fingerprint": target_fingerprint,
             }
-        )
+            if phase == "reference":
+                dashboard.bed["stage"] = "reference_complete"
+                dashboard.bed["status"] = "completed"
+                dashboard.event(
+                    "Eddy bed reference deployed and verified", status="completed"
+                )
+                console(client, "Eddy bed reference deployed and verified")
+                manifest.update(
+                    {
+                        "status": "completed",
+                        "finished_at": utc_now(),
+                        **reference_result,
+                    }
+                )
+            else:
+                mesh = run_mesh(client, dashboard, fixed=fixed)
+                mesh["active_physical_verification"] = verify_active_mesh_contacts(
+                    client, fixed
+                )
+                dashboard.bed["mesh"].update(mesh)
+                dashboard.publish()
+                persisted = persist_mesh(
+                    client, dashboard, run_dir=run_dir, fixed=fixed, mesh=mesh
+                )
+                manifest.update(
+                    {
+                        "status": "completed",
+                        "finished_at": utc_now(),
+                        **reference_result,
+                        "mesh": mesh,
+                        "mesh_verification": persisted["mesh_verification"],
+                        "target_config_fingerprint": persisted[
+                            "target_config_fingerprint"
+                        ],
+                    }
+                )
     except BaseException as exc:
         manifest.update(
             {"status": "failed", "finished_at": utc_now(), "error": str(exc)}

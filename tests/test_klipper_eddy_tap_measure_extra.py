@@ -1,5 +1,6 @@
 import importlib.util
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -147,13 +148,47 @@ class FakeProbeSession:
     def __init__(self, toolhead, method):
         self.toolhead = toolhead
         self.method = method
+        self.reject = False
         self.values = iter([-0.012, -0.008, -0.010])
         self.pending = []
         self.ended = False
+        self.trace = {
+            "status": "pending",
+            "trace_start": 10.0,
+            "trace_end": 10.3,
+            "trigger_time": 10.1,
+            "retract_start_time": 10.12,
+            "retract_end_time": 10.3,
+            "rows": [
+                {
+                    "mcu_time": 10.0,
+                    "frequency_hz": 3_200_000.0,
+                    "stream_height_mm": 1.0,
+                    "converted_height_mm": 1.0,
+                    "commanded_x": 123.456,
+                    "commanded_y": 234.567,
+                    "commanded_z": 5.0,
+                    "phase": "descent",
+                },
+                {
+                    "mcu_time": 10.2,
+                    "frequency_hz": 3_200_100.0,
+                    "stream_height_mm": 0.0,
+                    "converted_height_mm": 0.0,
+                    "commanded_x": 123.456,
+                    "commanded_y": 234.567,
+                    "commanded_z": 1.0,
+                    "phase": "retract",
+                },
+            ],
+        }
 
     def run_probe(self, _gcmd):
         self.toolhead.position[2] = 3.99
+        if self.reject:
+            raise RuntimeError("Unable to detect tap: insufficient slope delta")
         if self.method == "tap":
+            self.trace["status"] = "success"
             self.pending = [
                 ProbeResult(
                     next(self.values),
@@ -171,20 +206,48 @@ class FakeProbeSession:
     def end_probe_session(self):
         self.ended = True
 
+    def flush_tap_trace(self):
+        pass
+
+    def get_last_tap_trace(self):
+        return self.trace
+
+
+class FakeProbeSessionWrapper:
+    """Match Klipper's ProbeSessionHelper/underlying EddyTap split."""
+
+    def __init__(self, session):
+        self.hw_probe_session = session
+
+    def run_probe(self, gcmd):
+        return self.hw_probe_session.run_probe(gcmd)
+
+    def pull_probed_results(self):
+        return self.hw_probe_session.pull_probed_results()
+
+    def end_probe_session(self):
+        return self.hw_probe_session.end_probe_session()
+
 
 class FakeProbe:
     def __init__(self, toolhead):
         self.toolhead = toolhead
         self.sessions = []
         self.last_probe_position = [0.0, 0.0, 0.0]
+        self.wrap_sessions = False
+        self.reject_sessions = False
 
     def get_offsets(self):
         return (-57.391, -18.997, 1.399)
 
     def start_probe_session(self, gcmd):
         session = FakeProbeSession(self.toolhead, gcmd.get("METHOD", "probe"))
+        session.reject = self.reject_sessions
         self.sessions.append(session)
-        return session
+        return FakeProbeSessionWrapper(session) if self.wrap_sessions else session
+
+    def get_last_tap_diagnostics(self):
+        return {}
 
     def get_status(self, _eventtime):
         return {"last_probe_position": self.last_probe_position}
@@ -335,7 +398,9 @@ def test_eddy_tap_measure_reports_contact_statistics_and_threshold_override():
     assert "reference=(123.456, 234.567)" in gcmd.responses[0]
     assert "contact=(123.456, 234.567, -0.012000)" in gcmd.responses[1]
     assert "post_retract_z=3.990000" in gcmd.responses[1]
-    assert any("mean=-0.010000 median=-0.010000" in response for response in gcmd.responses)
+    assert any(
+        "mean=-0.010000 median=-0.010000" in response for response in gcmd.responses
+    )
     assert any("span=0.004000" in response for response in gcmd.responses)
     assert any(
         "EDDY_TAP_MEASURE mesh: inactive; commanded_z_for_tap_median=unavailable"
@@ -350,6 +415,70 @@ def test_eddy_tap_measure_reports_contact_statistics_and_threshold_override():
         "commanded_z_for_tap_median": None,
     }
     assert all(session.ended for session in printer.probe.sessions)
+
+
+def test_trace_publishes_combined_csv_plot_and_metadata(tmp_path, monkeypatch):
+    module = _load()
+    printer = FakePrinter()
+    printer.probe.wrap_sessions = True
+    measure = module.load_config(FakeConfig(printer))
+    monkeypatch.setattr(module, "TRACE_ROOT", tmp_path)
+
+    gcmd = FakeGcmd({"X": 123.456, "Y": 234.567, "COUNT": 1, "TRACE": 1})
+    printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
+
+    assert (tmp_path / "latest.csv").is_file()
+    assert (tmp_path / "latest.png").is_file()
+    assert stat.S_IMODE((tmp_path / "latest.csv").stat().st_mode) == 0o644
+    assert stat.S_IMODE((tmp_path / "latest.json").stat().st_mode) == 0o644
+    assert stat.S_IMODE((tmp_path / "latest.png").stat().st_mode) == 0o644
+    metadata = __import__("json").loads((tmp_path / "latest.json").read_text())
+    assert metadata["status"] == "completed"
+    assert metadata["tap_count_recorded"] == 1
+    csv_text = (tmp_path / "latest.csv").read_text()
+    assert "commanded_z_mm" in csv_text
+    assert "frequency_hz" in csv_text
+    assert "converted_height_mm" in csv_text
+    assert any("trace:" in response for response in gcmd.responses)
+
+
+def test_rejected_trace_with_klipper_session_wrapper_does_not_crash(
+    tmp_path, monkeypatch
+):
+    module = _load()
+    printer = FakePrinter()
+    printer.probe.wrap_sessions = True
+    printer.probe.reject_sessions = True
+    measure = module.load_config(FakeConfig(printer))
+    monkeypatch.setattr(module, "TRACE_ROOT", tmp_path)
+
+    gcmd = FakeGcmd(
+        {"X": 123.456, "Y": 234.567, "COUNT": 1, "TRACE": 1, "ALLOW_REJECTED": 1}
+    )
+    printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
+
+    metadata = __import__("json").loads((tmp_path / "latest.json").read_text())
+    assert metadata["status"] == "failed"
+    assert metadata["error"] == "tap batch aborted"
+    assert metadata["tap_count_recorded"] == 1
+    assert metadata["traces"][0]["status"] == "rejected"
+    assert any("rejected:" in response for response in gcmd.responses)
+    assert measure.get_status(0.0)["last_tap_measurement"]["tap"]["status"] == (
+        "rejected"
+    )
+
+
+def test_trace_is_not_allocated_or_written_when_disabled(tmp_path, monkeypatch):
+    module = _load()
+    printer = FakePrinter()
+    module.load_config(FakeConfig(printer))
+    monkeypatch.setattr(module, "TRACE_ROOT", tmp_path)
+
+    printer.gcode.commands["_EDDY_TAP_MEASURE"](
+        FakeGcmd({"COUNT": 1, "EDDY_MODE": "none"})
+    )
+
+    assert not list(tmp_path.iterdir())
 
 
 def test_eddy_tap_measure_maps_tap_z_through_active_mesh_transform():
@@ -612,6 +741,8 @@ def test_eddy_tap_measure_is_deployed_and_generated_macro_is_present():
         "_EDDY_TAP_MEASURE X={x} Y={y} THRESHOLD={threshold} COUNT={count} "
         "EDDY_MODE={eddy_mode}" in config_text
     )
+    assert "START_Z={start_z}" in config_text
+    assert "TRACE={trace}" in config_text
     assert "[gcode_macro EDDY_RAW_MEASURE]" in config_text
     assert (
         "_EDDY_RAW_MEASURE X={x} Y={y} Z={z} DURATION={duration} "

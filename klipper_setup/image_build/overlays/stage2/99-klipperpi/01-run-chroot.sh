@@ -413,6 +413,27 @@ ln -sf /etc/nginx/sites-available/mainsail /etc/nginx/sites-enabled/mainsail
 rm -f /etc/nginx/sites-enabled/default
 systemctl_enable_safe nginx
 
+log "Installing Eddy tap trace dashboard"
+require_file "${FILES_DIR}/eddy_dashboard/index.html"
+require_file "${FILES_DIR}/eddy_dashboard/style.css"
+require_file "${FILES_DIR}/eddy_dashboard/app.js"
+install -d -m 0755 /home/pi/printer_data/eddy/runs
+install -m 0644 \
+  "${FILES_DIR}/eddy_dashboard/index.html" \
+  "${FILES_DIR}/eddy_dashboard/style.css" \
+  "${FILES_DIR}/eddy_dashboard/app.js" \
+  /home/pi/printer_data/eddy/
+if [[ ! -f /home/pi/printer_data/eddy/latest.json ]]; then
+  cat > /home/pi/printer_data/eddy/latest.json <<'EOF'
+{
+  "schema_version": 1,
+  "status": "idle",
+  "message": "No Eddy TRACE=1 run has been published yet."
+}
+EOF
+  chown pi:pi /home/pi/printer_data/eddy/latest.json
+fi
+
 # --- Systemd units -----------------------------------------------------------
 
 log "Installing systemd units"
@@ -564,6 +585,7 @@ require_file "${FILES_DIR}/klipper_host/klippy/extras/bed_mesh.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/vision.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/idex_manual_tuning.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/eddy_tap_measure.py"
+require_file "${FILES_DIR}/klipper_host/klippy/extras/probe_eddy_current.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/daq.py"
 require_file "${FILES_DIR}/klipper_host/klippy/extras/eddy_daq.py"
 install -m 0644 \
@@ -581,6 +603,9 @@ install -m 0644 \
 install -m 0644 \
   "${FILES_DIR}/klipper_host/klippy/extras/eddy_tap_measure.py" \
   /opt/klipper/klippy/extras/eddy_tap_measure.py
+install -m 0644 \
+  "${FILES_DIR}/klipper_host/klippy/extras/probe_eddy_current.py" \
+  /opt/klipper/klippy/extras/probe_eddy_current.py
 install -m 0644 \
   "${FILES_DIR}/klipper_host/klippy/extras/daq.py" \
   /opt/klipper/klippy/extras/daq.py
@@ -699,7 +724,7 @@ log "Writing build info"
   echo "hostname=${HOSTNAME}"
   echo "username=${USERNAME}"
   echo "klipper_commit=${KLIPPER_COMMIT:-}"
-  echo "klipper_host_extras=bed_mesh.py,vision.py,idex_manual_tuning.py,eddy_tap_measure.py,daq.py,eddy_daq.py"
+  echo "klipper_host_extras=bed_mesh.py,vision.py,idex_manual_tuning.py,eddy_tap_measure.py,probe_eddy_current.py,daq.py,eddy_daq.py"
   echo "moonraker_commit=${MOONRAKER_COMMIT:-}"
   echo "mainsail_version=${MAINSAIL_VERSION}"
   echo "build_time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eddy tap trace</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Eddy tap trace</h1>
+        <p id="updated">Waiting for a TRACE=1 run…</p>
+      </div>
+      <a class="button" href="latest.csv" download>Download latest CSV</a>
+    </header>
+    <section id="summary" class="card">
+      <div class="muted">No trace published yet.</div>
+    </section>
+    <section class="card plot-card">
+      <img id="plot" alt="Latest Eddy tap trace plot" hidden>
+      <div id="plot-empty" class="muted">Run <code>EDDY_TAP_MEASURE TRACE=1</code> to publish a trace.</div>
+    </section>
+    <p class="muted footer">The trace is diagnostic only. It does not change tap motion or calibration.</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

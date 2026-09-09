@@ -258,6 +258,15 @@ def test_multi_head_zero_is_monitor_only_on_legacy_primary_y_pin():
     assert _setting_value(stepper_y, "endstop_pin") == "^!y_pico:gpio4"
 
 
+def test_dual_z_endstops_use_nc_ground_wiring_with_internal_pullups():
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    stepper_z = _section(template, "stepper_z")
+    stepper_z1 = _section(template, "stepper_z1")
+
+    assert _setting_value(stepper_z, "endstop_pin") == "^gpio22"
+    assert _setting_value(stepper_z1, "endstop_pin") == "^gpio17"
+
+
 def test_dual_carriage_input_shapers_are_generated_from_calibration_source():
     generator = _load_generator_module()
     calibration = generator.load_calibration(CALIB_PATH)

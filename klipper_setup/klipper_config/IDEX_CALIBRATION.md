@@ -28,21 +28,31 @@ scripts/run_idex_calibration.sh
    multi-head-zero switch to report `RELEASED`; otherwise it reports a fault and
    stops before further motion. It then performs one final slow X-only latch
    pass so both chapters use the same settled carriage datum.
-2. T0 and T1 each make 26 guarded ball contacts. Their logical X/Y frames are
+2. T0 first performs a fixed high-to-low Eddy discovery at `(150,150)` using
+   overlapping guarded 2 mm bands. The windows begin `10→8`, then advance by
+   1 mm (`9→7`, `8→6`, …) until the final `0→-2.2` window. No-trigger bands
+   are logged and continue downward, so a contact on an endpoint is also
+   covered by the neighbouring window. A rejected fit exactly at a lower
+   endpoint is treated as ambiguous and retried in the next overlapping
+   window; a rejected fit in the interior (or in the final window) aborts
+   safely. Only then does
+   T0 make five narrow-range Eddy Tap contacts, starting 2 mm above the
+   discovery and stopping 1 mm below it. Their median establishes the absolute
+   bed-Z datum; the same correction is applied to both tool endstops,
+   preserving their relative Z exactly. The probe retracts 4 mm after each
+   trigger so the deformation fit has enough samples. A fresh staged discovery
+   and five-tap reference check after deployment must be within `0.030 mm` of
+   logical Z=0.
+3. T0 and T1 each make 26 guarded ball contacts in that rebased Z frame. Their logical X/Y frames are
    independently rebased so the measured ball centre is exactly `(75,-9)`.
    T0 remains the Z anchor and T1 Z is aligned to T0's direct centre contact.
-3. Both tools make nine fixed-target verification contacts. The centre contact
+4. Both tools make nine fixed-target verification contacts. The centre contact
    supplies Z; the 1.5 mm crown-adjacent octagonal ring verifies X/Y. Failure
    stops here.
-4. T0 makes three Eddy Tap contacts at `(150,150)` with the mesh cleared. The
-   median is used to add the same Z delta to both tool endstops, preserving
-   their relative Z exactly.
-5. After deployment and homing, three new reference taps must read within
-   0.030 mm of logical Z=0.
-6. T0 measures the 7×7 native Tap mesh. The profile is zero-referenced at
+5. T0 measures the 7×7 native Tap mesh. The profile is zero-referenced at
    `(150,150)`, written atomically to `calib.yaml`, regenerated, deployed, and
    loaded as `default`.
-7. Five physical mesh-aware Tap checks must all place contact within 0.040 mm
+6. Five physical mesh-aware Tap checks must all place contact within 0.040 mm
    of commanded Z=0. Only then does the dashboard say **READY TO PRINT**.
 
 The printer console mirrors the major state changes and per-contact progress.
@@ -57,11 +67,16 @@ Rerun only tool alignment and fixed-target verification:
 scripts/run_multi_head_zero_contact_map.sh
 ```
 
-Preserve relative tool alignment while replacing the absolute bed Z datum and
-mesh:
+Run only the Eddy centre reference/rebase and its post-deploy check:
 
 ```bash
-scripts/run_eddy_tap_bed_calibration.sh
+IDEX_EDDY_PHASE=reference scripts/run_eddy_tap_bed_calibration.sh
+```
+
+Run only the final Eddy mesh acquisition after tool alignment:
+
+```bash
+IDEX_EDDY_PHASE=mesh scripts/run_eddy_tap_bed_calibration.sh
 ```
 
 These are complete workflows, not preparation for manual edits.

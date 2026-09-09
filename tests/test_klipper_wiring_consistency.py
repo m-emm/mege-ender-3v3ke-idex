@@ -791,6 +791,25 @@ def test_generated_yz_wiring_svg_includes_multi_head_zero_header():
         assert "MULTI_HEAD_ZERO_VCC_UNUSED" in svg_text
 
 
+def test_yz_wiring_uses_nc_ground_endstops_and_retains_unused_power():
+    wiring = yaml.safe_load(ACTIVE_Y_Z_WIRING_PATH.read_text(encoding="utf-8"))
+    pin_sets = {
+        pin_set["prefix"]: pin_set["pins"]
+        for pin_set in wiring["pin_sets"]
+        if pin_set["prefix"] in {"ENDSTOP_Z_LEFT_", "ENDSTOP_Z_RIGHT_"}
+    }
+    wire_pairs = {(wire["from"], wire["to"]) for wire in wiring["wires"]}
+
+    assert pin_sets == {
+        "ENDSTOP_Z_LEFT_": ["NC", "GND", "VCC_UNUSED"],
+        "ENDSTOP_Z_RIGHT_": ["NC", "GND", "VCC_UNUSED"],
+    }
+    assert ("PICO_GPIO_22_29", "ENDSTOP_Z_LEFT_NC") in wire_pairs
+    assert ("PICO_GPIO_17_22", "ENDSTOP_Z_RIGHT_NC") in wire_pairs
+    assert ("ENDSTOP_Z_LEFT_VCC_UNUSED", "MULTI_HEAD_ZERO_VCC_UNUSED") in wire_pairs
+    assert ("ENDSTOP_Z_RIGHT_VCC_UNUSED", "ENDSTOP_Z_LEFT_VCC_UNUSED") in wire_pairs
+
+
 def test_active_looking_legacy_wiring_paths_are_removed():
     assert not (KLIPPER_CONFIG_DIR / "archive" / "wiring").exists()
     assert not (KLIPPER_CONFIG_DIR / "archive" / "snippets").exists()

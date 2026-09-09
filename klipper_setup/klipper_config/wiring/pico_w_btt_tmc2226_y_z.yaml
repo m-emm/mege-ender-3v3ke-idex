@@ -13,7 +13,9 @@ metadata:
     Driver2 (Z-left): STEP=GPIO7, DIR=GPIO6, EN=GPIO8, UART=GPIO5.
     Driver3 (Z-right): STEP=GPIO14, DIR=GPIO15, EN=GPIO16, UART=GPIO13.
     Live Y motor phases are on the dedicated TMC5160 driver; the local TMC1 motor wiring is reserved for rollback.
-    Z endstops: Z-left=GPIO22, Z-right=GPIO17.
+    Z endstops: Z-left=GPIO22, Z-right=GPIO17. Both use Creality bare
+    dry-contact switches wired NC-to-GND with the Pico internal pull-up.
+    Their retained 3.3V header wires are unused; do not connect them to either switch.
     Heatbed SSR: SSR_OUT=GPIO20 with Pico logic ground for the single 220V 750W bed.
     Reserved MOSFET driver: HEATBED_ON=GPIO21 remains wired but has no active Klipper assignment.
     Heatbed thermistor: SIGNAL=GPIO26_ADC0, GND=AGND, 4.7k pull-up REF-to-SIGNAL.
@@ -249,16 +251,16 @@ pin_sets:
     origin: [34, 16]
     direction: down
     pins:
-      - "NO"
+      - "NC"
       - GND
-      - VCC
+      - VCC_UNUSED
   - prefix: ENDSTOP_Z_RIGHT_
     origin: [34, 12]
     direction: down
     pins:
-      - "NO"
+      - "NC"
       - GND
-      - VCC
+      - VCC_UNUSED
   - prefix: MOTOR_Z_LEFT_
     origin: [34, 8]
     direction: down
@@ -445,18 +447,19 @@ wires:
     type: data
     color: "#9ca3af"
 
-  # Multi-head-zero reuses the former primary-Pico Y-endstop header. The NC
-  # switch contact uses only signal and ground; the powered third pin is unused.
+  # Multi-head-zero and both Creality Z endstops use dry NC-to-GND contacts.
+  # Their powered third header pins remain wired to 3.3V but are unused; do
+  # not connect those pins to a switch.
   - from: PICO_GPIO_4
     to: MULTI_HEAD_ZERO_NC
     klipper: "multi_head_zero_probe.pin"
     type: data
   - from: PICO_GPIO_22_29
-    to: ENDSTOP_Z_LEFT_NO
+    to: ENDSTOP_Z_LEFT_NC
     klipper: stepper_z.endstop_pin
     type: data
   - from: PICO_GPIO_17_22
-    to: ENDSTOP_Z_RIGHT_NO
+    to: ENDSTOP_Z_RIGHT_NC
     klipper: stepper_z1.endstop_pin
     type: data
   - from: PWR_GND
@@ -471,11 +474,11 @@ wires:
   - from: MULTI_HEAD_ZERO_VCC_UNUSED
     to: PICO_THREEV3_OUT_36
     type: lv_power
-  - from: ENDSTOP_Z_LEFT_VCC
+  - from: ENDSTOP_Z_LEFT_VCC_UNUSED
     to: MULTI_HEAD_ZERO_VCC_UNUSED
     type: lv_power
-  - from: ENDSTOP_Z_RIGHT_VCC
-    to: ENDSTOP_Z_LEFT_VCC
+  - from: ENDSTOP_Z_RIGHT_VCC_UNUSED
+    to: ENDSTOP_Z_LEFT_VCC_UNUSED
     type: lv_power
   - from: PICO_AGND_33
     to: HEATBED_THERM_GND

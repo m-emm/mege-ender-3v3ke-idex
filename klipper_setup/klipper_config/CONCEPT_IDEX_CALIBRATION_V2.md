@@ -155,15 +155,14 @@ The command performs the following sequence without asking the user to edit a
 file, copy a number, restart Klipper, load a mesh, or run a verifier manually.
 
 1. Preflight the local configuration and live printer.
-2. Calibrate T0 and T1 against the multi-head-zero ball.
-3. Atomically apply the X/Y and relative-Z corrections.
-4. Generate and deploy `printer.cfg`, then require live parity.
-5. Verify both tools at the fixed ball target.
-6. Establish T0 bed contact `Z=0` at `(150,150)` with Eddy Tap.
-7. Apply the same Z correction to both tools, deploy, and verify the reference
+2. Establish T0 bed contact `Z=0` at `(150,150)` with Eddy Tap.
+3. Apply the same Z correction to both tools, deploy, and verify the reference
    tap after re-homing.
-8. Measure, validate, persist, deploy, and activate the bed mesh.
-9. Verify the active mesh and publish the final printable/not-printable result.
+4. Calibrate T0 and T1 against the multi-head-zero ball in that rebased Z frame.
+5. Atomically apply the X/Y and relative-Z corrections, then require live parity.
+6. Verify both tools at the fixed ball target.
+7. Measure, validate, persist, deploy, and activate the bed mesh.
+8. Verify the active mesh and publish the final printable/not-printable result.
 
 The dashboard is opened separately at:
 
@@ -222,7 +221,40 @@ The coordinator:
 Every later candidate names this source fingerprint. A stale result cannot be
 applied to a changed `calib.yaml` or a different live configuration.
 
-### 1. Multi-head-zero calibration
+### 1. Eddy Tap absolute bed reference
+
+The first physical datum is always the T0 Eddy Tap centre at exactly
+`(150,150)` with the mesh cleared. Discovery is deliberately staged from high
+to low in overlapping 2 mm guarded bands, advancing by 1 mm:
+
+```text
+10→8, 9→7, 8→6, 7→5, 6→4, 5→3, 4→2, 3→1,
+2→0, 1→-1, 0→-2.2 mm
+```
+
+Each no-trigger band is recorded and continues from its lower endpoint plus
+the 1 mm overlap. A contact on an endpoint is therefore covered by the
+neighbouring window as well. The first accepted deformation fit establishes a
+physical contact height. A trigger whose pullback fit is rejected exactly at a
+lower window endpoint is treated as an ambiguous boundary and retried in the
+next overlapping window. A rejected fit in the interior, or in the final
+window, remains a safety fault: retract, report the diagnostics, and stop
+rather than probing farther on an unproven signal.
+
+After discovery, five narrow-range centre taps start 2 mm above that contact
+and stop 1 mm below it. The probe retracts 4 mm after each trigger so the
+deformation fit has enough samples. Only their median establishes the absolute bed-Z datum;
+the common correction is applied to both Z endstops, preserving the
+T1-minus-T0 Z difference. The candidate is deployed and the same staged
+discovery plus five-tap batch must return within the absolute-Z tolerance before
+the ball workflow starts. No ball or mesh motion is attempted until this stage
+passes.
+
+This ordering is deliberate: the ball's measured summit is then expressed in
+the final bed-referenced logical Z frame, while the ball remains the authority
+for relative T0/T1 Z alignment.
+
+### 2. Multi-head-zero calibration
 
 For T0, then T1, the runner performs the fixed 26-contact sequence:
 
@@ -256,7 +288,7 @@ X limits, generates a candidate `printer.cfg`, deploys it, checks file and live
 fingerprints, re-homes once if the restart invalidated homing, and repeats the
 same final X-only latch pass before verification.
 
-### 2. Fixed-target tool verification
+### 3. Fixed-target tool verification
 
 T0 and T1 each perform nine mandatory contacts in their logical frames:
 
@@ -274,26 +306,9 @@ the authoritative centre Z.
 Verification never performs a second correction. Failure marks tool alignment
 failed and stops the full workflow before bed calibration.
 
-### 3. Eddy Tap bed-reference rebase
-
-The coordinator returns to T0, clears the mesh and manual offsets, and taps the
-bed at exactly `(150.000,150.000)`. The prescribed small repeat count is reduced
-to one accepted centre result by the configured statistic. The result and its
-spread must pass repeatability limits.
-
-The coordinator adds `-z_reference` to both tool Z endstops, proves the
-T1-minus-T0 Z-endstop difference is bit-for-bit unchanged at the stored
-precision, stages the candidate, regenerates, deploys, checks parity, and homes
-once after restart. The same immediate post-home `RELEASED` safety check runs
-before T0 selection or bed-calibration motion.
-
-It then repeats the reference taps with the mesh cleared. The measured centre
-must be within the absolute-Z tolerance of `0.000 mm`. If not, mesh acquisition
-does not start and no further correction is inferred from a bed mesh.
-
 ### 4. Eddy Tap mesh acquisition and persistence
 
-With T0 still selected and the absolute reference verified, the coordinator:
+With the absolute reference verified before ball alignment, the coordinator:
 
 1. runs the source-configured native `BED_MESH_CALIBRATE` Tap sequence;
 2. publishes progress after every mesh point;
@@ -713,8 +728,8 @@ The implementation should proceed in reviewable stages:
 2. migrate every consumer to the flat measured schema and combined generator
    fingerprint;
 3. add the transactional calibration writer;
-4. implement the automatic Eddy reference rebase and mesh persistence;
-5. add the no-option full coordinator;
+4. implement the automatic Eddy reference rebase before mesh persistence;
+5. add the no-option full coordinator with the reference-first order;
 6. migrate dashboard storage and render both chapters;
 7. mark vision calibration legacy and write `IDEX_CALIBRATION.md`;
 8. run local syntax/generation/parity checks;

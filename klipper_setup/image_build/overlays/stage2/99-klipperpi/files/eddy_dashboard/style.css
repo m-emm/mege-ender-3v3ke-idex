@@ -1,0 +1,29 @@
+:root {
+  color-scheme: dark;
+  font: 16px/1.4 system-ui, -apple-system, sans-serif;
+  background: #0e141b;
+  color: #e5edf5;
+}
+body { margin: 0; }
+main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+header { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
+h1 { margin: 0 0 4px; font-size: 1.8rem; }
+p { margin: 0; }
+.card { margin-top: 20px; padding: 18px; border: 1px solid #2b3b4c; border-radius: 8px; background: #17222e; }
+.plot-card { text-align: center; overflow: auto; }
+#plot { display: block; width: 100%; height: auto; border-radius: 4px; background: #fff; cursor: zoom-in; }
+.button { display: inline-block; padding: 8px 12px; border-radius: 5px; background: #2e8bd6; color: white; text-decoration: none; }
+.button:hover { background: #45a1eb; }
+.muted { color: #9db0c1; }
+.ok { color: #74e2a2; }
+.failed { color: #ff8f8f; }
+code { color: #a8d5ff; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 20px; margin: 0; }
+dt { color: #9db0c1; }
+dd { margin: 0; font-family: ui-monospace, monospace; }
+.footer { margin-top: 18px; }
+@media (max-width: 700px) {
+  main { padding: 16px; }
+  header { display: block; }
+  .button { margin-top: 12px; }
+}

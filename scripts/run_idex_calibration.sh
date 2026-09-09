@@ -130,13 +130,26 @@ trap failure ERR
 
 publish_state running tool_alignment.calibration "Full IDEX calibration started"
 printer_console "full calibration started"
+# Establish the absolute bed-Z datum before touching the ball.  The ball
+# workflow then runs in the newly rebased logical Z frame; mesh acquisition is
+# deliberately deferred until both toolheads have passed alignment.
+publish_state running bed_calibration.reference "Starting Eddy centre reference before tool alignment"
+printer_console "starting Eddy centre reference at X=150 Y=150 before ball calibration"
+IDEX_CALIBRATION_BATCH_ID="${batch_id}" \
+IDEX_EDDY_PHASE=reference \
+IDEX_BED_CALIBRATION_RUN_DIR="${batch_dir}/bed_calibration/reference" \
+  "${SCRIPT_DIR}/run_eddy_tap_bed_calibration.sh"
+
+publish_state running tool_alignment.calibration "Eddy centre reference passed; starting ball alignment"
+printer_console "Eddy centre reference passed; starting T0 then T1 ball alignment"
 IDEX_CALIBRATION_BATCH_ID="${batch_id}" LOCAL_OUT_DIR="${batch_dir}/tool_alignment" \
   "${SCRIPT_DIR}/run_multi_head_zero_contact_map.sh"
 
-publish_state running bed_calibration.reference "Tool alignment passed; starting Eddy bed calibration"
-printer_console "tool alignment passed; starting Eddy bed reference and mesh"
+publish_state running bed_calibration.mesh "Tool alignment passed; starting Eddy mesh acquisition"
+printer_console "tool alignment passed; starting Eddy mesh acquisition"
 IDEX_CALIBRATION_BATCH_ID="${batch_id}" \
-IDEX_BED_CALIBRATION_RUN_DIR="${batch_dir}/bed_calibration" \
+IDEX_EDDY_PHASE=mesh \
+IDEX_BED_CALIBRATION_RUN_DIR="${batch_dir}/bed_calibration/mesh" \
   "${SCRIPT_DIR}/run_eddy_tap_bed_calibration.sh"
 
 publish_state completed completed "All calibration checks passed" true
@@ -148,7 +161,22 @@ import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
-bed = json.loads((root / "bed_calibration/bed_calibration_result.json").read_text())
+reference = json.loads(
+    (root / "bed_calibration/reference/bed_calibration_result.json").read_text()
+)
+mesh = json.loads(
+    (root / "bed_calibration/mesh/bed_calibration_result.json").read_text()
+)
+bed = {
+    "schema_version": 2,
+    "workflow": "idex_eddy_tap_bed_calibration_v2_reference_then_mesh",
+    "reference": reference,
+    "mesh": mesh,
+    "target_config_fingerprint": mesh["target_config_fingerprint"],
+}
+(root / "bed_calibration/bed_calibration_result.json").write_text(
+    json.dumps(bed, indent=2, sort_keys=True) + "\n"
+)
 verification = sorted((root / "tool_alignment").glob("*_verification/paired_report/verification_report.json"))[-1]
 report = {
     "schema_version": 1,

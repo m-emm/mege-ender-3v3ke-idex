@@ -5,45 +5,6 @@ import copy
 from shellforgepy.simple import *
 
 
-def create_profile_mount_plate(
-    *,
-    profile_mount_width,
-    z_axis_profile_mount_plate_thickness,
-    z_axis_profile_mount_plate_height,
-    z_axis_profile_mount_plate_fillet_radius,
-    BIG_THING,
-    num_holes,
-    screw_inset,
-):
-    plate = create_box(
-        profile_mount_width,
-        z_axis_profile_mount_plate_thickness,
-        z_axis_profile_mount_plate_height,
-        # z_axis_profile_mount_plate_fillet_radius,
-        # no_fillets_at=[Alignment.FRONT, Alignment.BACK, Alignment.BOTTOM],
-    )
-
-    hole_drill_diameter = MScrew.from_size("M5").clearance_hole_loose + 0.1
-
-    hole_drills = PartCollector()
-    hole_pitch = (
-        (z_axis_profile_mount_plate_height - 2 * screw_inset - hole_drill_diameter)
-        / (num_holes - 1)
-        if num_holes > 1
-        else 0
-    )
-    for i in range(num_holes):
-        hole_drill = create_cylinder(hole_drill_diameter / 2, BIG_THING)
-        hole_drill = rotate(90, axis=(1, 0, 0))(hole_drill)
-        hole_drill = translate(0, 0, i * hole_pitch)(hole_drill)
-        hole_drills = hole_drills.fuse(hole_drill)
-
-    hole_drills = align(hole_drills, plate, Alignment.CENTER)
-    plate = plate.cut(hole_drills)
-
-    return plate
-
-
 def _get_part(part):
     return part.leader if hasattr(part, "leader") else part
 
