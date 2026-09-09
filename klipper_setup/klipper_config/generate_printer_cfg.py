@@ -28,11 +28,10 @@ FINGERPRINT_SETTINGS_KEY = "source_sha256"
 # These are deliberately code constants: V2 supports one prescribed contact
 # algorithm, not a family of user-tunable variants.
 MULTI_HEAD_ZERO_BALL_RADIUS_MM = 5.0
-# Keep the X/Y measurement near the crown.  Live 2.8 mm rings imposed enough
-# lateral load to move the ball/mount between T0 and T1 by roughly 0.2 mm.
-# At 1.5 mm the sphere still provides ample harmonic slope while the contact
-# force is predominantly vertical.
-MULTI_HEAD_ZERO_RING_RADIUS_MM = 1.5
+# Use the larger ring now that the ball/mount slides freely again.  The wider
+# ring gives the fit more lateral information and improves the ball-centre
+# estimate without changing the physical ball datum.
+MULTI_HEAD_ZERO_RING_RADIUS_MM = 2.8
 MULTI_HEAD_ZERO_BALL_FRONT_GAP_MM = 1.0
 MULTI_HEAD_ZERO_Y_ZERO_BEHIND_FRONT_EDGE_MM = 3.0
 MEASURED_CALIBRATION_KEYS = frozenset(

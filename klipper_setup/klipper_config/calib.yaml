@@ -2,12 +2,12 @@
 # atomically. Fixed geometry and workflow settings live in calib_config.yaml;
 # camera configuration lives in vision_config.yaml.
 
-t0_x_endstop: -85.228
-t0_y_endstop: -15.580
+t0_x_endstop: -85.124
+t0_y_endstop: -14.117
 t0_z_endstop: 289.242
-t1_x_endstop: 345.265
-t1_y_endstop: -14.145
-t1_z_endstop: 288.582
+t1_x_endstop: 345.662
+t1_y_endstop: -12.552
+t1_z_endstop: 288.524
 
 input_shaper_t0_x_type: mzv
 input_shaper_t0_x_frequency_hz: 31.600
