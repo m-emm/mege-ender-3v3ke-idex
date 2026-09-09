@@ -71,6 +71,7 @@ class EddyTapMeasure:
         self.reference_y = config.getfloat("reference_y")
         self.move_z = config.getfloat("move_z", 5.0, above=0.0)
         self.move_speed = config.getfloat("move_speed", 20.0, above=0.0)
+        self.start_dwell = config.getfloat("start_dwell", 1.0, minval=1.0)
         probe_config = config.getsection("probe_eddy_current btt_eddy")
         self.tap_threshold = probe_config.getfloat("tap_threshold", 0.0, minval=0.0)
         self.default_count = config.getint("default_count", 7, minval=1)
@@ -539,15 +540,25 @@ class EddyTapMeasure:
         # coil's x/y offsets here; doing so moves the nozzle away from the
         # requested physical contact point and corrupts the tap datum.
         self.gcode.run_script_from_command(
-            "G90\nG1 Z%.3f F%.0f\nG1 X%.3f Y%.3f F%.0f"
+            "G90\nG1 Z%.3f F%.0f"
             % (
                 start_z,
                 self.move_speed * 60.0,
+            )
+        )
+        self.gcode.run_script_from_command(
+            "G90\nG1 X%.3f Y%.3f F%.0f"
+            % (
                 x,
                 y,
                 xy_speed * 60.0,
             )
         )
+        toolhead.wait_moves()
+        # Give the carriage, nozzle mount, and Eddy signal a full second to
+        # settle at the absolute start height and reference XY before the tap
+        # descent begins.
+        toolhead.dwell(self.start_dwell)
         toolhead.wait_moves()
 
     def _report_tap_failure(

@@ -61,6 +61,7 @@ reference_x: ${bed_z_reference_x}
 reference_y: ${bed_z_reference_y}
 move_z: 5.0
 move_speed: 20.0
+start_dwell: 1.0
 default_count: 7
 scan_nozzle_zs: 0.5,1,2,3
 

@@ -799,6 +799,11 @@ class EddyTap:
     TAP_MIN_LEG_SAMPLES = 3
     TAP_MIN_CONTACT_SPAN_MM = 0.020
     TAP_MIN_FREE_SPAN_MM = 0.100
+    # A staged discovery band may stop at a frequency outside the calibrated
+    # height range.  A few in-range samples can still form a convincing but
+    # false release intersection there, so do not accept a fit when most of
+    # the retract was converted to OUT_OF_RANGE.
+    TAP_MAX_INVALID_HEIGHT_FRACTION = 0.50
     TAP_MIN_HEIGHT_SLOPE_DELTA = 0.250
     TAP_FREE_HEIGHT_SLOPE_MIN = 0.500
     TAP_FREE_HEIGHT_SLOPE_MAX = 1.500
@@ -1107,6 +1112,11 @@ class EddyTap:
             "guard_mm": self.TAP_RELEASE_GUARD_MM,
             "height_sample_count": len(height_samples),
             "invalid_height_samples": invalid_height_samples,
+            "invalid_height_fraction": (
+                invalid_height_samples / (len(height_samples) + invalid_height_samples)
+                if height_samples or invalid_height_samples
+                else 0.0
+            ),
             "rejections": {},
         }
 
@@ -1114,6 +1124,16 @@ class EddyTap:
             diagnostics["rejections"][reason] = (
                 diagnostics["rejections"].get(reason, 0) + 1
             )
+
+        total_height_samples = len(height_samples) + invalid_height_samples
+        if (
+            total_height_samples
+            and invalid_height_samples / total_height_samples
+            > self.TAP_MAX_INVALID_HEIGHT_FRACTION
+        ):
+            reject("insufficient_calibrated_coverage")
+            diagnostics["valid_candidate_count"] = 0
+            return None, diagnostics
 
         best = None
         for split_z in candidates:

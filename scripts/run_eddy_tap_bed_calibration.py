@@ -61,11 +61,12 @@ REFERENCE_TAP_COUNT = 5
 REFERENCE_MAX_SPAN_MM = 0.030
 REFERENCE_ZERO_TOLERANCE_MM = 0.030
 DISCOVERY_START_Z_MM = 10.0
-DISCOVERY_BAND_MM = 2.0
-# Move the two-millimetre window down by only one millimetre at a time.  Thus
-# every height (including an exact band boundary) is covered by two discovery
-# attempts instead of depending on one endpoint's trigger timing.
-DISCOVERY_OVERLAP_MM = 1.0
+DISCOVERY_BAND_MM = 4.0
+# Move the four-millimetre window down by only one millimetre at a time.  Thus
+# every height is covered by four discovery attempts, and a trigger near one
+# window boundary is still covered by several following attempts.
+DISCOVERY_STEP_MM = 1.0
+DISCOVERY_OVERLAP_MM = DISCOVERY_BAND_MM - DISCOVERY_STEP_MM
 DISCOVERY_FINAL_Z_MM = -2.2
 NARROW_START_MARGIN_MM = 2.0
 NARROW_BELOW_CONTACT_MM = 1.0
@@ -497,24 +498,38 @@ def discover_reference(
             diagnostics = sample.get("diagnostics", {})
             trigger_z = diagnostics.get("trigger_z")
             endpoint_tolerance = 0.010
-            if (
+            release_candidates = diagnostics.get("release_candidates", {})
+            rejection_reasons = release_candidates.get("rejections", {})
+            coverage_rejected = rejection_reasons.get(
+                "insufficient_calibrated_coverage", 0
+            )
+            band["trigger_z"] = float(trigger_z) if trigger_z is not None else None
+            band["error"] = sample.get("error", "rejected tap")
+            if coverage_rejected:
+                band["status"] = "coverage_rejected"
+                message = (
+                    f"Eddy reference {phase} rejected an uncalibrated high-Z "
+                    "feature; retrying in next overlapping band"
+                )
+            elif (
                 trigger_z is not None
                 and abs(float(trigger_z) - target_z) <= endpoint_tolerance
                 and target_z > z_min + 1.0e-9
             ):
                 band["status"] = "boundary_rejected"
-                band["trigger_z"] = float(trigger_z)
                 message = (
                     f"Eddy reference {phase} boundary trigger at "
                     f"Z={float(trigger_z):+.6f}; retrying in next overlapping band"
                 )
-                console(client, message)
-                dashboard.event(message, status="running")
             else:
-                raise CalibrationError(
+                band["status"] = "fit_rejected"
+                message = (
                     f"Eddy reference {phase} rejected tap in band "
-                    f"{start_z:.3f}->{target_z:.3f}: {sample.get('error', 'unknown error')}"
+                    f"{start_z:.3f}->{target_z:.3f}; retrying in next overlapping band: "
+                    f"{sample.get('error', 'unknown error')}"
                 )
+            console(client, message)
+            dashboard.event(message, status="running")
         # Descend by one millimetre while retaining a two-millimetre guarded
         # window.  The final clamped band is emitted once and then terminates.
         if target_z <= z_min + 1.0e-9:
