@@ -8,11 +8,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 EXTRA_PATH = (
     REPO_ROOT
     / "klipper_setup"
-    / "image_build"
-    / "overlays"
-    / "stage2"
-    / "99-klipperpi"
-    / "files"
     / "klipper_host"
     / "klippy"
     / "extras"

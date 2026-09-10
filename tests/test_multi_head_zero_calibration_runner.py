@@ -7,7 +7,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNNER_PATH = ROOT / "scripts/run_multi_head_zero_contact_map.py"
+RUNNER_PATH = ROOT / "klipper_setup/runtime_helpers/multi_head_zero_probe/run_multi_head_zero_contact_map.py"
 APPLIER_PATH = ROOT / "scripts/apply_multi_head_zero_maximum_calibration.py"
 VERIFIER_PATH = ROOT / "scripts/verify_multi_head_zero_alignment.py"
 

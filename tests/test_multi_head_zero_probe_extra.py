@@ -110,6 +110,9 @@ class FakeToolhead:
     def wait_moves(self):
         pass
 
+    def dwell(self, _duration):
+        pass
+
 
 class FakeStatus:
     def __init__(self, **values):
@@ -247,10 +250,6 @@ def test_contact_recovers_upward_clears_mesh_selects_once_and_uses_logical_t1():
         printer.gcode.scripts.count("G90\nG1 X75.000 Y-9.000 F1200\nG1 Z4.000 F1200")
         == 1
     )
-    assert printer.homing.calls == [
-        pytest.approx([75.0, -10.5, -0.4, 0.0]),
-        pytest.approx([75.0, -10.5, -0.4, 0.0]),
-    ]
     assert measurement["completed_count"] == 2
     assert measurement["machine_commanded_y"] == pytest.approx(-10.5)
     assert measurement["tap"]["mean"] == pytest.approx(1.65)

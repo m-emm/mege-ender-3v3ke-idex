@@ -23,6 +23,11 @@ require_file() {
   [ -f "$f" ] || die "Missing required file: $f"
 }
 
+require_dir() {
+  local d="$1"
+  [ -d "$d" ] || die "Missing required directory: $d"
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "Missing command: $1"
 }
@@ -138,6 +143,7 @@ apt-get install -y --no-install-recommends \
   wget \
   unzip \
   git \
+  rsync \
   acl \
   sudo \
   openssh-server \
@@ -331,7 +337,10 @@ log "Creating printer_data layout under ${PRINTER_DATA}"
 
 require_file "${FILES_DIR}/printer.cfg"
 require_file "${FILES_DIR}/moonraker.conf"
-require_file "${FILES_DIR}/resonance/run_resonance_plot.py"
+require_file "${FILES_DIR}/KLIPPER_COMMIT"
+require_dir "${FILES_DIR}/runtime_helpers"
+require_file "${FILES_DIR}/runtime_helpers/resonance/run_resonance_plot.py"
+require_file "${FILES_DIR}/runtime_helpers/multi_head_zero_probe/run_multi_head_zero_contact_map.py"
 
 install -d -m 0755 -o "${USERNAME}" -g "${USERNAME}" \
   "${CONFIG_DIR}" "${CONFIG_DIR}/resonance" "${LOG_DIR}" "${COMMS_DIR}" \
@@ -339,9 +348,10 @@ install -d -m 0755 -o "${USERNAME}" -g "${USERNAME}" \
 
 install -m 0644 "${FILES_DIR}/printer.cfg" "${CONFIG_DIR}/printer.cfg"
 install -m 0644 "${FILES_DIR}/moonraker.conf" "${CONFIG_DIR}/moonraker.conf"
-install -m 0755 \
-  "${FILES_DIR}/resonance/run_resonance_plot.py" \
-  "${CONFIG_DIR}/resonance/run_resonance_plot.py"
+cp -a "${FILES_DIR}/runtime_helpers/." "${CONFIG_DIR}/"
+chmod 0755 \
+  "${CONFIG_DIR}/resonance/run_resonance_plot.py" \
+  "${CONFIG_DIR}/multi_head_zero_probe/run_multi_head_zero_contact_map.py"
 chown -R "${USERNAME}:${USERNAME}" "${PRINTER_DATA}"
 
 # --- X wrapper (KlipperScreen) ----------------------------------------------
@@ -570,7 +580,11 @@ usermod -a -G tty,dialout,video "${USERNAME}" || true
 # --- Klipper + Moonraker -----------------------------------------------------
 
 log "Setting up Klipper (venv + checkout)"
-clone_repo https://github.com/Klipper3d/klipper.git /opt/klipper "${KLIPPER_COMMIT:-}"
+KLIPPER_COMMIT="$(tr -d '[:space:]' < "${FILES_DIR}/KLIPPER_COMMIT")"
+if [[ ! "${KLIPPER_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+  die "Invalid shared Klipper commit: ${KLIPPER_COMMIT}"
+fi
+clone_repo https://github.com/Klipper3d/klipper.git /opt/klipper "${KLIPPER_COMMIT}"
 python3 -m venv /opt/klipper-env
 /opt/klipper-env/bin/pip install --upgrade pip wheel
 /opt/klipper-env/bin/pip install -r /opt/klipper/scripts/klippy-requirements.txt
@@ -579,40 +593,10 @@ python3 -m venv /opt/klipper-env
 /opt/klipper-env/bin/pip install "sqlitedict==2.1.0"
 /opt/klipper-env/bin/python -c 'import numpy, matplotlib'
 
-log "Installing custom Klipper host extras"
-require_file "${FILES_DIR}/klipper_host/klippy/extras/heaters.py"
-require_file "${FILES_DIR}/klipper_host/klippy/extras/bed_mesh.py"
-require_file "${FILES_DIR}/klipper_host/klippy/extras/vision.py"
-require_file "${FILES_DIR}/klipper_host/klippy/extras/idex_manual_tuning.py"
-require_file "${FILES_DIR}/klipper_host/klippy/extras/eddy_tap_measure.py"
-require_file "${FILES_DIR}/klipper_host/klippy/extras/probe_eddy_current.py"
-require_file "${FILES_DIR}/klipper_host/klippy/extras/daq.py"
-require_file "${FILES_DIR}/klipper_host/klippy/extras/eddy_daq.py"
-install -m 0644 \
-  "${FILES_DIR}/klipper_host/klippy/extras/heaters.py" \
-  /opt/klipper/klippy/extras/heaters.py
-install -m 0644 \
-  "${FILES_DIR}/klipper_host/klippy/extras/bed_mesh.py" \
-  /opt/klipper/klippy/extras/bed_mesh.py
-install -m 0644 \
-  "${FILES_DIR}/klipper_host/klippy/extras/vision.py" \
-  /opt/klipper/klippy/extras/vision.py
-install -m 0644 \
-  "${FILES_DIR}/klipper_host/klippy/extras/idex_manual_tuning.py" \
-  /opt/klipper/klippy/extras/idex_manual_tuning.py
-install -m 0644 \
-  "${FILES_DIR}/klipper_host/klippy/extras/eddy_tap_measure.py" \
-  /opt/klipper/klippy/extras/eddy_tap_measure.py
-install -m 0644 \
-  "${FILES_DIR}/klipper_host/klippy/extras/probe_eddy_current.py" \
-  /opt/klipper/klippy/extras/probe_eddy_current.py
-install -m 0644 \
-  "${FILES_DIR}/klipper_host/klippy/extras/daq.py" \
-  /opt/klipper/klippy/extras/daq.py
-install -m 0644 \
-  "${FILES_DIR}/klipper_host/klippy/extras/eddy_daq.py" \
-  /opt/klipper/klippy/extras/eddy_daq.py
-
+log "Overlaying canonical Klipper host tree"
+require_dir "${FILES_DIR}/klipper_host"
+rsync -a --checksum --exclude '__pycache__/' --exclude '*.pyc' \
+  "${FILES_DIR}/klipper_host/klippy/" /opt/klipper/
 chown -R "${USERNAME}:${USERNAME}" /opt/klipper /opt/klipper-env
 
 log "Pre-building Klipper host C helper"
@@ -723,8 +707,8 @@ log "Writing build info"
 {
   echo "hostname=${HOSTNAME}"
   echo "username=${USERNAME}"
-  echo "klipper_commit=${KLIPPER_COMMIT:-}"
-  echo "klipper_host_extras=bed_mesh.py,vision.py,idex_manual_tuning.py,eddy_tap_measure.py,probe_eddy_current.py,daq.py,eddy_daq.py"
+  echo "klipper_commit=${KLIPPER_COMMIT}"
+  echo "klipper_host_overlay=klipper_host/"
   echo "moonraker_commit=${MOONRAKER_COMMIT:-}"
   echo "mainsail_version=${MAINSAIL_VERSION}"
   echo "build_time_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

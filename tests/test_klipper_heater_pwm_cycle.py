@@ -7,8 +7,6 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HEATER_PATHS = [
     REPO_ROOT / "klipper_setup/klipper_host/klippy/extras/heaters.py",
-    REPO_ROOT
-    / "klipper_setup/image_build/overlays/stage2/99-klipperpi/files/klipper_host/klippy/extras/heaters.py",
 ]
 
 

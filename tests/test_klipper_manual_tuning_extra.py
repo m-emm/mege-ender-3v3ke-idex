@@ -193,13 +193,10 @@ def test_status_resynchronizes_babystep_and_reset_event_returns_to_neutral():
 
 
 def test_extra_is_packaged_and_deployed_with_the_managed_klipper_extras():
-    assert EXTRA_PATH.read_text(encoding="utf-8") == IMAGE_EXTRA_PATH.read_text(
-        encoding="utf-8"
-    )
     image_install = IMAGE_INSTALL_PATH.read_text(encoding="utf-8")
     updater = UPDATER_PATH.read_text(encoding="utf-8")
 
-    assert "idex_manual_tuning.py" in image_install
-    assert "SOURCE_IDEX_MANUAL_TUNING" in updater
-    assert "REMOTE_TMP_IDEX_MANUAL_TUNING" in updater
-    assert "EXPECTED_IDEX_MANUAL_TUNING_SHA256" in updater
+    assert 'rsync -a --checksum' in image_install
+    assert 'SOURCE_HOST_ROOT="$SETUP_DIR/klipper_host"' in updater
+    assert 'SOURCE_IDEX_MANUAL_TUNING' not in updater
+    assert 'REMOTE_TMP_IDEX_MANUAL_TUNING' not in updater

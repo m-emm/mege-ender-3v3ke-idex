@@ -560,9 +560,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
         Path(__file__).resolve().parents[1]
         / "klipper_setup/klipper_host/klippy/extras/vision.py"
     ).read_text(encoding="utf-8")
-    image_extra = (
-        IMAGE_BUILD_FILES_DIR / "klipper_host/klippy/extras/vision.py"
-    ).read_text(encoding="utf-8")
 
     assert "socket_path: /run/vision-capture-nozzle_cam/visiond.sock" in vision_section
     assert "timeout: 45.0" in vision_section
@@ -718,9 +715,6 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     assert "VISION_REGISTER_CALIBRATION_METHODS=1" in capture_service
     assert "VISIOND_SOCKET_REQUEST_TIMEOUT=45" in capture_service
     assert "VISION_REGISTER_NOZZLE_METHODS" not in capture_service
-    assert ast.dump(ast.parse(image_extra), include_attributes=False) == ast.dump(
-        ast.parse(extra), include_attributes=False
-    )
     for command in (
         "VISION_JOB_BEGIN",
         "VISION_PROFILE",

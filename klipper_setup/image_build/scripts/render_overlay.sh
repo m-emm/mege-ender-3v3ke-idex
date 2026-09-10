@@ -8,7 +8,8 @@ OVERLAY_SRC="${IMAGE_BUILD_DIR}/overlays/stage2/99-klipperpi"
 PIGEN_DIR="${IMAGE_BUILD_DIR}/pi-gen"
 SECRETS_DIR="${IMAGE_BUILD_DIR}/secrets"
 OUT_CONFIG="${PIGEN_DIR}/config"
-RESONANCE_HELPER_SRC="${IMAGE_BUILD_DIR}/../../scripts/run_resonance_plot.py"
+RUNTIME_HELPERS_SRC="${IMAGE_BUILD_DIR}/../runtime_helpers"
+KLIPPER_COMMIT_SRC="${IMAGE_BUILD_DIR}/../KLIPPER_COMMIT"
 CALIB_SRC="${IMAGE_BUILD_DIR}/../klipper_config/calib.yaml"
 VISION_CONFIG_SRC="${IMAGE_BUILD_DIR}/../klipper_config/vision_config.yaml"
 PRIORS_SRC="${IMAGE_BUILD_DIR}/../klipper_config/priors.yaml"
@@ -107,16 +108,21 @@ cp "${CALIB_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/calib.yaml"
 cp "${VISION_CONFIG_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/vision_config.yaml"
 cp "${PRIORS_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/priors.yaml"
 
-if [ ! -f "${RESONANCE_HELPER_SRC}" ]; then
-  echo "Missing resonance helper: ${RESONANCE_HELPER_SRC}" >&2
+if [ ! -d "${RUNTIME_HELPERS_SRC}" ]; then
+  echo "Missing runtime helper bundle: ${RUNTIME_HELPERS_SRC}" >&2
+  exit 1
+fi
+if [ ! -f "${KLIPPER_COMMIT_SRC}" ]; then
+  echo "Missing shared Klipper commit file: ${KLIPPER_COMMIT_SRC}" >&2
   exit 1
 fi
 
-echo "Injecting resonance helper"
-install -d "${PIGEN_DIR}/stage2/99-klipperpi/files/resonance"
-install -m 0755 \
-  "${RESONANCE_HELPER_SRC}" \
-  "${PIGEN_DIR}/stage2/99-klipperpi/files/resonance/run_resonance_plot.py"
+echo "Injecting runtime helper bundle"
+rsync -a --delete --exclude '__pycache__/' --exclude '*.pyc' \
+  "${RUNTIME_HELPERS_SRC}/" \
+  "${PIGEN_DIR}/stage2/99-klipperpi/files/runtime_helpers/"
+install -m 0644 "${KLIPPER_COMMIT_SRC}" \
+  "${PIGEN_DIR}/stage2/99-klipperpi/files/KLIPPER_COMMIT"
 
 echo "Injecting secrets (authorized_keys, build.env) into overlay files/"
 cp "${AUTHORIZED_KEYS_SRC}" "${PIGEN_DIR}/stage2/99-klipperpi/files/authorized_keys"

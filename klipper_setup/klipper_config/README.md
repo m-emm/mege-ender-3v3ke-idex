@@ -8,10 +8,9 @@ This directory has one active printer configuration:
 - `vision_config.yaml` contains diagnostic camera configuration only. Vision is
   not part of the authoritative print-calibration chain.
 - `wiring/` is THE active wiring source for the custom Pico/TMC wiring.
-- `../klipper_host/` is THE active Klipper host-extra source and contains the
-  managed heater baseline plus the Tap-aware `bed_mesh.py` override. The
-  override uses nozzle coordinates for `METHOD=tap` and retains Eddy offsets
-  for Eddy methods.
+- `../klipper_host/` is THE active Klipper host overlay source. It is applied
+  recursively after the pinned upstream Klipper checkout in both the image
+  build and live deployment.
 - `update_menderpi.sh` is THE script for copying it to `pi@menderpi.local`.
 - `archive/` is historical/reference material only. Do not edit files there to
   change the active printer.
@@ -39,15 +38,15 @@ python wiring/validate_wiring.py
 ```
 
 `update_menderpi.sh --check` verifies the generated local `printer.cfg`, the
-remote `~/printer_data/config/printer.cfg`, the managed remote
-`/opt/klipper/klippy/extras/heaters.py` and `bed_mesh.py`, the deployed
-resonance helper, and the config Klippy has loaded via Moonraker without
-uploading files or restarting Klipper.
+remote configuration, the pinned Klipper checkout, recursive overlay
+manifests, runtime helpers, and the config Klippy has loaded via Moonraker
+without uploading files or restarting Klipper.
 
-`update_menderpi.sh` copies local `printer.cfg` to
-`~/printer_data/config/printer.cfg` on `pi@menderpi.local`, backs up the
-previous remote file with a timestamp, installs the managed Klipper core
-overrides and custom extras,
+`update_menderpi.sh` first stages the generated configuration, canonical host
+overlay, and runtime-helper directory bundles. It then copies
+`printer.cfg` to `~/printer_data/config/printer.cfg`, recursively overlays the
+host bundle onto `/opt/klipper`, backs up managed replacements, prunes only
+previously managed retired files, and
 restarts Klipper, verifies the Moonraker/Klippy state, then runs
 `deploy_vision_code.sh` to synchronize all tracked top-level vision Python,
 JSON, and PNG assets plus `priors.yaml`, restart the four vision services, and
@@ -55,7 +54,8 @@ rebuild the static vision catalog.
 
 ## Resonance measurements
 
-The live resonance helpers are in the repository-level `scripts/` directory.
+The live resonance helper source is in `../runtime_helpers/resonance/`; the
+shell wrapper remains in the repository-level `scripts/` directory.
 Run the default X-axis measurement from the repository root with:
 
 ```bash

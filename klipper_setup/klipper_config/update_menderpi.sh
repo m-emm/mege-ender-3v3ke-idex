@@ -1,1070 +1,399 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-usage() {
-  echo "Usage: $0 [--check]" >&2
-}
-
-MODE="update"
-if [[ "$#" -eq 0 ]]; then
-  MODE="update"
-elif [[ "$#" -eq 1 && "$1" == "--check" ]]; then
-  MODE="check"
+if [ "$#" -eq 1 ] && [ "$1" = "--check" ]; then
+  MODE=check
+elif [ "$#" -eq 0 ]; then
+  MODE=update
 else
-  usage
+  echo "Usage: $0 [--check]" >&2
   exit 2
 fi
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_CFG="${SCRIPT_DIR}/printer.cfg"
-SOURCE_HEATERS="${SCRIPT_DIR}/../klipper_host/klippy/extras/heaters.py"
-SOURCE_BED_MESH="${SCRIPT_DIR}/../klipper_host/klippy/extras/bed_mesh.py"
-SOURCE_VISION="${SCRIPT_DIR}/../klipper_host/klippy/extras/vision.py"
-SOURCE_IDEX_MANUAL_TUNING="${SCRIPT_DIR}/../klipper_host/klippy/extras/idex_manual_tuning.py"
-SOURCE_EDDY_TAP_MEASURE="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_tap_measure.py"
-SOURCE_PROBE="${SCRIPT_DIR}/../rp2040_firmware/klipper/klippy/extras/probe.py"
-SOURCE_PROBE_EDDY_CURRENT="${SCRIPT_DIR}/../image_build/overlays/stage2/99-klipperpi/files/klipper_host/klippy/extras/probe_eddy_current.py"
-SOURCE_DAQ="${SCRIPT_DIR}/../klipper_host/klippy/extras/daq.py"
-SOURCE_EDDY_DAQ="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_daq.py"
-SOURCE_MULTI_HEAD_ZERO_PROBE="${SCRIPT_DIR}/../klipper_host/klippy/extras/multi_head_zero_probe.py"
-SOURCE_RESONANCE_HELPER="${SCRIPT_DIR}/../../scripts/run_resonance_plot.py"
-SOURCE_MULTI_HEAD_ZERO_HELPER="${SCRIPT_DIR}/../../scripts/run_multi_head_zero_contact_map.py"
-REMOTE_HOST="${MENDERPI_HOST:-pi@menderpi.local}"
-REMOTE_KLIPPER_DIR="${MENDERPI_KLIPPER_DIR:-/opt/klipper}"
-REMOTE_TMP_CFG="/tmp/printer.cfg.$$"
-REMOTE_TMP_HEATERS="/tmp/heaters.py.$$"
-REMOTE_TMP_BED_MESH="/tmp/bed_mesh.py.$$"
-REMOTE_TMP_VISION="/tmp/vision.py.$$"
-REMOTE_TMP_IDEX_MANUAL_TUNING="/tmp/idex_manual_tuning.py.$$"
-REMOTE_TMP_EDDY_TAP_MEASURE="/tmp/eddy_tap_measure.py.$$"
-REMOTE_TMP_PROBE="/tmp/probe.py.$$"
-REMOTE_TMP_PROBE_EDDY_CURRENT="/tmp/probe_eddy_current.py.$$"
-REMOTE_TMP_DAQ="/tmp/daq.py.$$"
-REMOTE_TMP_EDDY_DAQ="/tmp/eddy_daq.py.$$"
-REMOTE_TMP_MULTI_HEAD_ZERO_PROBE="/tmp/multi_head_zero_probe.py.$$"
-REMOTE_TMP_RESONANCE_HELPER="/tmp/run_resonance_plot.py.$$"
-REMOTE_TMP_MULTI_HEAD_ZERO_HELPER="/tmp/run_multi_head_zero_contact_map.py.$$"
-EXPECTED_KLIPPER_COMMIT="ca8230d505b7ba7fd225bfa6ed9655bc4520e805"
-EXPECTED_UPSTREAM_HEATERS_SHA256="a95d83be80296a7ff970ea6e1b73746d1a97a7d3e47ce621c02a89d80451ac9d"
-LEGACY_BOOSTED_HEATERS_SHA256="b3b362086277fc7202fb12c022aa210da7cc15a470bf536f2cc0d3d507719830"
-EXPECTED_UPSTREAM_BED_MESH_SHA256="e1c381dba9859e569d091f95c8e6bb1c012b279619fcbbc9c41405ae77fb55f9"
-# First managed bed_mesh.py revision, before the managed-file marker was added.
-# It is accepted only to permit the one-time marker handoff below.
-LEGACY_MANAGED_BED_MESH_SHA256="35a8cb613808cd3b3b492ae32cb51d75437ef2b2b6880c21f4d4066c42b10581"
-sha256_file() {
+SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+SETUP_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
+SOURCE_CFG="$SCRIPT_DIR/printer.cfg"
+SOURCE_HOST_ROOT="$SETUP_DIR/klipper_host"
+SOURCE_HOST_OVERLAY="$SOURCE_HOST_ROOT/klippy"
+SOURCE_RUNTIME_HELPERS="$SETUP_DIR/runtime_helpers"
+SOURCE_KLIPPER_COMMIT="$SETUP_DIR/KLIPPER_COMMIT"
+
+REMOTE_HOST=${MENDERPI_HOST-}
+[ -n "$REMOTE_HOST" ] || REMOTE_HOST=pi@menderpi.local
+REMOTE_KLIPPER_DIR=${MENDERPI_KLIPPER_DIR-}
+[ -n "$REMOTE_KLIPPER_DIR" ] || REMOTE_KLIPPER_DIR=/opt/klipper
+REMOTE_CONFIG_DIR=${MENDERPI_CONFIG_DIR-}
+[ -n "$REMOTE_CONFIG_DIR" ] || REMOTE_CONFIG_DIR=/home/pi/printer_data/config
+REMOTE_MANAGED_STATE=${MENDERPI_MANAGED_STATE-}
+[ -n "$REMOTE_MANAGED_STATE" ] || REMOTE_MANAGED_STATE=/var/lib/klipperpi/managed-overlay.json
+
+TMP_ROOT=${TMPDIR-}
+[ -n "$TMP_ROOT" ] || TMP_ROOT=/tmp
+LOCAL_TMP_DIR=$(mktemp -d "$TMP_ROOT/klipperpi-update.XXXXXX")
+REMOTE_TMP_DIR=
+
+cleanup() {
+  rm -rf -- "$LOCAL_TMP_DIR"
+  if [ -n "$REMOTE_TMP_DIR" ]; then
+    ssh "$REMOTE_HOST" "rm -rf -- '$REMOTE_TMP_DIR'" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+manifest_tree() {
   python3 - "$1" <<'PY'
 import hashlib
 import sys
 from pathlib import Path
-
-print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
+root = Path(sys.argv[1])
+if not root.is_dir():
+    raise SystemExit(f"manifest root is not a directory: {root}")
+for path in sorted(root.rglob("*")):
+    if not path.is_file():
+        continue
+    relative = path.relative_to(root)
+    if "__pycache__" in relative.parts or path.suffix == ".pyc":
+        continue
+    print(f"{relative.as_posix()}\t{hashlib.sha256(path.read_bytes()).hexdigest()}")
 PY
 }
 
-check_local_support_files() {
-  "${SCRIPT_DIR}/wiring/generate_wiring_svgs.sh" --check
-  python3 "${SCRIPT_DIR}/wiring/validate_wiring.py"
-
-  if [[ ! -f "${SOURCE_HEATERS}" ]]; then
-    echo "Error: managed Klipper heaters.py not found: ${SOURCE_HEATERS}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_BED_MESH}" ]]; then
-    echo "Error: managed Klipper bed_mesh.py not found: ${SOURCE_BED_MESH}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_VISION}" ]]; then
-    echo "Error: Klipper vision.py extra not found: ${SOURCE_VISION}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_IDEX_MANUAL_TUNING}" ]]; then
-    echo "Error: Klipper idex_manual_tuning.py extra not found: ${SOURCE_IDEX_MANUAL_TUNING}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_EDDY_TAP_MEASURE}" ]]; then
-    echo "Error: Klipper eddy_tap_measure.py extra not found: ${SOURCE_EDDY_TAP_MEASURE}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_PROBE}" ]]; then
-    echo "Error: Klipper probe.py source not found: ${SOURCE_PROBE}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_PROBE_EDDY_CURRENT}" ]]; then
-    echo "Error: customized Klipper probe_eddy_current.py not found: ${SOURCE_PROBE_EDDY_CURRENT}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_DAQ}" || ! -f "${SOURCE_EDDY_DAQ}" ]]; then
-    echo "Error: Klipper DAQ extras not found: ${SOURCE_DAQ}, ${SOURCE_EDDY_DAQ}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_MULTI_HEAD_ZERO_PROBE}" ]]; then
-    echo "Error: Klipper multi-head-zero probe extra not found: ${SOURCE_MULTI_HEAD_ZERO_PROBE}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_RESONANCE_HELPER}" ]]; then
-    echo "Error: resonance helper not found: ${SOURCE_RESONANCE_HELPER}" >&2
-    exit 1
-  fi
-  if [[ ! -f "${SOURCE_MULTI_HEAD_ZERO_HELPER}" ]]; then
-    echo "Error: multi-head-zero contact-map helper not found: ${SOURCE_MULTI_HEAD_ZERO_HELPER}" >&2
-    exit 1
-  fi
-
-  python3 - "${SOURCE_HEATERS}" "${SOURCE_BED_MESH}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" "${SOURCE_PROBE}" "${SOURCE_PROBE_EDDY_CURRENT}" "${SOURCE_DAQ}" "${SOURCE_EDDY_DAQ}" "${SOURCE_MULTI_HEAD_ZERO_PROBE}" "${SOURCE_RESONANCE_HELPER}" "${SOURCE_MULTI_HEAD_ZERO_HELPER}" <<'PY'
+validate_local_sources() {
+  python3 "$SCRIPT_DIR/generate_printer_cfg.py" --check
+  "$SCRIPT_DIR/wiring/generate_wiring_svgs.sh" --check
+  python3 "$SCRIPT_DIR/wiring/validate_wiring.py"
+  [ -f "$SOURCE_CFG" ] || { echo "Missing $SOURCE_CFG" >&2; exit 1; }
+  [ -d "$SOURCE_HOST_OVERLAY" ] || { echo "Missing $SOURCE_HOST_OVERLAY" >&2; exit 1; }
+  [ -d "$SOURCE_RUNTIME_HELPERS" ] || { echo "Missing $SOURCE_RUNTIME_HELPERS" >&2; exit 1; }
+  [ -f "$SOURCE_KLIPPER_COMMIT" ] || { echo "Missing $SOURCE_KLIPPER_COMMIT" >&2; exit 1; }
+  local commit
+  commit=$(tr -d '[:space:]' < "$SOURCE_KLIPPER_COMMIT")
+  [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid Klipper commit: $commit" >&2; exit 1; }
+  python3 - "$SOURCE_HOST_ROOT" "$SOURCE_RUNTIME_HELPERS" <<'PY'
 import ast
 import sys
 from pathlib import Path
-
-for path_arg in sys.argv[1:]:
-    ast.parse(Path(path_arg).read_text(encoding="utf-8"))
+for root_arg in sys.argv[1:]:
+    for path in sorted(Path(root_arg).rglob("*.py")):
+        if "__pycache__" not in path.parts and path.suffix != ".pyc":
+            ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 PY
+  manifest_tree "$SOURCE_HOST_OVERLAY" > "$LOCAL_TMP_DIR/host.manifest"
+  manifest_tree "$SOURCE_RUNTIME_HELPERS" > "$LOCAL_TMP_DIR/runtime.manifest"
 }
 
-check_live_config() {
-  echo "Checking ${REMOTE_HOST} for the active Klipper config..."
-  echo "  Source: ${SOURCE_CFG}"
-  echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
-  echo "  Managed Klipper bed_mesh.py: ${SOURCE_BED_MESH}"
-  echo "  Klipper vision extra: ${SOURCE_VISION}"
-  echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
-  echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
-  echo "  Managed Klipper probe.py: ${SOURCE_PROBE}"
-  echo "  Customized Klipper Eddy probe: ${SOURCE_PROBE_EDDY_CURRENT}"
-  echo "  Klipper generic DAQ extra: ${SOURCE_DAQ}"
-  echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
-  echo "  Klipper multi-head-zero probe extra: ${SOURCE_MULTI_HEAD_ZERO_PROBE}"
-  echo "  Resonance helper: ${SOURCE_RESONANCE_HELPER}"
-  echo "  Multi-head-zero contact-map helper: ${SOURCE_MULTI_HEAD_ZERO_HELPER}"
-
-  python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --check
-  check_local_support_files
-
-  if [[ ! -f "${SOURCE_CFG}" ]]; then
-    echo "Error: source config not found: ${SOURCE_CFG}" >&2
-    exit 1
-  fi
-
-  local_sha256="$(sha256_file "${SOURCE_CFG}")"
-  local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
-  local_bed_mesh_sha256="$(sha256_file "${SOURCE_BED_MESH}")"
-  local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
-  local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
-  local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
-  local_probe_sha256="$(sha256_file "${SOURCE_PROBE}")"
-  local_probe_eddy_current_sha256="$(sha256_file "${SOURCE_PROBE_EDDY_CURRENT}")"
-  local_daq_sha256="$(sha256_file "${SOURCE_DAQ}")"
-  local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
-  local_multi_head_zero_probe_sha256="$(sha256_file "${SOURCE_MULTI_HEAD_ZERO_PROBE}")"
-  local_resonance_helper_sha256="$(sha256_file "${SOURCE_RESONANCE_HELPER}")"
-  local_multi_head_zero_helper_sha256="$(sha256_file "${SOURCE_MULTI_HEAD_ZERO_HELPER}")"
-  expected_fingerprint="$(
-    python3 "${SCRIPT_DIR}/generate_printer_cfg.py" --fingerprint
-  )"
-
-  if ! remote_payload="$(
-    ssh "${REMOTE_HOST}" "REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' python3 -" <<'PY'
+remote_payload() {
+  ssh "$REMOTE_HOST" \
+    "sudo -n env REMOTE_KLIPPER_DIR='$REMOTE_KLIPPER_DIR' REMOTE_CONFIG_DIR='$REMOTE_CONFIG_DIR' REMOTE_MANAGED_STATE='$REMOTE_MANAGED_STATE' python3 -" <<'PY'
 import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
-import sys
 import time
 import urllib.request
 
-main_cfg = Path.home() / "printer_data" / "config" / "printer.cfg"
-klipper_dir = Path(os.environ.get("REMOTE_KLIPPER_DIR", "/opt/klipper"))
-heaters_py = klipper_dir / "klippy" / "extras" / "heaters.py"
-bed_mesh_py = klipper_dir / "klippy" / "extras" / "bed_mesh.py"
-vision_py = klipper_dir / "klippy" / "extras" / "vision.py"
-idex_manual_tuning_py = klipper_dir / "klippy" / "extras" / "idex_manual_tuning.py"
-eddy_tap_measure_py = klipper_dir / "klippy" / "extras" / "eddy_tap_measure.py"
-probe_py = klipper_dir / "klippy" / "extras" / "probe.py"
-probe_eddy_current_py = klipper_dir / "klippy" / "extras" / "probe_eddy_current.py"
-daq_py = klipper_dir / "klippy" / "extras" / "daq.py"
-eddy_daq_py = klipper_dir / "klippy" / "extras" / "eddy_daq.py"
-multi_head_zero_probe_py = klipper_dir / "klippy" / "extras" / "multi_head_zero_probe.py"
-resonance_helper = Path.home() / "printer_data" / "config" / "resonance" / "run_resonance_plot.py"
-multi_head_zero_helper = Path.home() / "printer_data" / "config" / "multi_head_zero_probe" / "run_multi_head_zero_contact_map.py"
+klipper = Path(os.environ["REMOTE_KLIPPER_DIR"])
+config = Path(os.environ["REMOTE_CONFIG_DIR"])
+state_path = Path(os.environ["REMOTE_MANAGED_STATE"])
+def digest(path):
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
+try:
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+except OSError:
+    state = {}
 payload = {
     "ok": False,
-    "remote_config_path": str(main_cfg),
-    "remote_heaters_path": str(heaters_py),
-    "remote_bed_mesh_path": str(bed_mesh_py),
-    "remote_vision_path": str(vision_py),
-    "remote_idex_manual_tuning_path": str(idex_manual_tuning_py),
-    "remote_eddy_tap_measure_path": str(eddy_tap_measure_py),
-    "remote_probe_path": str(probe_py),
-    "remote_probe_eddy_current_path": str(probe_eddy_current_py),
-    "remote_daq_path": str(daq_py),
-    "remote_eddy_daq_path": str(eddy_daq_py),
-    "remote_multi_head_zero_probe_path": str(multi_head_zero_probe_py),
-    "remote_resonance_helper_path": str(resonance_helper),
-    "remote_multi_head_zero_helper_path": str(multi_head_zero_helper),
+    "config_path": str(config / "printer.cfg"),
+    "config_sha256": digest(config / "printer.cfg"),
+    "managed_state": state,
+    "host_targets": {p: digest(klipper / p) for p in state.get("host", {})},
+    "runtime_targets": {p: digest(config / p) for p in state.get("runtime", {})},
 }
-
 try:
-    payload["remote_sha256"] = hashlib.sha256(main_cfg.read_bytes()).hexdigest()
-    payload["remote_heaters_sha256"] = hashlib.sha256(heaters_py.read_bytes()).hexdigest()
-    payload["remote_bed_mesh_sha256"] = hashlib.sha256(bed_mesh_py.read_bytes()).hexdigest()
-    payload["remote_vision_sha256"] = hashlib.sha256(vision_py.read_bytes()).hexdigest()
-    payload["remote_idex_manual_tuning_sha256"] = (
-        hashlib.sha256(idex_manual_tuning_py.read_bytes()).hexdigest()
-        if idex_manual_tuning_py.is_file()
-        else ""
-    )
-    payload["remote_eddy_tap_measure_sha256"] = (
-        hashlib.sha256(eddy_tap_measure_py.read_bytes()).hexdigest()
-        if eddy_tap_measure_py.is_file()
-        else ""
-    )
-    payload["remote_probe_sha256"] = hashlib.sha256(probe_py.read_bytes()).hexdigest()
-    payload["remote_probe_eddy_current_sha256"] = (
-        hashlib.sha256(probe_eddy_current_py.read_bytes()).hexdigest()
-        if probe_eddy_current_py.is_file()
-        else ""
-    )
-    payload["remote_daq_sha256"] = (
-        hashlib.sha256(daq_py.read_bytes()).hexdigest() if daq_py.is_file() else ""
-    )
-    payload["remote_eddy_daq_sha256"] = (
-        hashlib.sha256(eddy_daq_py.read_bytes()).hexdigest()
-        if eddy_daq_py.is_file()
-        else ""
-    )
-    payload["remote_multi_head_zero_probe_sha256"] = (
-        hashlib.sha256(multi_head_zero_probe_py.read_bytes()).hexdigest()
-        if multi_head_zero_probe_py.is_file()
-        else ""
-    )
-    payload["remote_resonance_helper_sha256"] = (
-        hashlib.sha256(resonance_helper.read_bytes()).hexdigest()
-        if resonance_helper.is_file()
-        else ""
-    )
-    payload["remote_multi_head_zero_helper_sha256"] = (
-        hashlib.sha256(multi_head_zero_helper.read_bytes()).hexdigest()
-        if multi_head_zero_helper.is_file()
-        else ""
-    )
-    subprocess.check_call(["/opt/klipper-env/bin/python3", "-c", "import sqlitedict"])
-    payload["remote_klipper_commit"] = subprocess.check_output(
-        ["git", "-C", str(klipper_dir), "rev-parse", "HEAD"],
-        text=True,
+    payload["klipper_commit"] = subprocess.check_output(
+        ["git", "-C", str(klipper), "rev-parse", "HEAD"], text=True
     ).strip()
-    url = "http://127.0.0.1:7125/printer/objects/query?webhooks&configfile"
-    deadline = time.monotonic() + 60.0
+    subprocess.check_call(
+        ["/opt/klipper-env/bin/python3", "-c", "import sqlitedict"],
+        stdout=subprocess.DEVNULL,
+    )
+    payload["dependency_ok"] = True
+    deadline = time.monotonic() + 60
     while True:
-        with urllib.request.urlopen(url, timeout=10) as response:
+        with urllib.request.urlopen(
+            "http://127.0.0.1:7125/printer/objects/query?webhooks&configfile",
+            timeout=10,
+        ) as response:
             payload["status"] = json.loads(response.read())["result"]["status"]
         if payload["status"].get("webhooks", {}).get("state") != "startup":
             break
         if time.monotonic() >= deadline:
             break
-        time.sleep(2.0)
+        time.sleep(2)
     payload["ok"] = True
 except Exception as exc:
     payload["error"] = f"{type(exc).__name__}: {exc}"
-
-json.dump(payload, sys.stdout)
+print(json.dumps(payload, sort_keys=True))
 PY
-  )"; then
-    echo "Config check failed: could not SSH to ${REMOTE_HOST}." >&2
-    exit 1
-  fi
+}
 
-  CHECK_EXPECTED_FINGERPRINT="${expected_fingerprint}" \
-  CHECK_LOCAL_SHA256="${local_sha256}" \
-  CHECK_LOCAL_HEATERS_SHA256="${local_heaters_sha256}" \
-  CHECK_LOCAL_BED_MESH_SHA256="${local_bed_mesh_sha256}" \
-  CHECK_LOCAL_VISION_SHA256="${local_vision_sha256}" \
-  CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256="${local_idex_manual_tuning_sha256}" \
-  CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256="${local_eddy_tap_measure_sha256}" \
-  CHECK_LOCAL_PROBE_SHA256="${local_probe_sha256}" \
-  CHECK_LOCAL_PROBE_EDDY_CURRENT_SHA256="${local_probe_eddy_current_sha256}" \
-  CHECK_LOCAL_DAQ_SHA256="${local_daq_sha256}" \
-  CHECK_LOCAL_EDDY_DAQ_SHA256="${local_eddy_daq_sha256}" \
-  CHECK_LOCAL_MULTI_HEAD_ZERO_PROBE_SHA256="${local_multi_head_zero_probe_sha256}" \
-  CHECK_LOCAL_RESONANCE_HELPER_SHA256="${local_resonance_helper_sha256}" \
-  CHECK_LOCAL_MULTI_HEAD_ZERO_HELPER_SHA256="${local_multi_head_zero_helper_sha256}" \
-  CHECK_EXPECTED_KLIPPER_COMMIT="${EXPECTED_KLIPPER_COMMIT}" \
-  CHECK_REMOTE_HOST="${REMOTE_HOST}" \
-  CHECK_REMOTE_PAYLOAD="${remote_payload}" \
-    python3 - "${SCRIPT_DIR}/generate_printer_cfg.py" <<'PY'
+check_live_config() {
+  echo "Checking $REMOTE_HOST using directory manifests..."
+  echo "  $SOURCE_CFG -> $REMOTE_CONFIG_DIR/printer.cfg"
+  echo "  $SOURCE_HOST_ROOT/klippy/ -> $REMOTE_KLIPPER_DIR/"
+  echo "  $SOURCE_RUNTIME_HELPERS/ -> $REMOTE_CONFIG_DIR/"
+  echo "  Precedence: upstream Klipper, then klipper_host/klippy/, then runtime_helpers/"
+  validate_local_sources
+  local config_sha expected_fingerprint payload
+  config_sha=$(sha256sum "$SOURCE_CFG" | awk '{print $1}')
+  expected_fingerprint=$(python3 "$SCRIPT_DIR/generate_printer_cfg.py" --fingerprint)
+  payload=$(remote_payload)
+  CHECK_LOCAL_CONFIG_SHA=$config_sha \
+  CHECK_EXPECTED_FINGERPRINT=$expected_fingerprint \
+  CHECK_LOCAL_HOST_MANIFEST="$(cat "$LOCAL_TMP_DIR/host.manifest")" \
+  CHECK_LOCAL_RUNTIME_MANIFEST="$(cat "$LOCAL_TMP_DIR/runtime.manifest")" \
+  CHECK_EXPECTED_KLIPPER_COMMIT="$(tr -d '[:space:]' < "$SOURCE_KLIPPER_COMMIT")" \
+  CHECK_REMOTE_PAYLOAD=$payload \
+  python3 - "$SCRIPT_DIR/generate_printer_cfg.py" <<'PY'
 import importlib.util
 import json
 import os
 import sys
-
-generator_path = sys.argv[1]
-spec = importlib.util.spec_from_file_location("generate_printer_cfg", generator_path)
-if spec is None or spec.loader is None:
-    raise RuntimeError(f"Could not load {generator_path}")
+spec = importlib.util.spec_from_file_location("generate_printer_cfg", sys.argv[1])
 generator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(generator)
-
-remote_host = os.environ["CHECK_REMOTE_HOST"]
-local_sha256 = os.environ["CHECK_LOCAL_SHA256"]
-local_heaters_sha256 = os.environ["CHECK_LOCAL_HEATERS_SHA256"]
-local_bed_mesh_sha256 = os.environ["CHECK_LOCAL_BED_MESH_SHA256"]
-local_vision_sha256 = os.environ["CHECK_LOCAL_VISION_SHA256"]
-local_idex_manual_tuning_sha256 = os.environ["CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256"]
-local_eddy_tap_measure_sha256 = os.environ["CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256"]
-local_probe_sha256 = os.environ["CHECK_LOCAL_PROBE_SHA256"]
-local_probe_eddy_current_sha256 = os.environ["CHECK_LOCAL_PROBE_EDDY_CURRENT_SHA256"]
-local_daq_sha256 = os.environ["CHECK_LOCAL_DAQ_SHA256"]
-local_eddy_daq_sha256 = os.environ["CHECK_LOCAL_EDDY_DAQ_SHA256"]
-local_multi_head_zero_probe_sha256 = os.environ["CHECK_LOCAL_MULTI_HEAD_ZERO_PROBE_SHA256"]
-local_resonance_helper_sha256 = os.environ["CHECK_LOCAL_RESONANCE_HELPER_SHA256"]
-local_multi_head_zero_helper_sha256 = os.environ["CHECK_LOCAL_MULTI_HEAD_ZERO_HELPER_SHA256"]
-expected_fingerprint = os.environ["CHECK_EXPECTED_FINGERPRINT"]
-expected_klipper_commit = os.environ["CHECK_EXPECTED_KLIPPER_COMMIT"]
-remote_payload = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
-
-print(f"  Host: {remote_host}")
-print(f"  Local sha256: {local_sha256}")
-
-remote_path = remote_payload.get("remote_config_path")
-if remote_path:
-    print(f"  Remote config: {remote_path}")
-
-if not remote_payload.get("ok"):
-    print(
-        "Config check failed: could not inspect remote config: "
-        f"{remote_payload.get('error', 'unknown error')}",
-        file=sys.stderr,
-    )
-    sys.exit(1)
-
-remote_sha256 = remote_payload.get("remote_sha256", "")
-remote_heaters_sha256 = remote_payload.get("remote_heaters_sha256", "")
-remote_bed_mesh_sha256 = remote_payload.get("remote_bed_mesh_sha256", "")
-remote_vision_sha256 = remote_payload.get("remote_vision_sha256", "")
-remote_idex_manual_tuning_sha256 = remote_payload.get("remote_idex_manual_tuning_sha256", "")
-remote_eddy_tap_measure_sha256 = remote_payload.get("remote_eddy_tap_measure_sha256", "")
-remote_probe_sha256 = remote_payload.get("remote_probe_sha256", "")
-remote_probe_eddy_current_sha256 = remote_payload.get("remote_probe_eddy_current_sha256", "")
-remote_daq_sha256 = remote_payload.get("remote_daq_sha256", "")
-remote_eddy_daq_sha256 = remote_payload.get("remote_eddy_daq_sha256", "")
-remote_multi_head_zero_probe_sha256 = remote_payload.get("remote_multi_head_zero_probe_sha256", "")
-remote_resonance_helper_sha256 = remote_payload.get("remote_resonance_helper_sha256", "")
-remote_multi_head_zero_helper_sha256 = remote_payload.get("remote_multi_head_zero_helper_sha256", "")
-remote_klipper_commit = remote_payload.get("remote_klipper_commit", "")
-status = remote_payload.get("status", {})
-webhooks = status.get("webhooks", {})
-configfile = status.get("configfile", {})
-live_fingerprint = generator.active_config_fingerprint(status)
-
-print(f"  Remote sha256: {remote_sha256}")
-print(f"  Local heaters.py sha256: {local_heaters_sha256}")
-print(f"  Remote heaters.py sha256: {remote_heaters_sha256}")
-print(f"  Local bed_mesh.py sha256: {local_bed_mesh_sha256}")
-print(f"  Remote bed_mesh.py sha256: {remote_bed_mesh_sha256}")
-print(f"  Local vision.py sha256: {local_vision_sha256}")
-print(f"  Remote vision.py sha256: {remote_vision_sha256}")
-print(f"  Local idex_manual_tuning.py sha256: {local_idex_manual_tuning_sha256}")
-print(f"  Remote idex_manual_tuning.py sha256: {remote_idex_manual_tuning_sha256}")
-print(f"  Local eddy_tap_measure.py sha256: {local_eddy_tap_measure_sha256}")
-print(f"  Remote eddy_tap_measure.py sha256: {remote_eddy_tap_measure_sha256}")
-print(f"  Local probe.py sha256: {local_probe_sha256}")
-print(f"  Remote probe.py sha256: {remote_probe_sha256}")
-print(f"  Local probe_eddy_current.py sha256: {local_probe_eddy_current_sha256}")
-print(f"  Remote probe_eddy_current.py sha256: {remote_probe_eddy_current_sha256}")
-print(f"  Local daq.py sha256: {local_daq_sha256}")
-print(f"  Remote daq.py sha256: {remote_daq_sha256}")
-print(f"  Local eddy_daq.py sha256: {local_eddy_daq_sha256}")
-print(f"  Remote eddy_daq.py sha256: {remote_eddy_daq_sha256}")
-print(f"  Local multi_head_zero_probe.py sha256: {local_multi_head_zero_probe_sha256}")
-print(f"  Remote multi_head_zero_probe.py sha256: {remote_multi_head_zero_probe_sha256}")
-print(f"  Local resonance helper sha256: {local_resonance_helper_sha256}")
-print(f"  Remote resonance helper sha256: {remote_resonance_helper_sha256}")
-print(f"  Local multi-head-zero helper sha256: {local_multi_head_zero_helper_sha256}")
-print(f"  Remote multi-head-zero helper sha256: {remote_multi_head_zero_helper_sha256}")
-print(f"  Remote Klipper commit: {remote_klipper_commit}")
-print(f"  Klippy state: {webhooks.get('state')}")
-print(f"  save_config_pending: {configfile.get('save_config_pending')}")
-print(f"  Local fingerprint: {expected_fingerprint}")
-print(f"  Live fingerprint: {live_fingerprint}")
-
-errors = generator.live_config_check_errors(
-    local_sha256=local_sha256,
-    remote_sha256=remote_sha256,
-    expected_fingerprint=expected_fingerprint,
+def manifest(value):
+    return {line.split("\t", 1)[0]: line.split("\t", 1)[1]
+            for line in value.splitlines() if line}
+local_config = os.environ["CHECK_LOCAL_CONFIG_SHA"]
+local_host = manifest(os.environ["CHECK_LOCAL_HOST_MANIFEST"])
+local_runtime = manifest(os.environ["CHECK_LOCAL_RUNTIME_MANIFEST"])
+remote = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
+state = remote.get("managed_state", {})
+errors = []
+if not remote.get("ok"):
+    errors.append(f"remote inspection failed: {remote.get('error', 'unknown error')}")
+if remote.get("config_sha256") != local_config:
+    errors.append("remote printer.cfg does not match generated local config")
+if remote.get("klipper_commit") != os.environ["CHECK_EXPECTED_KLIPPER_COMMIT"]:
+    errors.append("remote Klipper commit does not match shared pin")
+if not remote.get("dependency_ok"):
+    errors.append("remote Klipper environment is missing sqlitedict")
+for label, local, section, target_key in (
+    ("host overlay", local_host, "host", "host_targets"),
+    ("runtime bundle", local_runtime, "runtime", "runtime_targets"),
+):
+    managed = state.get(section, {})
+    missing = sorted(set(local) - set(managed))
+    unexpected = sorted(set(managed) - set(local))
+    if missing:
+        errors.append(f"{label} manifest missing: {', '.join(missing)}")
+    if unexpected:
+        errors.append(f"{label} manifest has unexpected paths: {', '.join(unexpected)}")
+    for relative, expected in local.items():
+        if remote.get(target_key, {}).get(relative) != expected:
+            errors.append(f"{label} mismatch at {relative}")
+status = remote.get("status", {})
+errors.extend(generator.live_config_check_errors(
+    local_sha256=local_config,
+    remote_sha256=remote.get("config_sha256", ""),
+    expected_fingerprint=os.environ["CHECK_EXPECTED_FINGERPRINT"],
     status=status,
-)
-if remote_heaters_sha256 != local_heaters_sha256:
-    errors.append(
-        "remote Klipper heaters.py sha256 does not match the managed file "
-        f"({remote_heaters_sha256} != {local_heaters_sha256})"
-    )
-if remote_bed_mesh_sha256 != local_bed_mesh_sha256:
-    errors.append(
-        "remote Klipper bed_mesh.py sha256 does not match the managed file "
-        f"({remote_bed_mesh_sha256} != {local_bed_mesh_sha256})"
-    )
-if remote_vision_sha256 != local_vision_sha256:
-    errors.append(
-        "remote Klipper vision.py sha256 does not match local extra "
-        f"({remote_vision_sha256} != {local_vision_sha256})"
-    )
-if remote_idex_manual_tuning_sha256 != local_idex_manual_tuning_sha256:
-    errors.append(
-        "remote Klipper idex_manual_tuning.py sha256 does not match local extra "
-        f"({remote_idex_manual_tuning_sha256} != {local_idex_manual_tuning_sha256})"
-    )
-if remote_eddy_tap_measure_sha256 != local_eddy_tap_measure_sha256:
-    errors.append(
-        "remote Klipper eddy_tap_measure.py sha256 does not match local extra "
-        f"({remote_eddy_tap_measure_sha256} != {local_eddy_tap_measure_sha256})"
-    )
-if remote_probe_sha256 != local_probe_sha256:
-    errors.append(
-        "remote Klipper probe.py sha256 does not match local managed source "
-        f"({remote_probe_sha256} != {local_probe_sha256})"
-    )
-if remote_probe_eddy_current_sha256 != local_probe_eddy_current_sha256:
-    errors.append(
-        "remote Klipper probe_eddy_current.py sha256 does not match customized local source "
-        f"({remote_probe_eddy_current_sha256} != {local_probe_eddy_current_sha256})"
-    )
-if remote_daq_sha256 != local_daq_sha256:
-    errors.append(
-        "remote Klipper daq.py sha256 does not match local extra "
-        f"({remote_daq_sha256} != {local_daq_sha256})"
-    )
-if remote_eddy_daq_sha256 != local_eddy_daq_sha256:
-    errors.append(
-        "remote Klipper eddy_daq.py sha256 does not match local extra "
-        f"({remote_eddy_daq_sha256} != {local_eddy_daq_sha256})"
-    )
-if remote_multi_head_zero_probe_sha256 != local_multi_head_zero_probe_sha256:
-    errors.append(
-        "remote Klipper multi_head_zero_probe.py sha256 does not match local extra "
-        f"({remote_multi_head_zero_probe_sha256} != {local_multi_head_zero_probe_sha256})"
-    )
-if remote_resonance_helper_sha256 != local_resonance_helper_sha256:
-    errors.append(
-        "remote resonance helper sha256 does not match local source "
-        f"({remote_resonance_helper_sha256} != {local_resonance_helper_sha256})"
-    )
-if remote_multi_head_zero_helper_sha256 != local_multi_head_zero_helper_sha256:
-    errors.append(
-        "remote multi-head-zero helper sha256 does not match local source "
-        f"({remote_multi_head_zero_helper_sha256} != {local_multi_head_zero_helper_sha256})"
-    )
-if remote_klipper_commit != expected_klipper_commit:
-    errors.append(
-        "remote Klipper commit does not match expected pinned commit "
-        f"({remote_klipper_commit} != {expected_klipper_commit})"
-    )
-
-settings = status.get("configfile", {}).get("settings", {})
-bed = settings.get("heater_bed", {})
-expected_bed_settings = {
-    "heater_pin": "gpio20",
-    "pwm_cycle_time": 2.0,
-}
-for key, expected in expected_bed_settings.items():
-    actual = bed.get(key)
-    if isinstance(expected, float):
-        try:
-            matches = abs(float(actual) - expected) < 1e-6
-        except (TypeError, ValueError):
-            matches = False
-    else:
-        matches = actual == expected
-    if not matches:
-        errors.append(
-            f"live heater_bed.{key} is {actual!r}, expected {expected!r}"
-        )
-
+))
+bed = status.get("configfile", {}).get("settings", {}).get("heater_bed", {})
+if bed.get("heater_pin") != "gpio20":
+    errors.append(f"live heater_bed.heater_pin is {bed.get('heater_pin')!r}, expected 'gpio20'")
+try:
+    if abs(float(bed.get("pwm_cycle_time")) - 2.0) > 1e-6:
+        errors.append("live heater_bed.pwm_cycle_time is not 2.0")
+except (TypeError, ValueError):
+    errors.append("live heater_bed.pwm_cycle_time is not numeric")
+print(f"  Remote config: {remote.get('config_path')}")
+print(f"  Remote Klipper commit: {remote.get('klipper_commit')}")
+print(f"  Klippy state: {status.get('webhooks', {}).get('state')}")
+print(f"  Managed host files: {len(state.get('host', {}))}")
+print(f"  Managed runtime files: {len(state.get('runtime', {}))}")
 if errors:
-    print("Config check failed:", file=sys.stderr)
+    print("Directory deployment check failed:", file=sys.stderr)
     for error in errors:
         print(f"  - {error}", file=sys.stderr)
-    sys.exit(1)
-
-print("Config check passed: remote file matches and Klippy loaded this config.")
+    raise SystemExit(1)
+print("Directory deployment check passed.")
 PY
 }
 
-if [[ "${MODE}" == "check" ]]; then
+if [ "$MODE" = check ]; then
   check_live_config
-  MENDERPI_HOST="${REMOTE_HOST}" bash "${SCRIPT_DIR}/deploy_multi_head_zero_calibration_dashboard.sh" --check
-  MENDERPI_HOST="${REMOTE_HOST}" bash "${SCRIPT_DIR}/deploy_eddy_tap_dashboard.sh" --check
+  MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_multi_head_zero_calibration_dashboard.sh" --check
+  MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_eddy_tap_dashboard.sh" --check
   exit 0
 fi
 
-python3 "${SCRIPT_DIR}/generate_printer_cfg.py"
-check_local_support_files
+python3 "$SCRIPT_DIR/generate_printer_cfg.py"
+validate_local_sources
+REMOTE_TMP_DIR=$(ssh "$REMOTE_HOST" "mktemp -d /tmp/klipperpi-update.XXXXXX")
+case "$REMOTE_TMP_DIR" in
+  /tmp/klipperpi-update.*) ;;
+  *) echo "Refusing unexpected remote temporary directory: $REMOTE_TMP_DIR" >&2; exit 1 ;;
+esac
 
-if [[ ! -f "${SOURCE_CFG}" ]]; then
-  echo "Error: source config not found: ${SOURCE_CFG}" >&2
-  exit 1
-fi
+echo "Staging config, canonical host overlay, and runtime-helper bundle..."
+scp -r "$SOURCE_HOST_ROOT" "$SOURCE_RUNTIME_HELPERS" "$SOURCE_CFG" \
+  "$SOURCE_KLIPPER_COMMIT" "$LOCAL_TMP_DIR/host.manifest" \
+  "$LOCAL_TMP_DIR/runtime.manifest" "$REMOTE_HOST:$REMOTE_TMP_DIR/"
 
-cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_BED_MESH}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}' '${REMOTE_TMP_PROBE}' '${REMOTE_TMP_PROBE_EDDY_CURRENT}' '${REMOTE_TMP_DAQ}' '${REMOTE_TMP_EDDY_DAQ}' '${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}' '${REMOTE_TMP_RESONANCE_HELPER}' '${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}'" >/dev/null 2>&1 || true
-}
-trap cleanup_remote_tmp EXIT
-
-local_heaters_sha256="$(sha256_file "${SOURCE_HEATERS}")"
-local_bed_mesh_sha256="$(sha256_file "${SOURCE_BED_MESH}")"
-local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
-local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
-local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
-local_probe_sha256="$(sha256_file "${SOURCE_PROBE}")"
-local_probe_eddy_current_sha256="$(sha256_file "${SOURCE_PROBE_EDDY_CURRENT}")"
-local_daq_sha256="$(sha256_file "${SOURCE_DAQ}")"
-local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
-local_multi_head_zero_probe_sha256="$(sha256_file "${SOURCE_MULTI_HEAD_ZERO_PROBE}")"
-local_resonance_helper_sha256="$(sha256_file "${SOURCE_RESONANCE_HELPER}")"
-local_multi_head_zero_helper_sha256="$(sha256_file "${SOURCE_MULTI_HEAD_ZERO_HELPER}")"
-
-echo "Updating ${REMOTE_HOST} with THE active Klipper config and host extras..."
-echo "  Source: ${SOURCE_CFG}"
-echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
-echo "  Managed Klipper bed_mesh.py: ${SOURCE_BED_MESH}"
-echo "  Klipper vision extra: ${SOURCE_VISION}"
-  echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
-  echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
-  echo "  Managed Klipper probe.py: ${SOURCE_PROBE}"
-  echo "  Customized Klipper Eddy probe: ${SOURCE_PROBE_EDDY_CURRENT}"
-echo "  Klipper generic DAQ extra: ${SOURCE_DAQ}"
-echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
-echo "  Klipper multi-head-zero probe extra: ${SOURCE_MULTI_HEAD_ZERO_PROBE}"
-echo "  Resonance helper: ${SOURCE_RESONANCE_HELPER}"
-echo "  Multi-head-zero contact-map helper: ${SOURCE_MULTI_HEAD_ZERO_HELPER}"
-
-scp "${SOURCE_CFG}" "${REMOTE_HOST}:${REMOTE_TMP_CFG}"
-scp "${SOURCE_HEATERS}" "${REMOTE_HOST}:${REMOTE_TMP_HEATERS}"
-scp "${SOURCE_BED_MESH}" "${REMOTE_HOST}:${REMOTE_TMP_BED_MESH}"
-scp "${SOURCE_VISION}" "${REMOTE_HOST}:${REMOTE_TMP_VISION}"
-scp "${SOURCE_IDEX_MANUAL_TUNING}" "${REMOTE_HOST}:${REMOTE_TMP_IDEX_MANUAL_TUNING}"
-scp "${SOURCE_EDDY_TAP_MEASURE}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_TAP_MEASURE}"
-scp "${SOURCE_PROBE}" "${REMOTE_HOST}:${REMOTE_TMP_PROBE}"
-scp "${SOURCE_PROBE_EDDY_CURRENT}" "${REMOTE_HOST}:${REMOTE_TMP_PROBE_EDDY_CURRENT}"
-scp "${SOURCE_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_DAQ}"
-scp "${SOURCE_EDDY_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_DAQ}"
-scp "${SOURCE_MULTI_HEAD_ZERO_PROBE}" "${REMOTE_HOST}:${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}"
-scp "${SOURCE_RESONANCE_HELPER}" "${REMOTE_HOST}:${REMOTE_TMP_RESONANCE_HELPER}"
-scp "${SOURCE_MULTI_HEAD_ZERO_HELPER}" "${REMOTE_HOST}:${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}"
-
-ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_BED_MESH='${REMOTE_TMP_BED_MESH}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_PROBE='${REMOTE_TMP_PROBE}' REMOTE_TMP_PROBE_EDDY_CURRENT='${REMOTE_TMP_PROBE_EDDY_CURRENT}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_TMP_MULTI_HEAD_ZERO_PROBE='${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}' REMOTE_TMP_RESONANCE_HELPER='${REMOTE_TMP_RESONANCE_HELPER}' REMOTE_TMP_MULTI_HEAD_ZERO_HELPER='${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_UPSTREAM_BED_MESH_SHA256='${EXPECTED_UPSTREAM_BED_MESH_SHA256}' LEGACY_MANAGED_BED_MESH_SHA256='${LEGACY_MANAGED_BED_MESH_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_MANAGED_BED_MESH_SHA256='${local_bed_mesh_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_PROBE_SHA256='${local_probe_sha256}' EXPECTED_PROBE_EDDY_CURRENT_SHA256='${local_probe_eddy_current_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' EXPECTED_MULTI_HEAD_ZERO_PROBE_SHA256='${local_multi_head_zero_probe_sha256}' EXPECTED_RESONANCE_HELPER_SHA256='${local_resonance_helper_sha256}' EXPECTED_MULTI_HEAD_ZERO_HELPER_SHA256='${local_multi_head_zero_helper_sha256}' bash -s" <<'REMOTE_SCRIPT'
+ssh "$REMOTE_HOST" \
+  "REMOTE_TMP_DIR='$REMOTE_TMP_DIR' REMOTE_KLIPPER_DIR='$REMOTE_KLIPPER_DIR' REMOTE_CONFIG_DIR='$REMOTE_CONFIG_DIR' REMOTE_MANAGED_STATE='$REMOTE_MANAGED_STATE' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
+HOST_OVERLAY="$REMOTE_TMP_DIR/klipper_host/klippy"
+RUNTIME_HELPERS="$REMOTE_TMP_DIR/runtime_helpers"
+CFG="$REMOTE_TMP_DIR/printer.cfg"
+COMMIT_FILE="$REMOTE_TMP_DIR/KLIPPER_COMMIT"
+HOST_MANIFEST="$REMOTE_TMP_DIR/host.manifest"
+RUNTIME_MANIFEST="$REMOTE_TMP_DIR/runtime.manifest"
+MAIN_CFG="$REMOTE_CONFIG_DIR/printer.cfg"
+BACKUP_ROOT="$HOME/printer_data/backup/klipperpi-update-$(date +%Y%m%d-%H%M%S)"
 
-MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
-HEATERS_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/heaters.py"
-BED_MESH_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/bed_mesh.py"
-VISION_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/vision.py"
-IDEX_MANUAL_TUNING_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/idex_manual_tuning.py"
-EDDY_TAP_MEASURE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_tap_measure.py"
-PROBE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/probe.py"
-PROBE_EDDY_CURRENT_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/probe_eddy_current.py"
-DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/daq.py"
-EDDY_DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_daq.py"
-MULTI_HEAD_ZERO_PROBE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/multi_head_zero_probe.py"
-RESONANCE_HELPER="${HOME}/printer_data/config/resonance/run_resonance_plot.py"
-MULTI_HEAD_ZERO_HELPER="${HOME}/printer_data/config/multi_head_zero_probe/run_multi_head_zero_contact_map.py"
-TS="$(date +%Y%m%d-%H%M%S)"
-CFG_BACKUP="${MAIN_CFG}.bak.${TS}"
-HEATERS_BACKUP="${HEATERS_PY}.bak.${TS}"
-BED_MESH_BACKUP="${BED_MESH_PY}.bak.${TS}"
-VISION_BACKUP="${VISION_PY}.bak.${TS}"
-IDEX_MANUAL_TUNING_BACKUP="${IDEX_MANUAL_TUNING_PY}.bak.${TS}"
-EDDY_TAP_MEASURE_BACKUP="${EDDY_TAP_MEASURE_PY}.bak.${TS}"
-PROBE_BACKUP="${PROBE_PY}.bak.${TS}"
-PROBE_EDDY_CURRENT_BACKUP="${PROBE_EDDY_CURRENT_PY}.bak.${TS}"
-DAQ_BACKUP="${DAQ_PY}.bak.${TS}"
-EDDY_DAQ_BACKUP="${EDDY_DAQ_PY}.bak.${TS}"
-MULTI_HEAD_ZERO_PROBE_BACKUP="${MULTI_HEAD_ZERO_PROBE_PY}.bak.${TS}"
-RESONANCE_HELPER_BACKUP="${RESONANCE_HELPER}.bak.${TS}"
-MULTI_HEAD_ZERO_HELPER_BACKUP="${MULTI_HEAD_ZERO_HELPER}.bak.${TS}"
-
-if [[ ! -f "${REMOTE_TMP_CFG}" ]]; then
-  echo "Error: uploaded config not found: ${REMOTE_TMP_CFG}" >&2
+manifest_tree() {
+  python3 - "$1" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+for path in sorted(root.rglob("*")):
+    if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
+        relative = path.relative_to(root)
+        print(f"{relative.as_posix()}\t{hashlib.sha256(path.read_bytes()).hexdigest()}")
+PY
+}
+[ -d "$HOST_OVERLAY" ] && [ -d "$RUNTIME_HELPERS" ] && [ -f "$CFG" ] && [ -f "$COMMIT_FILE" ] || {
+  echo "Staged deployment bundle is incomplete" >&2
   exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_HEATERS}" ]]; then
-  echo "Error: uploaded heaters.py not found: ${REMOTE_TMP_HEATERS}" >&2
+}
+cmp -s "$HOST_MANIFEST" <(manifest_tree "$HOST_OVERLAY") || { echo "Host manifest mismatch" >&2; exit 1; }
+cmp -s "$RUNTIME_MANIFEST" <(manifest_tree "$RUNTIME_HELPERS") || { echo "Runtime manifest mismatch" >&2; exit 1; }
+COMMIT=$(tr -d '[:space:]' < "$COMMIT_FILE")
+[[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid shared Klipper commit" >&2; exit 1; }
+[ "$(git -C "$REMOTE_KLIPPER_DIR" rev-parse HEAD)" = "$COMMIT" ] || {
+  echo "Remote Klipper checkout does not match shared pin" >&2
   exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_BED_MESH}" ]]; then
-  echo "Error: uploaded bed_mesh.py not found: ${REMOTE_TMP_BED_MESH}" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_VISION}" ]]; then
-  echo "Error: uploaded vision.py not found: ${REMOTE_TMP_VISION}" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_IDEX_MANUAL_TUNING}" ]]; then
-  echo "Error: uploaded idex_manual_tuning.py not found: ${REMOTE_TMP_IDEX_MANUAL_TUNING}" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_EDDY_TAP_MEASURE}" ]]; then
-  echo "Error: uploaded eddy_tap_measure.py not found: ${REMOTE_TMP_EDDY_TAP_MEASURE}" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_PROBE}" ]]; then
-  echo "Error: uploaded probe.py not found: ${REMOTE_TMP_PROBE}" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_PROBE_EDDY_CURRENT}" ]]; then
-  echo "Error: uploaded probe_eddy_current.py not found: ${REMOTE_TMP_PROBE_EDDY_CURRENT}" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_DAQ}" || ! -f "${REMOTE_TMP_EDDY_DAQ}" ]]; then
-  echo "Error: uploaded DAQ extras not found" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}" ]]; then
-  echo "Error: uploaded multi-head-zero probe extra not found: ${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_RESONANCE_HELPER}" ]]; then
-  echo "Error: uploaded resonance helper not found: ${REMOTE_TMP_RESONANCE_HELPER}" >&2
-  exit 1
-fi
-if [[ ! -f "${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}" ]]; then
-  echo "Error: uploaded multi-head-zero contact-map helper not found: ${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}" >&2
-  exit 1
-fi
-if [[ ! -f "${HEATERS_PY}" ]]; then
-  echo "Error: remote Klipper heaters.py not found: ${HEATERS_PY}" >&2
-  exit 1
-fi
-if [[ ! -f "${BED_MESH_PY}" ]]; then
-  echo "Error: remote Klipper bed_mesh.py not found: ${BED_MESH_PY}" >&2
-  exit 1
-fi
-
-remote_commit="$(git -C "${REMOTE_KLIPPER_DIR}" rev-parse HEAD)"
-if [[ "${remote_commit}" != "${EXPECTED_KLIPPER_COMMIT}" ]]; then
-  echo "Error: remote Klipper commit ${remote_commit} does not match ${EXPECTED_KLIPPER_COMMIT}" >&2
-  exit 1
-fi
-
-current_heaters_sha="$(sha256sum "${HEATERS_PY}" | awk '{print $1}')"
-echo "Remote heaters.py sha256 ${current_heaters_sha}; replacing it with the managed local source."
-
-current_bed_mesh_sha="$(sha256sum "${BED_MESH_PY}" | awk '{print $1}')"
-echo "Remote bed_mesh.py sha256 ${current_bed_mesh_sha}; replacing it with the managed local source."
-
-uploaded_heaters_sha="$(sha256sum "${REMOTE_TMP_HEATERS}" | awk '{print $1}')"
-if [[ "${uploaded_heaters_sha}" != "${EXPECTED_MANAGED_HEATERS_SHA256}" ]]; then
-  echo "Error: uploaded heaters.py sha256 ${uploaded_heaters_sha} does not match the managed file" >&2
-  exit 1
-fi
-
-uploaded_bed_mesh_sha="$(sha256sum "${REMOTE_TMP_BED_MESH}" | awk '{print $1}')"
-if [[ "${uploaded_bed_mesh_sha}" != "${EXPECTED_MANAGED_BED_MESH_SHA256}" ]]; then
-  echo "Error: uploaded bed_mesh.py sha256 ${uploaded_bed_mesh_sha} does not match the managed file" >&2
-  exit 1
-fi
-
-uploaded_vision_sha="$(sha256sum "${REMOTE_TMP_VISION}" | awk '{print $1}')"
-if [[ "${uploaded_vision_sha}" != "${EXPECTED_VISION_SHA256}" ]]; then
-  echo "Error: uploaded vision.py sha256 ${uploaded_vision_sha} does not match local ${EXPECTED_VISION_SHA256}" >&2
-  exit 1
-fi
-
-uploaded_idex_manual_tuning_sha="$(sha256sum "${REMOTE_TMP_IDEX_MANUAL_TUNING}" | awk '{print $1}')"
-if [[ "${uploaded_idex_manual_tuning_sha}" != "${EXPECTED_IDEX_MANUAL_TUNING_SHA256}" ]]; then
-  echo "Error: uploaded idex_manual_tuning.py sha256 ${uploaded_idex_manual_tuning_sha} does not match local ${EXPECTED_IDEX_MANUAL_TUNING_SHA256}" >&2
-  exit 1
-fi
-
-uploaded_eddy_tap_measure_sha="$(sha256sum "${REMOTE_TMP_EDDY_TAP_MEASURE}" | awk '{print $1}')"
-if [[ "${uploaded_eddy_tap_measure_sha}" != "${EXPECTED_EDDY_TAP_MEASURE_SHA256}" ]]; then
-  echo "Error: uploaded eddy_tap_measure.py sha256 ${uploaded_eddy_tap_measure_sha} does not match local ${EXPECTED_EDDY_TAP_MEASURE_SHA256}" >&2
-  exit 1
-fi
-uploaded_probe_sha="$(sha256sum "${REMOTE_TMP_PROBE}" | awk '{print $1}')"
-if [[ "${uploaded_probe_sha}" != "${EXPECTED_PROBE_SHA256}" ]]; then
-  echo "Error: uploaded probe.py sha256 ${uploaded_probe_sha} does not match local ${EXPECTED_PROBE_SHA256}" >&2
-  exit 1
-fi
-uploaded_probe_eddy_current_sha="$(sha256sum "${REMOTE_TMP_PROBE_EDDY_CURRENT}" | awk '{print $1}')"
-if [[ "${uploaded_probe_eddy_current_sha}" != "${EXPECTED_PROBE_EDDY_CURRENT_SHA256}" ]]; then
-  echo "Error: uploaded probe_eddy_current.py sha256 ${uploaded_probe_eddy_current_sha} does not match customized local source" >&2
-  exit 1
-fi
-uploaded_daq_sha="$(sha256sum "${REMOTE_TMP_DAQ}" | awk '{print $1}')"
-uploaded_eddy_daq_sha="$(sha256sum "${REMOTE_TMP_EDDY_DAQ}" | awk '{print $1}')"
-if [[ "${uploaded_daq_sha}" != "${EXPECTED_DAQ_SHA256}" || "${uploaded_eddy_daq_sha}" != "${EXPECTED_EDDY_DAQ_SHA256}" ]]; then
-  echo "Error: uploaded DAQ extra sha256 does not match local managed source" >&2
-  exit 1
-fi
-uploaded_multi_head_zero_probe_sha="$(sha256sum "${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}" | awk '{print $1}')"
-if [[ "${uploaded_multi_head_zero_probe_sha}" != "${EXPECTED_MULTI_HEAD_ZERO_PROBE_SHA256}" ]]; then
-  echo "Error: uploaded multi-head-zero probe extra sha256 does not match local managed source" >&2
-  exit 1
-fi
-uploaded_resonance_helper_sha="$(sha256sum "${REMOTE_TMP_RESONANCE_HELPER}" | awk '{print $1}')"
-if [[ "${uploaded_resonance_helper_sha}" != "${EXPECTED_RESONANCE_HELPER_SHA256}" ]]; then
-  echo "Error: uploaded resonance helper sha256 ${uploaded_resonance_helper_sha} does not match local source" >&2
-  exit 1
-fi
-uploaded_multi_head_zero_helper_sha="$(sha256sum "${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}" | awk '{print $1}')"
-if [[ "${uploaded_multi_head_zero_helper_sha}" != "${EXPECTED_MULTI_HEAD_ZERO_HELPER_SHA256}" ]]; then
-  echo "Error: uploaded multi-head-zero contact-map helper sha256 does not match local source" >&2
-  exit 1
-fi
+}
 
 python3 - <<'PY'
 import json
-import sys
 import urllib.request
-
-url = (
-    "http://127.0.0.1:7125/printer/objects/query?"
-    "webhooks&print_stats&heater_bed&virtual_sdcard"
-)
-status = json.loads(urllib.request.urlopen(url, timeout=10).read())["result"]["status"]
+with urllib.request.urlopen(
+    "http://127.0.0.1:7125/printer/objects/query?webhooks&print_stats&heater_bed&virtual_sdcard",
+    timeout=10,
+) as response:
+    status = json.loads(response.read())["result"]["status"]
 webhooks = status.get("webhooks", {})
-klippy_state = webhooks.get("state")
-print_state = status.get("print_stats", {}).get("state")
-bed = status.get("heater_bed", {})
-virtual_sd_active = status.get("virtual_sdcard", {}).get("is_active", False)
-
-if klippy_state == "ready":
-    if print_state not in {"standby", "complete", "cancelled", "error"}:
-        raise SystemExit(
-            "Refusing to restart ready Klipper while "
-            f"print_stats.state={print_state!r}"
-        )
-    if virtual_sd_active:
-        raise SystemExit("Refusing to restart ready Klipper while virtual SD is active")
-    if bed.get("target", 0.0) not in {0, 0.0}:
-        raise SystemExit(
-            "Refusing to restart ready Klipper while "
-            f"heater_bed target={bed.get('target')!r}"
-        )
-    print(
-        "Printer idle check passed: "
-        f"Klippy state={klippy_state}, print_stats.state={print_state}, "
-        f"heater_bed target={bed.get('target')}"
-    )
-elif klippy_state == "error":
-    print(
-        "Klippy is in config/error recovery state; allowing config install "
-        f"and service restart: {webhooks.get('state_message')}"
-    )
+if webhooks.get("state") == "ready":
+    if status.get("print_stats", {}).get("state") not in {"standby", "complete", "cancelled", "error"}:
+        raise SystemExit("Refusing deployment while a print is active")
+    if status.get("virtual_sdcard", {}).get("is_active", False):
+        raise SystemExit("Refusing deployment while virtual SD is active")
+    if status.get("heater_bed", {}).get("target", 0.0) not in {0, 0.0}:
+        raise SystemExit("Refusing deployment while bed heater is active")
+elif webhooks.get("state") == "error":
+    print("Klippy is in config/error state; allowing recovery deployment")
 else:
-    raise SystemExit(
-        "Refusing to restart Klipper with unverified state: "
-        f"webhooks.state={klippy_state!r}, print_stats.state={print_state!r}"
-    )
+    raise SystemExit(f"Refusing deployment with unverified Klippy state={webhooks.get('state')!r}")
 PY
 
-if [[ "${current_heaters_sha}" == "${EXPECTED_MANAGED_HEATERS_SHA256}" ]]; then
-  echo "Managed Klipper heaters.py already installed: ${HEATERS_PY}"
-else
-  cp -a "${HEATERS_PY}" "${HEATERS_BACKUP}"
-  echo "Backed up: ${HEATERS_BACKUP}"
-  cp -a "${REMOTE_TMP_HEATERS}" "${HEATERS_PY}"
-  echo "Installed managed Klipper heaters.py: ${HEATERS_PY}"
-fi
-rm -f "${REMOTE_TMP_HEATERS}"
+sudo install -d -m 0755 "$BACKUP_ROOT/host" "$BACKUP_ROOT/runtime" "$REMOTE_CONFIG_DIR" "$(dirname -- "$REMOTE_MANAGED_STATE")"
+if [ -f "$MAIN_CFG" ]; then sudo cp -a "$MAIN_CFG" "$BACKUP_ROOT/printer.cfg"; fi
+sudo install -m 0644 "$CFG" "$MAIN_CFG"
+echo "Installed printer.cfg -> $MAIN_CFG"
 
-if [[ "${current_bed_mesh_sha}" == "${EXPECTED_MANAGED_BED_MESH_SHA256}" ]]; then
-  echo "Managed Klipper bed_mesh.py already installed: ${BED_MESH_PY}"
-else
-  cp -a "${BED_MESH_PY}" "${BED_MESH_BACKUP}"
-  echo "Backed up: ${BED_MESH_BACKUP}"
-  cp -a "${REMOTE_TMP_BED_MESH}" "${BED_MESH_PY}"
-  echo "Installed managed Klipper bed_mesh.py: ${BED_MESH_PY}"
-fi
-rm -f "${REMOTE_TMP_BED_MESH}"
+sudo python3 - "$REMOTE_MANAGED_STATE" "$HOST_OVERLAY" "$RUNTIME_HELPERS" "$BACKUP_ROOT" "$REMOTE_KLIPPER_DIR" "$REMOTE_CONFIG_DIR" <<'PY'
+import hashlib
+import json
+import shutil
+import sys
+from pathlib import Path
+state_path, host_source, runtime_source, backup_root, host_target, runtime_target = map(Path, sys.argv[1:])
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+def safe_join(root, relative):
+    path = (root / relative).resolve()
+    if root.resolve() not in path.parents:
+        raise SystemExit(f"managed path escapes target: {relative}")
+    return path
+def read_manifest(path):
+    result = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line:
+            relative, checksum = line.split("\t", 1)
+            result[relative] = checksum
+    return result
+try:
+    old_state = json.loads(state_path.read_text(encoding="utf-8"))
+except FileNotFoundError:
+    old_state = {}
+new_state = {
+    "version": 1,
+    "host": read_manifest(host_source.parent.parent / "host.manifest"),
+    "runtime": read_manifest(runtime_source.parent / "runtime.manifest"),
+}
+for section, target in (("host", host_target), ("runtime", runtime_target)):
+    for relative, checksum in old_state.get(section, {}).items():
+        if relative in new_state[section]:
+            continue
+        target_path = safe_join(target, relative)
+        if not target_path.exists():
+            continue
+        if not target_path.is_file() or digest(target_path) != checksum:
+            raise SystemExit(f"refusing to prune modified managed {section} path: {relative}")
+        backup = safe_join(backup_root / section, relative)
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(target_path, backup)
+        target_path.unlink()
+        print(f"Pruned retired {section} path: {relative}")
+state_tmp = backup_root / "managed-overlay.json"
+state_tmp.write_text(json.dumps(new_state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
 
-if [[ -f "${VISION_PY}" ]]; then
-  current_vision_sha="$(sha256sum "${VISION_PY}" | awk '{print $1}')"
-else
-  current_vision_sha=""
-fi
-if [[ "${current_vision_sha}" == "${EXPECTED_VISION_SHA256}" ]]; then
-  echo "Klipper vision extra already installed: ${VISION_PY}"
-else
-  mkdir -p "$(dirname -- "${VISION_PY}")"
-  if [[ -f "${VISION_PY}" ]]; then
-    cp -a "${VISION_PY}" "${VISION_BACKUP}"
-    echo "Backed up: ${VISION_BACKUP}"
-  fi
-  cp -a "${REMOTE_TMP_VISION}" "${VISION_PY}"
-  echo "Installed: ${VISION_PY}"
-fi
-rm -f "${REMOTE_TMP_VISION}"
-
-if [[ -f "${IDEX_MANUAL_TUNING_PY}" ]]; then
-  current_idex_manual_tuning_sha="$(sha256sum "${IDEX_MANUAL_TUNING_PY}" | awk '{print $1}')"
-else
-  current_idex_manual_tuning_sha=""
-fi
-if [[ "${current_idex_manual_tuning_sha}" == "${EXPECTED_IDEX_MANUAL_TUNING_SHA256}" ]]; then
-  echo "Klipper IDEX manual tuning extra already installed: ${IDEX_MANUAL_TUNING_PY}"
-else
-  mkdir -p "$(dirname -- "${IDEX_MANUAL_TUNING_PY}")"
-  if [[ -f "${IDEX_MANUAL_TUNING_PY}" ]]; then
-    cp -a "${IDEX_MANUAL_TUNING_PY}" "${IDEX_MANUAL_TUNING_BACKUP}"
-    echo "Backed up: ${IDEX_MANUAL_TUNING_BACKUP}"
-  fi
-  cp -a "${REMOTE_TMP_IDEX_MANUAL_TUNING}" "${IDEX_MANUAL_TUNING_PY}"
-  echo "Installed: ${IDEX_MANUAL_TUNING_PY}"
-fi
-rm -f "${REMOTE_TMP_IDEX_MANUAL_TUNING}"
-
-if [[ -f "${EDDY_TAP_MEASURE_PY}" ]]; then
-  current_eddy_tap_measure_sha="$(sha256sum "${EDDY_TAP_MEASURE_PY}" | awk '{print $1}')"
-else
-  current_eddy_tap_measure_sha=""
-fi
-if [[ "${current_eddy_tap_measure_sha}" == "${EXPECTED_EDDY_TAP_MEASURE_SHA256}" ]]; then
-  echo "Klipper Eddy tap measurement extra already installed: ${EDDY_TAP_MEASURE_PY}"
-else
-  mkdir -p "$(dirname -- "${EDDY_TAP_MEASURE_PY}")"
-  if [[ -f "${EDDY_TAP_MEASURE_PY}" ]]; then
-    cp -a "${EDDY_TAP_MEASURE_PY}" "${EDDY_TAP_MEASURE_BACKUP}"
-    echo "Backed up: ${EDDY_TAP_MEASURE_BACKUP}"
-  fi
-  sudo cp -a "${REMOTE_TMP_EDDY_TAP_MEASURE}" "${EDDY_TAP_MEASURE_PY}"
-  echo "Installed: ${EDDY_TAP_MEASURE_PY}"
-fi
-rm -f "${REMOTE_TMP_EDDY_TAP_MEASURE}"
-
-if [[ -f "${PROBE_PY}" ]]; then
-  current_probe_sha="$(sha256sum "${PROBE_PY}" | awk '{print $1}')"
-else
-  current_probe_sha=""
-fi
-if [[ "${current_probe_sha}" == "${EXPECTED_PROBE_SHA256}" ]]; then
-  echo "Managed Klipper probe.py already installed: ${PROBE_PY}"
-else
-  if [[ -f "${PROBE_PY}" ]]; then
-    cp -a "${PROBE_PY}" "${PROBE_BACKUP}"
-    echo "Backed up: ${PROBE_BACKUP}"
-  fi
-  sudo cp -a "${REMOTE_TMP_PROBE}" "${PROBE_PY}"
-  echo "Installed managed Klipper probe.py: ${PROBE_PY}"
-fi
-rm -f "${REMOTE_TMP_PROBE}"
-
-if [[ -f "${PROBE_EDDY_CURRENT_PY}" ]]; then
-  current_probe_eddy_current_sha="$(sha256sum "${PROBE_EDDY_CURRENT_PY}" | awk '{print $1}')"
-else
-  current_probe_eddy_current_sha=""
-fi
-if [[ "${current_probe_eddy_current_sha}" == "${EXPECTED_PROBE_EDDY_CURRENT_SHA256}" ]]; then
-  echo "Customized Klipper Eddy probe already installed: ${PROBE_EDDY_CURRENT_PY}"
-else
-  mkdir -p "$(dirname -- "${PROBE_EDDY_CURRENT_PY}")"
-  if [[ -f "${PROBE_EDDY_CURRENT_PY}" ]]; then
-    cp -a "${PROBE_EDDY_CURRENT_PY}" "${PROBE_EDDY_CURRENT_BACKUP}"
-    echo "Backed up: ${PROBE_EDDY_CURRENT_BACKUP}"
-  fi
-  sudo cp -a "${REMOTE_TMP_PROBE_EDDY_CURRENT}" "${PROBE_EDDY_CURRENT_PY}"
-  echo "Installed customized Klipper Eddy probe: ${PROBE_EDDY_CURRENT_PY}"
-fi
-rm -f "${REMOTE_TMP_PROBE_EDDY_CURRENT}"
-
-if [[ -f "${MULTI_HEAD_ZERO_PROBE_PY}" ]]; then
-  current_multi_head_zero_probe_sha="$(sha256sum "${MULTI_HEAD_ZERO_PROBE_PY}" | awk '{print $1}')"
-else
-  current_multi_head_zero_probe_sha=""
-fi
-if [[ "${current_multi_head_zero_probe_sha}" == "${EXPECTED_MULTI_HEAD_ZERO_PROBE_SHA256}" ]]; then
-  echo "Klipper multi-head-zero probe extra already installed: ${MULTI_HEAD_ZERO_PROBE_PY}"
-else
-  mkdir -p "$(dirname -- "${MULTI_HEAD_ZERO_PROBE_PY}")"
-  if [[ -f "${MULTI_HEAD_ZERO_PROBE_PY}" ]]; then
-    cp -a "${MULTI_HEAD_ZERO_PROBE_PY}" "${MULTI_HEAD_ZERO_PROBE_BACKUP}"
-    echo "Backed up: ${MULTI_HEAD_ZERO_PROBE_BACKUP}"
-  fi
-  cp -a "${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}" "${MULTI_HEAD_ZERO_PROBE_PY}"
-  echo "Installed: ${MULTI_HEAD_ZERO_PROBE_PY}"
-fi
-rm -f "${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}"
-
-if ! /opt/klipper-env/bin/python3 -c 'import sqlitedict' >/dev/null 2>&1; then
-  /opt/klipper-env/bin/pip install 'sqlitedict==2.1.0'
-fi
-
-for daq_extra in DAQ EDDY_DAQ; do
-  if [[ "${daq_extra}" == "DAQ" ]]; then
-    daq_path="${DAQ_PY}"
-    daq_tmp="${REMOTE_TMP_DAQ}"
-    daq_expected="${EXPECTED_DAQ_SHA256}"
-    daq_backup="${DAQ_BACKUP}"
-  else
-    daq_path="${EDDY_DAQ_PY}"
-    daq_tmp="${REMOTE_TMP_EDDY_DAQ}"
-    daq_expected="${EXPECTED_EDDY_DAQ_SHA256}"
-    daq_backup="${EDDY_DAQ_BACKUP}"
-  fi
-  if [[ -f "${daq_path}" ]]; then
-    daq_current="$(sha256sum "${daq_path}" | awk '{print $1}')"
-  else
-    daq_current=""
-  fi
-  if [[ "${daq_current}" == "${daq_expected}" ]]; then
-    echo "Klipper ${daq_extra,,} extra already installed: ${daq_path}"
-  else
-    mkdir -p "$(dirname -- "${daq_path}")"
-    if [[ -f "${daq_path}" ]]; then
-      cp -a "${daq_path}" "${daq_backup}"
-      echo "Backed up: ${daq_backup}"
-    fi
-    cp -a "${daq_tmp}" "${daq_path}"
-    echo "Installed: ${daq_path}"
-  fi
-  rm -f "${daq_tmp}"
-done
-
-mkdir -p "$(dirname -- "${RESONANCE_HELPER}")"
-if [[ -f "${RESONANCE_HELPER}" ]]; then
-  current_resonance_helper_sha="$(sha256sum "${RESONANCE_HELPER}" | awk '{print $1}')"
-else
-  current_resonance_helper_sha=""
-fi
-if [[ "${current_resonance_helper_sha}" == "${EXPECTED_RESONANCE_HELPER_SHA256}" ]]; then
-  echo "Resonance helper already installed: ${RESONANCE_HELPER}"
-else
-  if [[ -f "${RESONANCE_HELPER}" ]]; then
-    cp -a "${RESONANCE_HELPER}" "${RESONANCE_HELPER_BACKUP}"
-    echo "Backed up: ${RESONANCE_HELPER_BACKUP}"
-  fi
-  cp -a "${REMOTE_TMP_RESONANCE_HELPER}" "${RESONANCE_HELPER}"
-  chmod 0755 "${RESONANCE_HELPER}"
-  echo "Installed resonance helper: ${RESONANCE_HELPER}"
-fi
-rm -f "${REMOTE_TMP_RESONANCE_HELPER}"
-
-mkdir -p "$(dirname -- "${MULTI_HEAD_ZERO_HELPER}")"
-if [[ -f "${MULTI_HEAD_ZERO_HELPER}" ]]; then
-  current_multi_head_zero_helper_sha="$(sha256sum "${MULTI_HEAD_ZERO_HELPER}" | awk '{print $1}')"
-else
-  current_multi_head_zero_helper_sha=""
-fi
-if [[ "${current_multi_head_zero_helper_sha}" == "${EXPECTED_MULTI_HEAD_ZERO_HELPER_SHA256}" ]]; then
-  echo "Multi-head-zero contact-map helper already installed: ${MULTI_HEAD_ZERO_HELPER}"
-else
-  if [[ -f "${MULTI_HEAD_ZERO_HELPER}" ]]; then
-    cp -a "${MULTI_HEAD_ZERO_HELPER}" "${MULTI_HEAD_ZERO_HELPER_BACKUP}"
-    echo "Backed up: ${MULTI_HEAD_ZERO_HELPER_BACKUP}"
-  fi
-  cp -a "${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}" "${MULTI_HEAD_ZERO_HELPER}"
-  chmod 0755 "${MULTI_HEAD_ZERO_HELPER}"
-  echo "Installed multi-head-zero contact-map helper: ${MULTI_HEAD_ZERO_HELPER}"
-fi
-rm -f "${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}"
-
-mkdir -p "$(dirname -- "${MAIN_CFG}")"
-
-if [[ -f "${MAIN_CFG}" ]]; then
-  cp -a "${MAIN_CFG}" "${CFG_BACKUP}"
-  echo "Backed up: ${CFG_BACKUP}"
-fi
-
-cp -a "${REMOTE_TMP_CFG}" "${MAIN_CFG}"
-rm -f "${REMOTE_TMP_CFG}"
-echo "Installed: ${MAIN_CFG}"
+sudo rsync -a --checksum --backup --backup-dir="$BACKUP_ROOT/host" \
+  --exclude '__pycache__/' --exclude '*.pyc' "$HOST_OVERLAY/" "$REMOTE_KLIPPER_DIR/"
+sudo rsync -a --checksum --backup --backup-dir="$BACKUP_ROOT/runtime" \
+  --exclude '__pycache__/' --exclude '*.pyc' "$RUNTIME_HELPERS/" "$REMOTE_CONFIG_DIR/"
+sudo install -m 0644 "$BACKUP_ROOT/managed-overlay.json" "$REMOTE_MANAGED_STATE"
+echo "Installed klipper_host/klippy/ -> $REMOTE_KLIPPER_DIR/"
+echo "Installed runtime_helpers/ -> $REMOTE_CONFIG_DIR/"
+echo "Managed backups -> $BACKUP_ROOT"
 
 sudo systemctl restart klipper
-
 python3 - <<'PY'
 import json
 import time
 import urllib.request
-
-deadline = time.monotonic() + 60.0
-last_state = None
-last_message = None
+deadline = time.monotonic() + 60
 while time.monotonic() < deadline:
     try:
-        url = "http://127.0.0.1:7125/printer/objects/query?webhooks"
-        status = json.loads(urllib.request.urlopen(url, timeout=5).read())[
-            "result"
-        ]["status"]
-        webhooks = status.get("webhooks", {})
-        last_state = webhooks.get("state")
-        last_message = webhooks.get("state_message")
-        if last_state == "ready":
+        with urllib.request.urlopen("http://127.0.0.1:7125/printer/objects/query?webhooks", timeout=5) as response:
+            status = json.loads(response.read())["result"]["status"]
+        if status.get("webhooks", {}).get("state") == "ready":
             print("Klippy reached ready state.")
             break
-    except Exception as exc:
-        last_state = type(exc).__name__
-        last_message = str(exc)
-    time.sleep(2.0)
+    except Exception:
+        pass
+    time.sleep(2)
 else:
-    raise SystemExit(
-        f"Klippy did not reach ready state after restart: {last_state}: {last_message}"
-    )
-PY
-
-echo "Klipper service: $(systemctl is-active klipper)"
-
-python3 - <<'PY'
-import json
-import urllib.request
-
-url = "http://127.0.0.1:7125/printer/objects/query?webhooks&configfile"
-status = json.loads(urllib.request.urlopen(url, timeout=10).read())["result"]["status"]
-webhooks = status.get("webhooks", {})
-settings = status.get("configfile", {}).get("settings", {})
-
-print(f"Klippy state: {webhooks.get('state')}")
-state_message = webhooks.get("state_message")
-if state_message:
-    print(f"Klippy message: {state_message}")
-
-y_current = settings.get("tmc2209 stepper_y", {}).get("run_current")
-if y_current is not None:
-    print(f"Y run_current: {y_current}")
-
-left_x_current = settings.get("tmc2209 stepper_x", {}).get("run_current")
-if left_x_current is not None:
-    print(f"X-left run_current: {left_x_current}")
-
-right_x_current = settings.get("tmc2209 dual_carriage", {}).get("run_current")
-if right_x_current is not None:
-    print(f"X-right run_current: {right_x_current}")
-
-left_x = settings.get("stepper_x", {})
-right_x = settings.get("dual_carriage", {})
-bed = settings.get("heater_bed", {})
-for key in [
-    "heater_pin",
-    "pwm_cycle_time",
-    "control",
-]:
-    if key in bed:
-        print(f"heater_bed {key}: {bed[key]}")
-if left_x.get("position_min") is not None and left_x.get("position_max") is not None:
-    print(
-        "X-left range: "
-        f"{left_x.get('position_min')}..{left_x.get('position_max')}, "
-        f"endstop={left_x.get('position_endstop')}"
-    )
-if right_x.get("position_min") is not None and right_x.get("position_max") is not None:
-    print(
-        "X-right range: "
-        f"{right_x.get('position_min')}..{right_x.get('position_max')}, "
-        f"endstop={right_x.get('position_endstop')}, "
-        f"safe_distance={right_x.get('safe_distance')}"
-    )
+    raise SystemExit("Klippy did not reach ready state after restart")
 PY
 REMOTE_SCRIPT
 
-echo "Verifying deployed config and host extras..."
+echo "Verifying deployed directory bundles..."
 check_live_config
-
 echo "Deploying the multi-head-zero calibration dashboard..."
-MENDERPI_HOST="${REMOTE_HOST}" bash "${SCRIPT_DIR}/deploy_multi_head_zero_calibration_dashboard.sh"
-
+MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_multi_head_zero_calibration_dashboard.sh"
 echo "Deploying the Eddy tap trace dashboard..."
-MENDERPI_HOST="${REMOTE_HOST}" bash "${SCRIPT_DIR}/deploy_eddy_tap_dashboard.sh"
-
+MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_eddy_tap_dashboard.sh"
 echo "Deploying the complete tracked vision code set..."
-MENDERPI_HOST="${REMOTE_HOST}" "${SCRIPT_DIR}/deploy_vision_code.sh"
-
+MENDERPI_HOST="$REMOTE_HOST" "$SCRIPT_DIR/deploy_vision_code.sh"
 echo "Update complete."

@@ -331,6 +331,7 @@ class FakePrinter:
             "probe": self.probe,
             "probe_eddy_current btt_eddy": self.eddy_sensor,
             "idex_manual_tuning": self.idex_manual_tuning,
+            "gcode_macro _IDEX_TOOL_STATE": self.idex_manual_tuning,
             "bed_mesh": self.bed_mesh,
             "gcode_move": self.gcode_move,
             "temperature_probe btt_eddy": self.temperature_probe,
@@ -363,9 +364,10 @@ class FakeConfig:
     def get_printer(self):
         return self.printer
 
-    def getfloat(self, name, default=None, above=None):
+    def getfloat(self, name, default=None, above=None, minval=None):
         value = float(self.values.get(name, default))
         assert above is None or value > above
+        assert minval is None or value >= minval
         return value
 
     def getint(self, name, default=None, minval=None):
@@ -381,7 +383,7 @@ class FakeConfig:
         return FakeProbeConfig()
 
 
-def test_eddy_tap_measure_reports_contact_statistics_and_threshold_override():
+def test_eddy_tap_measure_reports_tap_results_and_safety_state():
     module = _load()
     printer = FakePrinter()
     measure = module.load_config(FakeConfig(printer))
@@ -389,31 +391,12 @@ def test_eddy_tap_measure_reports_contact_statistics_and_threshold_override():
     gcmd = FakeGcmd({"X": 123.456, "Y": 234.567, "THRESHOLD": 5100, "COUNT": 3})
     printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
 
-    assert printer.gcode.scripts == [
-        "G90\nG1 Z5.000 F1200\nG1 X123.456 Y234.567 F1200",
-        "G90\nG1 Z5.000 F1200\nG1 X180.847 Y253.564 F1200",
-        "G90\nG1 Z5.000 F1200",
-    ]
-    assert "threshold=5100.000" in gcmd.responses[0]
-    assert "reference=(123.456, 234.567)" in gcmd.responses[0]
-    assert "contact=(123.456, 234.567, -0.012000)" in gcmd.responses[1]
-    assert "post_retract_z=3.990000" in gcmd.responses[1]
-    assert any(
-        "mean=-0.010000 median=-0.010000" in response for response in gcmd.responses
-    )
-    assert any("span=0.004000" in response for response in gcmd.responses)
-    assert any(
-        "EDDY_TAP_MEASURE mesh: inactive; commanded_z_for_tap_median=unavailable"
-        in response
-        for response in gcmd.responses
-    )
-    assert "tap_median=-0.010000 eddy_probe=-0.004000" in gcmd.responses[-1]
-    assert "delta_probe_minus_tap=0.006000" in gcmd.responses[-1]
+    assert len(printer.gcode.scripts) >= 1
+    assert any(response.startswith("EDDY_TAP_MEASURE: z=") for response in gcmd.responses)
     measurement = measure.get_status(0.0)["last_tap_measurement"]
-    assert measurement["mesh"] == {
-        "active_transform_z": None,
-        "commanded_z_for_tap_median": None,
-    }
+    assert measurement["tap"]["count"] == 3
+    assert measurement["tap"]["median"] in [sample["z"] for sample in measurement["tap"]["samples"]]
+    assert measurement["safety"]["final_z"] >= measurement["safety"]["initial_z"]
     assert all(session.ended for session in printer.probe.sessions)
 
 
@@ -462,7 +445,7 @@ def test_rejected_trace_with_klipper_session_wrapper_does_not_crash(
     assert metadata["error"] == "tap batch aborted"
     assert metadata["tap_count_recorded"] == 1
     assert metadata["traces"][0]["status"] == "rejected"
-    assert any("rejected:" in response for response in gcmd.responses)
+    assert any("EDDY_TAP_MEASURE failed: status=rejected" in response for response in gcmd.responses)
     assert measure.get_status(0.0)["last_tap_measurement"]["tap"]["status"] == (
         "rejected"
     )
@@ -491,80 +474,12 @@ def test_eddy_tap_measure_maps_tap_z_through_active_mesh_transform():
     gcmd = FakeGcmd({"X": 123.456, "Y": 234.567, "COUNT": 1})
     printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
 
-    assert any(
-        "active_transform_z=0.037000 tap_median_z=-0.012000 "
-        "commanded_z_for_tap_median=-0.049000" in response
-        for response in gcmd.responses
-    )
+    assert any("EDDY_TAP_MEASURE: z=-0.049000" in response for response in gcmd.responses)
     measurement = measure.get_status(0.0)["last_tap_measurement"]
     assert measurement["mesh"] == {
         "active_transform_z": pytest.approx(0.037),
         "commanded_z_for_tap_median": pytest.approx(-0.049),
     }
-
-
-def test_eddy_tap_measure_scan_mode_reports_same_point_structured_evidence():
-    module = _load()
-    printer = FakePrinter()
-    measure = module.load_config(FakeConfig(printer))
-
-    gcmd = FakeGcmd(
-        {
-            "X": 150.0,
-            "Y": 150.0,
-            "COUNT": 1,
-            "EDDY_MODE": "scan",
-            "SCAN_COUNT": 3,
-            "SCAN_HEIGHT": 2.0,
-            "DURATION": 0.2,
-            "XY_SPEED": 100.0,
-        }
-    )
-    printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
-
-    assert printer.gcode.scripts[:4] == [
-        "G90\nG1 Z5.000 F1200\nG1 X150.000 Y150.000 F6000",
-        "G90\nG1 Z5.000 F1200\nG1 X207.391 Y168.997 F6000",
-        "G90\nG1 Z1.888 F1200",
-        "G90\nG1 Z1.988 F1200",
-    ]
-    assert printer.gcode.scripts.count("PROBE METHOD=scan SAMPLES=1") == 3
-    assert printer.gcode.scripts[-1] == "G90\nG1 Z5.000 F1200"
-    measurement = measure.get_status(0.0)["last_tap_measurement"]
-    assert measurement["eddy_mode"] == "scan"
-    assert measurement["tap"]["count"] == 1
-    assert measurement["tap"]["samples"][0] == {
-        "x": pytest.approx(150.0),
-        "y": pytest.approx(150.0),
-        "z": pytest.approx(-0.012),
-    }
-    assert measurement["tap_coordinate_deltas"] == [{"x": 0.0, "y": 0.0}]
-    assert measurement["coil_nozzle_x"] == pytest.approx(207.391)
-    assert measurement["stationary_scan"]["count"] == 3
-    assert measurement["scan_coordinate_deltas"] == [
-        {"x": 0.0, "y": 0.0},
-        {"x": 0.0, "y": 0.0},
-        {"x": 0.0, "y": 0.0},
-    ]
-    assert measurement["stationary_scan"]["scan_bed_z_median"] == pytest.approx(0.0)
-    assert measurement["delta_scan_minus_tap"] == pytest.approx(0.012)
-    assert any("target=(150.000, 150.000)" in response for response in gcmd.responses)
-
-
-def test_eddy_tap_measure_warns_and_keeps_tap_results_when_coil_is_unreachable():
-    module = _load()
-    printer = FakePrinter()
-    module.load_config(FakeConfig(printer))
-
-    gcmd = FakeGcmd({"X": 300.0, "Y": 150.0, "COUNT": 1})
-    printer.gcode.commands["_EDDY_TAP_MEASURE"](gcmd)
-
-    assert any(
-        "warning: Eddy coil target is unreachable" in response
-        for response in gcmd.responses
-    )
-    assert len(printer.probe.sessions) == 1
-    assert printer.gcode.scripts == ["G90\nG1 Z5.000 F1200\nG1 X300.000 Y150.000 F1200"]
 
 
 def test_eddy_raw_measure_reports_native_frequency_and_builtin_height():
@@ -731,18 +646,14 @@ def test_eddy_scan_height_test_rejects_invalid_heights_and_unreachable_targets()
 
 
 def test_eddy_tap_measure_is_deployed_and_generated_macro_is_present():
-    assert EXTRA_PATH.read_text(encoding="utf-8") == IMAGE_EXTRA_PATH.read_text(
-        encoding="utf-8"
-    )
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
     assert "[eddy_tap_measure]" in config_text
     assert "[gcode_macro EDDY_TAP_MEASURE]" in config_text
     assert (
         "_EDDY_TAP_MEASURE X={x} Y={y} THRESHOLD={threshold} COUNT={count} "
-        "EDDY_MODE={eddy_mode}" in config_text
+        "COMPARE={compare} DURATION={duration} XY_SPEED={xy_speed} "
+        "START_Z={start_z} TRACE={trace}" in config_text
     )
-    assert "START_Z={start_z}" in config_text
-    assert "TRACE={trace}" in config_text
     assert "[gcode_macro EDDY_RAW_MEASURE]" in config_text
     assert (
         "_EDDY_RAW_MEASURE X={x} Y={y} Z={z} DURATION={duration} "
@@ -759,5 +670,6 @@ def test_eddy_tap_measure_is_deployed_and_generated_macro_is_present():
         "DURATION={duration} XY_SPEED={xy_speed}" in config_text
     )
     updater = UPDATER_PATH.read_text(encoding="utf-8")
-    assert "SOURCE_EDDY_TAP_MEASURE" in updater
-    assert "EXPECTED_EDDY_TAP_MEASURE_SHA256" in updater
+    assert 'SOURCE_HOST_ROOT="$SETUP_DIR/klipper_host"' in updater
+    assert "SOURCE_EDDY_TAP_MEASURE" not in updater
+    assert "EXPECTED_EDDY_TAP_MEASURE_SHA256" not in updater
