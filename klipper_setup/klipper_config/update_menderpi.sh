@@ -22,6 +22,7 @@ SOURCE_BED_MESH="${SCRIPT_DIR}/../klipper_host/klippy/extras/bed_mesh.py"
 SOURCE_VISION="${SCRIPT_DIR}/../klipper_host/klippy/extras/vision.py"
 SOURCE_IDEX_MANUAL_TUNING="${SCRIPT_DIR}/../klipper_host/klippy/extras/idex_manual_tuning.py"
 SOURCE_EDDY_TAP_MEASURE="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_tap_measure.py"
+SOURCE_PROBE="${SCRIPT_DIR}/../rp2040_firmware/klipper/klippy/extras/probe.py"
 SOURCE_PROBE_EDDY_CURRENT="${SCRIPT_DIR}/../image_build/overlays/stage2/99-klipperpi/files/klipper_host/klippy/extras/probe_eddy_current.py"
 SOURCE_DAQ="${SCRIPT_DIR}/../klipper_host/klippy/extras/daq.py"
 SOURCE_EDDY_DAQ="${SCRIPT_DIR}/../klipper_host/klippy/extras/eddy_daq.py"
@@ -36,6 +37,7 @@ REMOTE_TMP_BED_MESH="/tmp/bed_mesh.py.$$"
 REMOTE_TMP_VISION="/tmp/vision.py.$$"
 REMOTE_TMP_IDEX_MANUAL_TUNING="/tmp/idex_manual_tuning.py.$$"
 REMOTE_TMP_EDDY_TAP_MEASURE="/tmp/eddy_tap_measure.py.$$"
+REMOTE_TMP_PROBE="/tmp/probe.py.$$"
 REMOTE_TMP_PROBE_EDDY_CURRENT="/tmp/probe_eddy_current.py.$$"
 REMOTE_TMP_DAQ="/tmp/daq.py.$$"
 REMOTE_TMP_EDDY_DAQ="/tmp/eddy_daq.py.$$"
@@ -83,6 +85,10 @@ check_local_support_files() {
     echo "Error: Klipper eddy_tap_measure.py extra not found: ${SOURCE_EDDY_TAP_MEASURE}" >&2
     exit 1
   fi
+  if [[ ! -f "${SOURCE_PROBE}" ]]; then
+    echo "Error: Klipper probe.py source not found: ${SOURCE_PROBE}" >&2
+    exit 1
+  fi
   if [[ ! -f "${SOURCE_PROBE_EDDY_CURRENT}" ]]; then
     echo "Error: customized Klipper probe_eddy_current.py not found: ${SOURCE_PROBE_EDDY_CURRENT}" >&2
     exit 1
@@ -104,7 +110,7 @@ check_local_support_files() {
     exit 1
   fi
 
-  python3 - "${SOURCE_HEATERS}" "${SOURCE_BED_MESH}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" "${SOURCE_PROBE_EDDY_CURRENT}" "${SOURCE_DAQ}" "${SOURCE_EDDY_DAQ}" "${SOURCE_MULTI_HEAD_ZERO_PROBE}" "${SOURCE_RESONANCE_HELPER}" "${SOURCE_MULTI_HEAD_ZERO_HELPER}" <<'PY'
+  python3 - "${SOURCE_HEATERS}" "${SOURCE_BED_MESH}" "${SOURCE_VISION}" "${SOURCE_IDEX_MANUAL_TUNING}" "${SOURCE_EDDY_TAP_MEASURE}" "${SOURCE_PROBE}" "${SOURCE_PROBE_EDDY_CURRENT}" "${SOURCE_DAQ}" "${SOURCE_EDDY_DAQ}" "${SOURCE_MULTI_HEAD_ZERO_PROBE}" "${SOURCE_RESONANCE_HELPER}" "${SOURCE_MULTI_HEAD_ZERO_HELPER}" <<'PY'
 import ast
 import sys
 from pathlib import Path
@@ -122,6 +128,7 @@ check_live_config() {
   echo "  Klipper vision extra: ${SOURCE_VISION}"
   echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
   echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
+  echo "  Managed Klipper probe.py: ${SOURCE_PROBE}"
   echo "  Customized Klipper Eddy probe: ${SOURCE_PROBE_EDDY_CURRENT}"
   echo "  Klipper generic DAQ extra: ${SOURCE_DAQ}"
   echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
@@ -143,6 +150,7 @@ check_live_config() {
   local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
   local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
   local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
+  local_probe_sha256="$(sha256_file "${SOURCE_PROBE}")"
   local_probe_eddy_current_sha256="$(sha256_file "${SOURCE_PROBE_EDDY_CURRENT}")"
   local_daq_sha256="$(sha256_file "${SOURCE_DAQ}")"
   local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
@@ -171,6 +179,7 @@ bed_mesh_py = klipper_dir / "klippy" / "extras" / "bed_mesh.py"
 vision_py = klipper_dir / "klippy" / "extras" / "vision.py"
 idex_manual_tuning_py = klipper_dir / "klippy" / "extras" / "idex_manual_tuning.py"
 eddy_tap_measure_py = klipper_dir / "klippy" / "extras" / "eddy_tap_measure.py"
+probe_py = klipper_dir / "klippy" / "extras" / "probe.py"
 probe_eddy_current_py = klipper_dir / "klippy" / "extras" / "probe_eddy_current.py"
 daq_py = klipper_dir / "klippy" / "extras" / "daq.py"
 eddy_daq_py = klipper_dir / "klippy" / "extras" / "eddy_daq.py"
@@ -185,6 +194,7 @@ payload = {
     "remote_vision_path": str(vision_py),
     "remote_idex_manual_tuning_path": str(idex_manual_tuning_py),
     "remote_eddy_tap_measure_path": str(eddy_tap_measure_py),
+    "remote_probe_path": str(probe_py),
     "remote_probe_eddy_current_path": str(probe_eddy_current_py),
     "remote_daq_path": str(daq_py),
     "remote_eddy_daq_path": str(eddy_daq_py),
@@ -208,6 +218,7 @@ try:
         if eddy_tap_measure_py.is_file()
         else ""
     )
+    payload["remote_probe_sha256"] = hashlib.sha256(probe_py.read_bytes()).hexdigest()
     payload["remote_probe_eddy_current_sha256"] = (
         hashlib.sha256(probe_eddy_current_py.read_bytes()).hexdigest()
         if probe_eddy_current_py.is_file()
@@ -269,6 +280,7 @@ PY
   CHECK_LOCAL_VISION_SHA256="${local_vision_sha256}" \
   CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256="${local_idex_manual_tuning_sha256}" \
   CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256="${local_eddy_tap_measure_sha256}" \
+  CHECK_LOCAL_PROBE_SHA256="${local_probe_sha256}" \
   CHECK_LOCAL_PROBE_EDDY_CURRENT_SHA256="${local_probe_eddy_current_sha256}" \
   CHECK_LOCAL_DAQ_SHA256="${local_daq_sha256}" \
   CHECK_LOCAL_EDDY_DAQ_SHA256="${local_eddy_daq_sha256}" \
@@ -298,6 +310,7 @@ local_bed_mesh_sha256 = os.environ["CHECK_LOCAL_BED_MESH_SHA256"]
 local_vision_sha256 = os.environ["CHECK_LOCAL_VISION_SHA256"]
 local_idex_manual_tuning_sha256 = os.environ["CHECK_LOCAL_IDEX_MANUAL_TUNING_SHA256"]
 local_eddy_tap_measure_sha256 = os.environ["CHECK_LOCAL_EDDY_TAP_MEASURE_SHA256"]
+local_probe_sha256 = os.environ["CHECK_LOCAL_PROBE_SHA256"]
 local_probe_eddy_current_sha256 = os.environ["CHECK_LOCAL_PROBE_EDDY_CURRENT_SHA256"]
 local_daq_sha256 = os.environ["CHECK_LOCAL_DAQ_SHA256"]
 local_eddy_daq_sha256 = os.environ["CHECK_LOCAL_EDDY_DAQ_SHA256"]
@@ -329,6 +342,7 @@ remote_bed_mesh_sha256 = remote_payload.get("remote_bed_mesh_sha256", "")
 remote_vision_sha256 = remote_payload.get("remote_vision_sha256", "")
 remote_idex_manual_tuning_sha256 = remote_payload.get("remote_idex_manual_tuning_sha256", "")
 remote_eddy_tap_measure_sha256 = remote_payload.get("remote_eddy_tap_measure_sha256", "")
+remote_probe_sha256 = remote_payload.get("remote_probe_sha256", "")
 remote_probe_eddy_current_sha256 = remote_payload.get("remote_probe_eddy_current_sha256", "")
 remote_daq_sha256 = remote_payload.get("remote_daq_sha256", "")
 remote_eddy_daq_sha256 = remote_payload.get("remote_eddy_daq_sha256", "")
@@ -352,6 +366,8 @@ print(f"  Local idex_manual_tuning.py sha256: {local_idex_manual_tuning_sha256}"
 print(f"  Remote idex_manual_tuning.py sha256: {remote_idex_manual_tuning_sha256}")
 print(f"  Local eddy_tap_measure.py sha256: {local_eddy_tap_measure_sha256}")
 print(f"  Remote eddy_tap_measure.py sha256: {remote_eddy_tap_measure_sha256}")
+print(f"  Local probe.py sha256: {local_probe_sha256}")
+print(f"  Remote probe.py sha256: {remote_probe_sha256}")
 print(f"  Local probe_eddy_current.py sha256: {local_probe_eddy_current_sha256}")
 print(f"  Remote probe_eddy_current.py sha256: {remote_probe_eddy_current_sha256}")
 print(f"  Local daq.py sha256: {local_daq_sha256}")
@@ -400,6 +416,11 @@ if remote_eddy_tap_measure_sha256 != local_eddy_tap_measure_sha256:
     errors.append(
         "remote Klipper eddy_tap_measure.py sha256 does not match local extra "
         f"({remote_eddy_tap_measure_sha256} != {local_eddy_tap_measure_sha256})"
+    )
+if remote_probe_sha256 != local_probe_sha256:
+    errors.append(
+        "remote Klipper probe.py sha256 does not match local managed source "
+        f"({remote_probe_sha256} != {local_probe_sha256})"
     )
 if remote_probe_eddy_current_sha256 != local_probe_eddy_current_sha256:
     errors.append(
@@ -483,7 +504,7 @@ if [[ ! -f "${SOURCE_CFG}" ]]; then
 fi
 
 cleanup_remote_tmp() {
-  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_BED_MESH}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}' '${REMOTE_TMP_PROBE_EDDY_CURRENT}' '${REMOTE_TMP_DAQ}' '${REMOTE_TMP_EDDY_DAQ}' '${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}' '${REMOTE_TMP_RESONANCE_HELPER}' '${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}'" >/dev/null 2>&1 || true
+  ssh "${REMOTE_HOST}" "rm -f '${REMOTE_TMP_CFG}' '${REMOTE_TMP_HEATERS}' '${REMOTE_TMP_BED_MESH}' '${REMOTE_TMP_VISION}' '${REMOTE_TMP_IDEX_MANUAL_TUNING}' '${REMOTE_TMP_EDDY_TAP_MEASURE}' '${REMOTE_TMP_PROBE}' '${REMOTE_TMP_PROBE_EDDY_CURRENT}' '${REMOTE_TMP_DAQ}' '${REMOTE_TMP_EDDY_DAQ}' '${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}' '${REMOTE_TMP_RESONANCE_HELPER}' '${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}'" >/dev/null 2>&1 || true
 }
 trap cleanup_remote_tmp EXIT
 
@@ -492,6 +513,7 @@ local_bed_mesh_sha256="$(sha256_file "${SOURCE_BED_MESH}")"
 local_vision_sha256="$(sha256_file "${SOURCE_VISION}")"
 local_idex_manual_tuning_sha256="$(sha256_file "${SOURCE_IDEX_MANUAL_TUNING}")"
 local_eddy_tap_measure_sha256="$(sha256_file "${SOURCE_EDDY_TAP_MEASURE}")"
+local_probe_sha256="$(sha256_file "${SOURCE_PROBE}")"
 local_probe_eddy_current_sha256="$(sha256_file "${SOURCE_PROBE_EDDY_CURRENT}")"
 local_daq_sha256="$(sha256_file "${SOURCE_DAQ}")"
 local_eddy_daq_sha256="$(sha256_file "${SOURCE_EDDY_DAQ}")"
@@ -504,8 +526,9 @@ echo "  Source: ${SOURCE_CFG}"
 echo "  Managed Klipper heaters.py: ${SOURCE_HEATERS}"
 echo "  Managed Klipper bed_mesh.py: ${SOURCE_BED_MESH}"
 echo "  Klipper vision extra: ${SOURCE_VISION}"
-echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
+  echo "  Klipper IDEX manual tuning extra: ${SOURCE_IDEX_MANUAL_TUNING}"
   echo "  Klipper Eddy tap measurement extra: ${SOURCE_EDDY_TAP_MEASURE}"
+  echo "  Managed Klipper probe.py: ${SOURCE_PROBE}"
   echo "  Customized Klipper Eddy probe: ${SOURCE_PROBE_EDDY_CURRENT}"
 echo "  Klipper generic DAQ extra: ${SOURCE_DAQ}"
 echo "  Klipper Eddy DAQ extra: ${SOURCE_EDDY_DAQ}"
@@ -519,6 +542,7 @@ scp "${SOURCE_BED_MESH}" "${REMOTE_HOST}:${REMOTE_TMP_BED_MESH}"
 scp "${SOURCE_VISION}" "${REMOTE_HOST}:${REMOTE_TMP_VISION}"
 scp "${SOURCE_IDEX_MANUAL_TUNING}" "${REMOTE_HOST}:${REMOTE_TMP_IDEX_MANUAL_TUNING}"
 scp "${SOURCE_EDDY_TAP_MEASURE}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_TAP_MEASURE}"
+scp "${SOURCE_PROBE}" "${REMOTE_HOST}:${REMOTE_TMP_PROBE}"
 scp "${SOURCE_PROBE_EDDY_CURRENT}" "${REMOTE_HOST}:${REMOTE_TMP_PROBE_EDDY_CURRENT}"
 scp "${SOURCE_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_DAQ}"
 scp "${SOURCE_EDDY_DAQ}" "${REMOTE_HOST}:${REMOTE_TMP_EDDY_DAQ}"
@@ -527,7 +551,7 @@ scp "${SOURCE_RESONANCE_HELPER}" "${REMOTE_HOST}:${REMOTE_TMP_RESONANCE_HELPER}"
 scp "${SOURCE_MULTI_HEAD_ZERO_HELPER}" "${REMOTE_HOST}:${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}"
 
 ssh "${REMOTE_HOST}" \
-  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_BED_MESH='${REMOTE_TMP_BED_MESH}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_PROBE_EDDY_CURRENT='${REMOTE_TMP_PROBE_EDDY_CURRENT}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_TMP_MULTI_HEAD_ZERO_PROBE='${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}' REMOTE_TMP_RESONANCE_HELPER='${REMOTE_TMP_RESONANCE_HELPER}' REMOTE_TMP_MULTI_HEAD_ZERO_HELPER='${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_UPSTREAM_BED_MESH_SHA256='${EXPECTED_UPSTREAM_BED_MESH_SHA256}' LEGACY_MANAGED_BED_MESH_SHA256='${LEGACY_MANAGED_BED_MESH_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_MANAGED_BED_MESH_SHA256='${local_bed_mesh_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_PROBE_EDDY_CURRENT_SHA256='${local_probe_eddy_current_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' EXPECTED_MULTI_HEAD_ZERO_PROBE_SHA256='${local_multi_head_zero_probe_sha256}' EXPECTED_RESONANCE_HELPER_SHA256='${local_resonance_helper_sha256}' EXPECTED_MULTI_HEAD_ZERO_HELPER_SHA256='${local_multi_head_zero_helper_sha256}' bash -s" <<'REMOTE_SCRIPT'
+  "REMOTE_TMP_CFG='${REMOTE_TMP_CFG}' REMOTE_TMP_HEATERS='${REMOTE_TMP_HEATERS}' REMOTE_TMP_BED_MESH='${REMOTE_TMP_BED_MESH}' REMOTE_TMP_VISION='${REMOTE_TMP_VISION}' REMOTE_TMP_IDEX_MANUAL_TUNING='${REMOTE_TMP_IDEX_MANUAL_TUNING}' REMOTE_TMP_EDDY_TAP_MEASURE='${REMOTE_TMP_EDDY_TAP_MEASURE}' REMOTE_TMP_PROBE='${REMOTE_TMP_PROBE}' REMOTE_TMP_PROBE_EDDY_CURRENT='${REMOTE_TMP_PROBE_EDDY_CURRENT}' REMOTE_TMP_DAQ='${REMOTE_TMP_DAQ}' REMOTE_TMP_EDDY_DAQ='${REMOTE_TMP_EDDY_DAQ}' REMOTE_TMP_MULTI_HEAD_ZERO_PROBE='${REMOTE_TMP_MULTI_HEAD_ZERO_PROBE}' REMOTE_TMP_RESONANCE_HELPER='${REMOTE_TMP_RESONANCE_HELPER}' REMOTE_TMP_MULTI_HEAD_ZERO_HELPER='${REMOTE_TMP_MULTI_HEAD_ZERO_HELPER}' REMOTE_KLIPPER_DIR='${REMOTE_KLIPPER_DIR}' EXPECTED_KLIPPER_COMMIT='${EXPECTED_KLIPPER_COMMIT}' EXPECTED_UPSTREAM_HEATERS_SHA256='${EXPECTED_UPSTREAM_HEATERS_SHA256}' LEGACY_BOOSTED_HEATERS_SHA256='${LEGACY_BOOSTED_HEATERS_SHA256}' EXPECTED_UPSTREAM_BED_MESH_SHA256='${EXPECTED_UPSTREAM_BED_MESH_SHA256}' LEGACY_MANAGED_BED_MESH_SHA256='${LEGACY_MANAGED_BED_MESH_SHA256}' EXPECTED_MANAGED_HEATERS_SHA256='${local_heaters_sha256}' EXPECTED_MANAGED_BED_MESH_SHA256='${local_bed_mesh_sha256}' EXPECTED_VISION_SHA256='${local_vision_sha256}' EXPECTED_IDEX_MANUAL_TUNING_SHA256='${local_idex_manual_tuning_sha256}' EXPECTED_EDDY_TAP_MEASURE_SHA256='${local_eddy_tap_measure_sha256}' EXPECTED_PROBE_SHA256='${local_probe_sha256}' EXPECTED_PROBE_EDDY_CURRENT_SHA256='${local_probe_eddy_current_sha256}' EXPECTED_DAQ_SHA256='${local_daq_sha256}' EXPECTED_EDDY_DAQ_SHA256='${local_eddy_daq_sha256}' EXPECTED_MULTI_HEAD_ZERO_PROBE_SHA256='${local_multi_head_zero_probe_sha256}' EXPECTED_RESONANCE_HELPER_SHA256='${local_resonance_helper_sha256}' EXPECTED_MULTI_HEAD_ZERO_HELPER_SHA256='${local_multi_head_zero_helper_sha256}' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 MAIN_CFG="${HOME}/printer_data/config/printer.cfg"
@@ -536,6 +560,7 @@ BED_MESH_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/bed_mesh.py"
 VISION_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/vision.py"
 IDEX_MANUAL_TUNING_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/idex_manual_tuning.py"
 EDDY_TAP_MEASURE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_tap_measure.py"
+PROBE_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/probe.py"
 PROBE_EDDY_CURRENT_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/probe_eddy_current.py"
 DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/daq.py"
 EDDY_DAQ_PY="${REMOTE_KLIPPER_DIR}/klippy/extras/eddy_daq.py"
@@ -549,6 +574,7 @@ BED_MESH_BACKUP="${BED_MESH_PY}.bak.${TS}"
 VISION_BACKUP="${VISION_PY}.bak.${TS}"
 IDEX_MANUAL_TUNING_BACKUP="${IDEX_MANUAL_TUNING_PY}.bak.${TS}"
 EDDY_TAP_MEASURE_BACKUP="${EDDY_TAP_MEASURE_PY}.bak.${TS}"
+PROBE_BACKUP="${PROBE_PY}.bak.${TS}"
 PROBE_EDDY_CURRENT_BACKUP="${PROBE_EDDY_CURRENT_PY}.bak.${TS}"
 DAQ_BACKUP="${DAQ_PY}.bak.${TS}"
 EDDY_DAQ_BACKUP="${EDDY_DAQ_PY}.bak.${TS}"
@@ -578,6 +604,10 @@ if [[ ! -f "${REMOTE_TMP_IDEX_MANUAL_TUNING}" ]]; then
 fi
 if [[ ! -f "${REMOTE_TMP_EDDY_TAP_MEASURE}" ]]; then
   echo "Error: uploaded eddy_tap_measure.py not found: ${REMOTE_TMP_EDDY_TAP_MEASURE}" >&2
+  exit 1
+fi
+if [[ ! -f "${REMOTE_TMP_PROBE}" ]]; then
+  echo "Error: uploaded probe.py not found: ${REMOTE_TMP_PROBE}" >&2
   exit 1
 fi
 if [[ ! -f "${REMOTE_TMP_PROBE_EDDY_CURRENT}" ]]; then
@@ -648,6 +678,11 @@ fi
 uploaded_eddy_tap_measure_sha="$(sha256sum "${REMOTE_TMP_EDDY_TAP_MEASURE}" | awk '{print $1}')"
 if [[ "${uploaded_eddy_tap_measure_sha}" != "${EXPECTED_EDDY_TAP_MEASURE_SHA256}" ]]; then
   echo "Error: uploaded eddy_tap_measure.py sha256 ${uploaded_eddy_tap_measure_sha} does not match local ${EXPECTED_EDDY_TAP_MEASURE_SHA256}" >&2
+  exit 1
+fi
+uploaded_probe_sha="$(sha256sum "${REMOTE_TMP_PROBE}" | awk '{print $1}')"
+if [[ "${uploaded_probe_sha}" != "${EXPECTED_PROBE_SHA256}" ]]; then
+  echo "Error: uploaded probe.py sha256 ${uploaded_probe_sha} does not match local ${EXPECTED_PROBE_SHA256}" >&2
   exit 1
 fi
 uploaded_probe_eddy_current_sha="$(sha256sum "${REMOTE_TMP_PROBE_EDDY_CURRENT}" | awk '{print $1}')"
@@ -796,6 +831,23 @@ else
   echo "Installed: ${EDDY_TAP_MEASURE_PY}"
 fi
 rm -f "${REMOTE_TMP_EDDY_TAP_MEASURE}"
+
+if [[ -f "${PROBE_PY}" ]]; then
+  current_probe_sha="$(sha256sum "${PROBE_PY}" | awk '{print $1}')"
+else
+  current_probe_sha=""
+fi
+if [[ "${current_probe_sha}" == "${EXPECTED_PROBE_SHA256}" ]]; then
+  echo "Managed Klipper probe.py already installed: ${PROBE_PY}"
+else
+  if [[ -f "${PROBE_PY}" ]]; then
+    cp -a "${PROBE_PY}" "${PROBE_BACKUP}"
+    echo "Backed up: ${PROBE_BACKUP}"
+  fi
+  sudo cp -a "${REMOTE_TMP_PROBE}" "${PROBE_PY}"
+  echo "Installed managed Klipper probe.py: ${PROBE_PY}"
+fi
+rm -f "${REMOTE_TMP_PROBE}"
 
 if [[ -f "${PROBE_EDDY_CURRENT_PY}" ]]; then
   current_probe_eddy_current_sha="$(sha256sum "${PROBE_EDDY_CURRENT_PY}" | awk '{print $1}')"

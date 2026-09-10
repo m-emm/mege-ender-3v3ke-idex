@@ -20,6 +20,25 @@ from . import ldc1612, manual_probe, probe, trigger_analog
 OUT_OF_RANGE = 99.9
 
 
+def _require_t0_active(printer, command_name, gcmd=None):
+    try:
+        eventtime = printer.get_reactor().monotonic()
+        macro_state = printer.lookup_object("gcode_macro _IDEX_TOOL_STATE")
+        macro_tool = macro_state.get_status(eventtime).get("active_tool")
+        tuning_state = printer.lookup_object("idex_manual_tuning")
+        tuning_tool = tuning_state.get_status(eventtime).get("active_tool")
+    except Exception as exc:
+        error = gcmd.error if gcmd is not None else printer.command_error
+        raise error("%s cannot verify the active IDEX tool" % command_name) from exc
+    if macro_tool != 0 or tuning_tool != 0:
+        active_tool = macro_tool if macro_tool != 0 else tuning_tool
+        error = gcmd.error if gcmd is not None else printer.command_error
+        raise error(
+            "%s requires T0: the Eddy sensor is mounted on T0; "
+            "active tool is %s" % (command_name, active_tool)
+        )
+
+
 # Dummy temperature adjustments when "[temperature_probe]" not utilized
 class DummyDriftCompensation:
     def get_temperature(self):
@@ -330,6 +349,7 @@ class EddyCalibrationTool:
     cmd_EDDY_CALIBRATE_help = "Calibrate eddy current probe"
 
     def cmd_EDDY_CALIBRATE(self, gcmd):
+        _require_t0_active(self.printer, "PROBE_EDDY_CURRENT_CALIBRATE", gcmd)
         self.probe_speed = gcmd.get_float("PROBE_SPEED", 5.0, above=0.0)
         # Start manual probe
         manual_probe.ManualProbeHelper(self.printer, gcmd, self.post_manual_probe)
@@ -352,6 +372,7 @@ class EddyCalibrationTool:
     cmd_Z_OFFSET_APPLY_PROBE_help = "Adjust the probe's z_offset"
 
     def cmd_Z_OFFSET_APPLY_PROBE(self, gcmd):
+        _require_t0_active(self.printer, "Z_OFFSET_APPLY_PROBE", gcmd)
         gcode_move = self.printer.lookup_object("gcode_move")
         offset = gcode_move.get_status()["homing_origin"].z
         if offset == 0:
@@ -459,6 +480,7 @@ class EddyTapCalibration:
     cmd_TAP_CALIBRATE_help = "Calibrate tap_threshold for 'tap' probing"
 
     def cmd_TAP_CALIBRATE(self, gcmd):
+        _require_t0_active(self._printer, "PROBE_EDDY_CURRENT_TAP_CALIBRATE", gcmd)
         mc_coeffs = self._analyze_main_calibration()
         last_tap = self._eddy_tap.get_last_tap_info()
         tap_test = gcmd.get("TAP", None)
@@ -703,12 +725,14 @@ class EddyDescend:
 
     # Probe session interface
     def start_probe_session(self, gcmd):
+        _require_t0_active(self._printer, "PROBE_EDDY_CURRENT")
         self._calibration.verify_calibrated()
         self._prep_trigger_analog()
         self._gather = EddyGatherSamples(self._printer, self._sensor_helper)
         return self
 
     def run_probe(self, gcmd):
+        _require_t0_active(self._printer, "PROBE_EDDY_CURRENT")
         toolhead = self._printer.lookup_object("toolhead")
         pos = toolhead.get_position()
         pos[2] = self._z_min_position
@@ -1469,6 +1493,7 @@ class EddyTap:
 
     # Probe session interface
     def start_probe_session(self, gcmd):
+        _require_t0_active(self._printer, "PROBE_EDDY_CURRENT METHOD=tap")
         self._prep_trigger_analog_tap(gcmd)
         self._gather = EddyGatherSamples(self._printer, self._sensor_helper)
         self._trace_enabled = bool(gcmd.get_int("TRACE", 0, minval=0, maxval=1))
@@ -1476,6 +1501,7 @@ class EddyTap:
         return self
 
     def run_probe(self, gcmd):
+        _require_t0_active(self._printer, "PROBE_EDDY_CURRENT METHOD=tap")
         toolhead = self._printer.lookup_object("toolhead")
         pos = toolhead.get_position()
         start_pos = list(pos)
@@ -1495,23 +1521,6 @@ class EddyTap:
         speed = params["probe_speed"]
         lift_speed = params["lift_speed"]
         lift_dist = gcmd.get_float("SAMPLE_RETRACT_DIST", 4.0, above=0.0)
-        # This is intentionally a nozzle-contact descent.  Print it before
-        # motion so an operator can distinguish a missing deformation signal
-        # from a probe that never travelled far enough toward the bed.
-        gcmd.respond_info(
-            "Eddy tap descent: nozzle start=(%.3f, %.3f, %.6f), "
-            "target_z=%.6f, planned_down=%.6f mm, speed=%.3f mm/s, "
-            "retract=%.3f mm"
-            % (
-                start_pos[0],
-                start_pos[1],
-                start_pos[2],
-                target_z,
-                start_pos[2] - target_z,
-                speed,
-                lift_dist,
-            )
-        )
         trace_start = toolhead.get_last_move_time() - 0.010
         # Perform probing move
         phoming = self._printer.lookup_object("homing")
@@ -1528,11 +1537,6 @@ class EddyTap:
                     trace_end,
                 )
             raise
-        gcmd.respond_info(
-            "Eddy tap trigger: nozzle halt=(%.3f, %.3f, %.6f), "
-            "actual_down=%.6f mm; starting retract"
-            % (trig_pos[0], trig_pos[1], trig_pos[2], start_pos[2] - trig_pos[2])
-        )
         # Perform lifting move
         haltpos = toolhead.get_position()
         haltpos[2] += lift_dist
@@ -1619,6 +1623,7 @@ class EddyScanningProbe:
 
     # Probe session interface
     def start_probe_session(self, gcmd):
+        _require_t0_active(self._printer, "PROBE_EDDY_CURRENT METHOD=scan")
         self._calibration.verify_calibrated()
         self._gather = EddyGatherSamples(self._printer, self._sensor_helper)
         self._sample_time = gcmd.get_float("SAMPLE_TIME", 0.100, above=0.0)
@@ -1626,6 +1631,7 @@ class EddyScanningProbe:
         return self
 
     def run_probe(self, gcmd):
+        _require_t0_active(self._printer, "PROBE_EDDY_CURRENT METHOD=scan")
         toolhead = self._printer.lookup_object("toolhead")
         if self._is_rapid:
             toolhead.register_lookahead_callback(self._rapid_lookahead_cb)
