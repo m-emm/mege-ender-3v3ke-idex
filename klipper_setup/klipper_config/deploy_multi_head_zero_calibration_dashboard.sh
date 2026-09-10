@@ -131,6 +131,18 @@ temporary.write_text(
 temporary.replace(path)
 PY
 fi
+if [[ ! -f "${REMOTE_DASHBOARD_DIR}/data/last_successful.json" ]]; then
+  DASHBOARD_HISTORY_PATH="${REMOTE_DASHBOARD_DIR}/data/last_successful.json" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+path = Path(os.environ["DASHBOARD_HISTORY_PATH"])
+temporary = path.with_name(".%s.initial.tmp" % path.name)
+temporary.write_text(json.dumps({}, indent=2) + "\n", encoding="utf-8")
+temporary.replace(path)
+PY
+fi
 for asset in index.html style.css app.js; do
   install -m 0644 "${REMOTE_TMP}/${asset}" "${REMOTE_DASHBOARD_DIR}/${asset}"
 done

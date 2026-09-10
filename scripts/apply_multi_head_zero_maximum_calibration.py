@@ -8,6 +8,7 @@ import datetime as dt
 import json
 import math
 import re
+import statistics
 import subprocess
 import sys
 from pathlib import Path
@@ -78,33 +79,51 @@ def load_run(run_dir, expected_tool):
     if (
         not isinstance(calibration, dict)
         or calibration.get("algorithm") != "three_stage_sphere_ring_calibration_v2"
-        or calibration.get("contact_count") != 26
-        or calibration.get("termination_reason") != "phase_3_complete"
+        or calibration.get("contact_count") != 31
+        or calibration.get("termination_reason") != "phase_4_centre_complete"
     ):
         raise CalibrationError(
-            "%s has no valid 26-contact calibration result" % manifest_path
+            "%s has no valid 31-contact calibration result" % manifest_path
         )
     phase_1 = calibration.get("phase_1")
     phase_2 = calibration.get("phase_2")
     phase_3 = calibration.get("phase_3")
+    phase_4 = calibration.get("phase_4")
     if (
         not isinstance(phase_1, dict)
         or not isinstance(phase_2, dict)
         or not isinstance(phase_3, dict)
+        or not isinstance(phase_4, dict)
     ):
         raise CalibrationError("%s lacks calibration phases" % manifest_path)
     fit = phase_1.get("fit")
     summit = phase_1.get("summit")
     phase_2_refined = phase_2.get("refined_center")
     refined = phase_3.get("refined_center")
+    centre_contacts = phase_4.get("contacts")
+    centre_statistics = phase_4.get("statistics")
     if not isinstance(fit, dict) or fit.get("status") != "valid":
         raise CalibrationError("%s has no valid phase-1 fit" % manifest_path)
     if (
         not isinstance(summit, dict)
         or not isinstance(phase_2_refined, dict)
         or not isinstance(refined, dict)
+        or not isinstance(centre_contacts, list)
+        or len(centre_contacts) != 5
+        or not isinstance(centre_statistics, dict)
+        or phase_4.get("contact_count") != 5
+        or centre_statistics.get("count") != 5
+        or phase_4.get("repeatability_passed") is not True
     ):
-        raise CalibrationError("%s lacks summit or refined centre" % manifest_path)
+        raise CalibrationError("%s lacks a passing five-tap final centre" % manifest_path)
+    try:
+        centre_values = [finite(contact.get("trigger_z"), "%s final-centre Z" % expected_tool) for contact in centre_contacts]
+    except AttributeError as exc:
+        raise CalibrationError("%s has an invalid final-centre contact" % manifest_path) from exc
+    if abs(finite(centre_statistics.get("median"), "%s final-centre median" % expected_tool) - statistics.median(centre_values)) > 1.0e-9:
+        raise CalibrationError("%s has an invalid final-centre median" % manifest_path)
+    if abs(finite(centre_statistics.get("standard_deviation"), "%s final-centre sigma" % expected_tool) - statistics.pstdev(centre_values)) > 1.0e-9:
+        raise CalibrationError("%s has an invalid final-centre sigma" % manifest_path)
     if phase_2.get("ring_contact_count") != 8 or phase_3.get("ring_contact_count") != 8:
         raise CalibrationError(
             "%s does not contain two completed eight-contact rings" % manifest_path
@@ -121,8 +140,9 @@ def load_run(run_dir, expected_tool):
             phase_2_refined.get("y"), "%s phase-2 refined Y" % expected_tool
         ),
         "z": finite(
-            summit.get("trigger_z"), "%s direct logical summit Z" % expected_tool
+            phase_4["statistics"].get("median"), "%s final-centre median Z" % expected_tool
         ),
+        "centre_statistics": centre_statistics,
         "ball_radius_mm": finite(calibration.get("ball_radius_mm"), "ball radius"),
         "ring_radius_mm": finite(calibration.get("ring_radius_mm"), "ring radius"),
     }
@@ -312,6 +332,10 @@ def write_result(
         "measured_centers": {
             "t0": {axis: t0_run[axis] for axis in ("x", "y", "z")},
             "t1": {axis: t1_run[axis] for axis in ("x", "y", "z")},
+        },
+        "centre_statistics": {
+            "t0": t0_run["centre_statistics"],
+            "t1": t1_run["centre_statistics"],
         },
         "phase_2_centers": {
             "t0": {axis: t0_run["phase_2_%s" % axis] for axis in ("x", "y")},

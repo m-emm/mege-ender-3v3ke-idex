@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report paired residuals from multi-head-zero nine-contact verification."""
+"""Report paired residuals from multi-head-zero thirteen-contact verification."""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ import numpy as np
 
 XY_LIMIT_MM = 0.05
 Z_LIMIT_MM = 0.02
+CENTER_TAP_COUNT = 5
+CENTER_STDDEV_LIMIT_MM = 0.015
 COMPARISON_EPSILON_MM = 1.0e-6
 VERIFICATION_DIRECTIONS = (
     "east",
@@ -45,7 +47,7 @@ class VerificationError(RuntimeError):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Compare paired nine-contact multi-head-zero verification runs."
+        description="Compare paired thirteen-contact multi-head-zero verification runs."
     )
     parser.add_argument("--t0-run", type=Path, required=True)
     parser.add_argument("--t1-run", type=Path, required=True)
@@ -133,11 +135,11 @@ def load_run(run_dir, expected_tool, calibration_result):
     verification = manifest.get("verification")
     if (
         not isinstance(verification, dict)
-        or verification.get("algorithm") != "nine_contact_octagonal_verification_v2"
-        or verification.get("contact_count") != 9
-        or verification.get("termination_reason") != "nine_contact_complete"
+        or verification.get("algorithm") != "thirteen_contact_octagonal_verification_v2"
+        or verification.get("contact_count") != 13
+        or verification.get("termination_reason") != "thirteen_contact_complete"
     ):
-        raise VerificationError("%s has no valid nine-contact result" % path)
+        raise VerificationError("%s has no valid thirteen-contact result" % path)
     target_center = verification.get("target_center")
     expected_target = calibration_result["target_center"]
     if (
@@ -177,21 +179,37 @@ def load_run(run_dir, expected_tool, calibration_result):
     estimated = verification.get("estimated_center")
     if not isinstance(estimated, dict):
         raise VerificationError("%s lacks an estimated centre" % path)
+    centre_contacts = verification.get("centre_contacts")
+    centre_statistics = verification.get("centre_statistics")
+    if not isinstance(centre_contacts, list) or len(centre_contacts) != CENTER_TAP_COUNT:
+        raise VerificationError("%s lacks five verification centre contacts" % path)
+    if not isinstance(centre_statistics, dict):
+        raise VerificationError("%s lacks verification centre statistics" % path)
+    centre_values = []
+    for contact in centre_contacts:
+        for axis in ("x", "y"):
+            if abs(
+                finite(contact.get(axis), "%s centre %s" % (expected_tool, axis))
+                - finite(expected_target.get(axis), "calibration target %s" % axis)
+            ) > 1.0e-6:
+                raise VerificationError("%s did not tap the exact target centre" % path)
+        centre_values.append(finite(contact.get("trigger_z"), "%s centre Z" % expected_tool))
+    centre_median = float(np.median(centre_values))
+    centre_stddev = float(np.std(centre_values))
+    if finite(centre_statistics.get("count"), "%s centre tap count" % expected_tool) != CENTER_TAP_COUNT:
+        raise VerificationError("%s has an invalid centre tap count" % path)
+    if abs(finite(centre_statistics.get("median"), "%s centre median" % expected_tool) - centre_median) > 1.0e-9:
+        raise VerificationError("%s has an invalid centre median" % path)
+    if abs(finite(centre_statistics.get("standard_deviation"), "%s centre sigma" % expected_tool) - centre_stddev) > 1.0e-9:
+        raise VerificationError("%s has an invalid centre sigma" % path)
+    expected_repeatability = centre_stddev <= CENTER_STDDEV_LIMIT_MM + COMPARISON_EPSILON_MM
+    if centre_statistics.get("repeatability_passed") is not expected_repeatability:
+        raise VerificationError("%s has an invalid centre repeatability result" % path)
+    if abs(finite(estimated.get("trigger_z"), "%s estimated centre Z" % expected_tool) - centre_median) > 1.0e-9:
+        raise VerificationError("%s does not use the centre median for Z" % path)
     ring_contacts = verification.get("ring_contacts")
     if not isinstance(ring_contacts, list) or len(ring_contacts) != 8:
         raise VerificationError("%s lacks eight verification ring contacts" % path)
-    centre_contact = verification.get("centre_contact")
-    if not isinstance(centre_contact, dict):
-        raise VerificationError("%s lacks the verification centre contact" % path)
-    for axis in ("x", "y"):
-        if (
-            abs(
-                finite(centre_contact.get(axis), "%s centre %s" % (expected_tool, axis))
-                - finite(expected_target.get(axis), "calibration target %s" % axis)
-            )
-            > 1.0e-6
-        ):
-            raise VerificationError("%s did not tap the exact target centre" % path)
     ring_radius = finite(verification.get("ring_radius_mm"), "verification ring radius")
     ring_by_direction = {}
     for contact in ring_contacts:
@@ -201,9 +219,6 @@ def load_run(run_dir, expected_tool, calibration_result):
         point = {
             "x": finite(contact.get("x"), "%s %s X" % (expected_tool, direction)),
             "y": finite(contact.get("y"), "%s %s Y" % (expected_tool, direction)),
-            "z": finite(
-                contact.get("trigger_z"), "%s %s Z" % (expected_tool, direction)
-            ),
         }
         angle = VERIFICATION_ANGLES[direction]
         expected_x = finite(
@@ -222,10 +237,7 @@ def load_run(run_dir, expected_tool, calibration_result):
         ring_by_direction[direction] = point
     if tuple(ring_by_direction) != VERIFICATION_DIRECTIONS:
         raise VerificationError("%s ring order is not the prescribed octagon" % path)
-    centre_z = finite(
-        estimated.get("trigger_z"), "%s verification centre Z" % expected_tool
-    )
-    periphery_mean_z = sum(point["z"] for point in ring_by_direction.values()) / 8.0
+    centre_z = centre_median
     return {
         "manifest": manifest,
         "run_dir": run_dir.resolve(),
@@ -233,7 +245,8 @@ def load_run(run_dir, expected_tool, calibration_result):
         "y": finite(estimated.get("y"), "%s verification Y" % expected_tool),
         "z": centre_z,
         "centre_z": centre_z,
-        "periphery_mean_z": periphery_mean_z,
+        "centre_contacts": centre_contacts,
+        "centre_statistics": centre_statistics,
         "ring": ring_by_direction,
     }
 
@@ -259,22 +272,15 @@ def write_report(output_dir, result, t0, t1):
                 }
             )
             for direction, point in measurement["ring"].items():
-                writer.writerow({"tool": tool, "sample": direction, **point})
+                writer.writerow({"tool": tool, "sample": direction, **point, "z": ""})
     return json_path, csv_path
 
 
 def paired_result(calibration_result_path, t0, t1, target):
     residual = {axis: t1[axis] - t0[axis] for axis in ("x", "y")}
     centre_delta = t1["centre_z"] - t0["centre_z"]
-    ring_deltas = [
-        t1["ring"][direction]["z"] - t0["ring"][direction]["z"]
-        for direction in VERIFICATION_DIRECTIONS
-    ]
-    periphery_mean_delta = sum(ring_deltas) / len(ring_deltas)
-    ring_standard_deviation = float(np.std(ring_deltas))
     residual["z"] = centre_delta
     residual["z_center"] = centre_delta
-    residual["z_periphery_mean"] = periphery_mean_delta
     radial_xy = math.hypot(residual["x"], residual["y"])
     target_error = {
         tool: {axis: measurement[axis] - target[axis] for axis in ("x", "y")}
@@ -288,7 +294,47 @@ def paired_result(calibration_result_path, t0, t1, target):
         "paired_x": abs(residual["x"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
         "paired_y": abs(residual["y"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
         "z_center": abs(centre_delta) <= Z_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t0_center_repeatability": t0["centre_statistics"]["standard_deviation"] <= CENTER_STDDEV_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t1_center_repeatability": t1["centre_statistics"]["standard_deviation"] <= CENTER_STDDEV_LIMIT_MM + COMPARISON_EPSILON_MM,
     }
+    checks = {}
+    limits = {
+        "t0_x": XY_LIMIT_MM, "t0_y": XY_LIMIT_MM,
+        "t1_x": XY_LIMIT_MM, "t1_y": XY_LIMIT_MM,
+        "paired_x": XY_LIMIT_MM, "paired_y": XY_LIMIT_MM,
+        "z_center": Z_LIMIT_MM,
+        "t0_center_repeatability": CENTER_STDDEV_LIMIT_MM,
+        "t1_center_repeatability": CENTER_STDDEV_LIMIT_MM,
+    }
+    values = {
+        "t0_x": target_error["t0"]["x"], "t0_y": target_error["t0"]["y"],
+        "t1_x": target_error["t1"]["x"], "t1_y": target_error["t1"]["y"],
+        "paired_x": residual["x"], "paired_y": residual["y"],
+        "z_center": centre_delta,
+        "t0_center_repeatability": t0["centre_statistics"]["standard_deviation"],
+        "t1_center_repeatability": t1["centre_statistics"]["standard_deviation"],
+    }
+    labels = {
+        "t0_x": "T0 target ΔX",
+        "t0_y": "T0 target ΔY",
+        "t1_x": "T1 target ΔX",
+        "t1_y": "T1 target ΔY",
+        "paired_x": "Paired ΔX",
+        "paired_y": "Paired ΔY",
+        "z_center": "Paired centre ΔZ",
+        "t0_center_repeatability": "T0 centre σ",
+        "t1_center_repeatability": "T1 centre σ",
+    }
+    for name, value in values.items():
+        label = labels[name]
+        checks[name] = {
+            "label": label,
+            "value_mm": value,
+            "limit_mm": limits[name],
+            "passed": pass_components[name],
+            "reason": "%s: %.1f µm / limit %.1f µm — %s"
+            % (label, value * 1000.0, limits[name] * 1000.0, "PASS" if pass_components[name] else "FAIL"),
+        }
     return {
         "schema_version": 3,
         "workflow": "multi_head_zero_verification_report",
@@ -301,29 +347,22 @@ def paired_result(calibration_result_path, t0, t1, target):
                 "x": t0["x"],
                 "y": t0["y"],
                 "centre_z": t0["centre_z"],
-                "periphery_mean_z": t0["periphery_mean_z"],
+                "centre_statistics": t0["centre_statistics"],
             },
             "t1": {
                 "x": t1["x"],
                 "y": t1["y"],
                 "centre_z": t1["centre_z"],
-                "periphery_mean_z": t1["periphery_mean_z"],
+                "centre_statistics": t1["centre_statistics"],
             },
         },
         "t1_minus_t0": residual,
         "target_error_mm": target_error,
-        "z_diagnostics": {
-            "centre_delta_mm": centre_delta,
-            "ring_directions": list(VERIFICATION_DIRECTIONS),
-            "periphery_deltas_mm": ring_deltas,
-            "periphery_mean_delta_mm": periphery_mean_delta,
-            "periphery_delta_standard_deviation_mm": ring_standard_deviation,
-            "centre_minus_periphery_mean_mm": centre_delta - periphery_mean_delta,
-            "authoritative_for_z": False,
-        },
         "radial_xy_mm": radial_xy,
-        "limits_mm": {"x": XY_LIMIT_MM, "y": XY_LIMIT_MM, "z": Z_LIMIT_MM},
+        "limits_mm": {"x": XY_LIMIT_MM, "y": XY_LIMIT_MM, "z": Z_LIMIT_MM, "centre_sigma": CENTER_STDDEV_LIMIT_MM},
         "pass_components": pass_components,
+        "checks": checks,
+        "failure_reasons": [check["reason"] for check in checks.values() if not check["passed"]],
         "pass": all(pass_components.values()),
     }
 
@@ -337,14 +376,13 @@ def main(argv):
         args.calibration_result, t0, t1, calibration_result["target_center"]
     )
     residual = result["t1_minus_t0"]
-    centre_delta = result["z_diagnostics"]["centre_delta_mm"]
-    periphery_mean_delta = result["z_diagnostics"]["periphery_mean_delta_mm"]
+    centre_delta = result["t1_minus_t0"]["z_center"]
     radial_xy = result["radial_xy_mm"]
     passed = result["pass"]
     json_path, csv_path = write_report(args.output_dir, result, t0, t1)
     print(
         "Target errors: T0 X=%+.1f Y=%+.1f; T1 X=%+.1f Y=%+.1f µm. "
-        "T1-minus-T0: X=%+.1f Y=%+.1f centre Z=%+.1f periphery-mean Z=%+.1f µm; radial XY=%.1f µm"
+        "T1-minus-T0: X=%+.1f Y=%+.1f centre Z=%+.1f µm; radial XY=%.1f µm"
         % (
             result["target_error_mm"]["t0"]["x"] * 1000.0,
             result["target_error_mm"]["t0"]["y"] * 1000.0,
@@ -353,7 +391,6 @@ def main(argv):
             residual["x"] * 1000.0,
             residual["y"] * 1000.0,
             centre_delta * 1000.0,
-            periphery_mean_delta * 1000.0,
             radial_xy * 1000.0,
         )
     )

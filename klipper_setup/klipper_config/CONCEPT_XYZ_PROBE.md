@@ -29,9 +29,9 @@ scripts/run_multi_head_zero_contact_map.sh
 
 It performs the full T0 calibration, T1 calibration, absolute T0/T1 X/Y
 rebase plus T1-only Z correction,
-deployment/parity check, and nine-contact T0/T1 verification. The only
+deployment/parity check, and thirteen-contact T0/T1 verification. The only
 diagnostic form is `scripts/run_multi_head_zero_contact_map.sh --tool T0` or
-`--tool T1`; it collects that single 26-contact calibration and makes no
+`--tool T1`; it collects that single 31-contact calibration and makes no
 configuration change. There are no bounds, homing, reference, workflow, or
 output-path options.
 
@@ -73,8 +73,8 @@ the final verification result. The compact live view at
 once per second. It uses a fixed isometric logical XYZ view: each contact's
 vertical stalk starts at that run's lowest completed contact, so the ball shape
 is readable without hiding absolute result cards. Completed PNG plots open in a
-fullscreen modal. Chapter 1 retains the T0/T1 26-contact calibration plots and
-calculations; chapter 2 appends the T0/T1 nine-contact verification and paired
+fullscreen modal. Chapter 1 retains the T0/T1 31-contact calibration plots and
+calculations; chapter 2 appends the T0/T1 thirteen-contact verification and paired
 result. The result card presents source, applied, and change values for
 `T1−T0` endstop offsets rather than raw T1 endstops. It is a status view only;
 immutable run artifacts remain authoritative.
@@ -97,7 +97,7 @@ operation, where the other toolhead is parked at its own X endstop.
 simultaneous-carriage modes and is not the physical parked-tool clearance
 authority for this workflow.
 
-## Calibration: 26 contacts per tool
+## Calibration: 31 contacts per tool
 
 Calibration is the only workflow that can produce input for an endstop update.
 It uses a known 5 mm ball and a 2.8 mm refinement ring. This leaves margin to
@@ -118,15 +118,15 @@ the printer's hard front-Y travel limit around the installed ball position.
 3. Fit completed seed samples to the normalized six-term paraboloid. Require
    at least six completed samples, rank six, acceptable conditioning,
    negative-definite curvature, and a vertex strictly inside the safe envelope.
-4. Contact that fitted X/Y vertex. This tenth contact must trigger. Its direct
-   logical-frame Z is the calibration `z_max`; the broad paraboloid's fitted Z
-   is never used.
+4. Contact that fitted X/Y vertex as the rough summit. It must trigger and is
+   retained for sphere-fit provenance; the final five-centre median below is
+   the authoritative calibration Z.
 
 The seed is serpentine: `(72,-12) → (75,-12) → (78,-12) → (78,-9) → …`.
 It reduces seed travel to 24.000 mm per tool from 31.416 mm while leaving the
 measurements and fit unchanged. Contacts never home or select a tool. After
-T0's twenty-sixth contact retracts, the batch lifts to `Z=10.000`, switches once
-from T0 to T1, then completes T1's twenty-six contacts.
+T0's thirty-first contact retracts, the batch lifts to `Z=10.000`, switches once
+from T0 to T1, then completes T1's thirty-one contacts.
 
 ### Phase 2 — ring refinement (8 contacts)
 
@@ -151,16 +151,24 @@ This produces the intermediate phase-2 centre.
 
 Centre a second mandatory eight-point `r=2.8 mm` ring on the phase-2 centre
 and apply the same first-harmonic calculation again. Its phase-3 centre is the
-final X/Y result used for calibration. The phase-1 summit remains the sole
-physical Z datum: neither ring is used to infer a summit height.
+final X/Y result used for calibration. Add five exact final-centre taps there;
+their median is the calibration Z and their population standard deviation must
+be at most 15 µm. Ring heights are used only for XY fitting.
 
-The calibration result stores both centres, both harmonic corrections, direct
-phase-1 summit Z, and fixed-sphere diagnostics for each ring. It does not fit
+### Phase 4 — final-centre repeatability (5 contacts)
+
+The five taps are taken at the phase-3 refined centre without moving XY between
+taps. Their median is the only Z value passed to the applier; the population
+standard deviation gate is `σ ≤ 15 µm`.
+
+The calibration result stores both centres, both harmonic corrections, the
+five-tap final-centre median and standard deviation, and the rough summit for
+sphere-fit provenance. It does not fit
 a sphere, alter the known radius, or fall back to another search.
 
 ## Applying calibration
 
-After successful T0 and T1 26-contact runs made from the same source config,
+After successful T0 and T1 31-contact runs made from the same source config,
 run:
 
 ```text
@@ -174,7 +182,7 @@ The helper rejects mismatched provenance and uses the configured ball target
 `(75,-9)` as the absolute X/Y datum:
 
 - add `target − measured centre` independently to T0 and T1 X/Y endstops;
-- subtract `T1−T0` direct logical-frame summit Z from the T1 Z endstop. T1's
+- subtract `T1−T0` final-centre-median Z from the T1 Z endstop. T1's
   logical trigger Z is machine Z minus its active origin
   (`T0_z_endstop − T1_z_endstop`), so increasing the T1 endstop would make a
   positive T1−T0 Z residual worse;
@@ -188,26 +196,23 @@ The prescribed workflow deploys it and requires parity automatically. The
 Klipper restart may invalidate homing, so verification checks XYZ and homes
 once only if needed before its own T0-to-T1 batch.
 
-## Verification: nine contacts per tool
+## Verification: 13 contacts per tool
 
 Verification is evidence only. It never edits, calculates, or deploys another
 calibration.
 
 The runner reads the configured target directly from the generated runtime
-priors and runs the same nine-point pattern for each tool under the deployed
+priors and runs five exact-centre taps followed by the eight-point ring for each tool under the deployed
 configuration:
 
-1. one centre contact exactly at logical `X=75, Y=-9`; and
+1. five centre contacts exactly at logical `X=75, Y=-9`; and
 2. eight mandatory ring contacts at 2.8 mm around exactly that point: east, north-east, north,
    north-west, west, south-west, south, and south-east.
 
 The octagonal ring heights recover each tool's local X/Y centre using the same
-eight-point first-harmonic calculation as calibration. The centre contact
-supplies the only authoritative logical-frame Z. The raw mean and spread of the
-eight peripheral heights remain visible as shape/repeatability diagnostics, but
-they are never converted into an inferred summit: the nozzle tip has non-zero
-physical dimensions, so the point-probe sphere model is not valid for that
-purpose. Pair the resulting T0/T1 manifests with:
+eight-point first-harmonic calculation as calibration. The five-tap centre
+median supplies authoritative logical-frame Z and must have population
+standard deviation `σ ≤ 15 µm`. Pair the resulting T0/T1 manifests with:
 
 ```text
 scripts/verify_multi_head_zero_alignment.py \
@@ -227,13 +232,7 @@ abs(T1 X − 75) <= 0.05 mm
 abs(T1 Y + 9) <= 0.05 mm
 abs(T1−T0 X) <= 0.05 mm
 abs(T1−T0 Y) <= 0.05 mm
-abs(T1−T0 Z) <= 0.02 mm
+abs(T1−T0 centre-median Z) <= 0.02 mm
 ```
-
-It also reports radial XY error for inspection.
-
-For a repeatability audit, run multiple paired nine-contact batches without
-changing configuration or homing between them. Compare the physical centre-Z
-contacts in both logical and machine frames. A separate deliberately re-homed
-pair distinguishes contact/tool-switch repeatability from homing repeatability;
-the peripheral ring is still used only for X/Y and descriptive diagnostics.
+Each failed check is retained with its measured value, limit, and reason. A
+noisy or incomplete centre series fails before correction or mesh progression.

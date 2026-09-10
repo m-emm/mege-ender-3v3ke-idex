@@ -72,8 +72,9 @@ The multi-head-zero workflow may change:
 
 It must not change T0 Z or the bed mesh. X/Y corrections are absolute: each
 tool's measured phase-3 ball centre is independently moved to `(75,-9)`. T1 Z
-is adjusted from the direct physical centre/summit contact difference to T0;
-ring-derived Z estimates are diagnostic only.
+is adjusted from the final five-tap centre-median difference to T0. The rough
+summit remains available for the sphere fit, but it is not the authoritative Z
+measurement. Ring contacts support XY fitting only.
 
 After either X endstop changes, the two parked-tool limits are derived from the
 fixed physical nozzle separation of exactly `101.4 mm`:
@@ -163,8 +164,9 @@ manually.
 4. Align and verify T0/T1 X, Y, and relative Z against the ball.
 5. Measure the native Tap mesh and persist the accepted matrix to `calib.yaml`.
 6. Regenerate, deploy, reload, and verify the persisted active mesh.
-7. Publish `READY TO PRINT` only when every preceding check belongs to the same
-   successful batch.
+7. Publish `READY TO PRINT` only when the compatible accepted bed, tool, and
+   mesh chapters are all deployed and verified. The accepted calibration chain
+   may compose chapters from different immutable attempts.
 
 The dashboard is opened separately at:
 
@@ -181,14 +183,16 @@ The two systems remain independently runnable without exposing low-level
 applier commands:
 
 ```bash
-scripts/run_multi_head_zero_contact_map.sh
-scripts/refresh_idex_bed_mesh.sh
+scripts/run_idex_bed_reference.sh          # steps 1–3
+scripts/run_multi_head_zero_contact_map.sh # step 4
+scripts/refresh_idex_bed_mesh.sh           # steps 5–6
 ```
 
-The first reruns toolhead alignment and its verification. The second reruns
-steps 5–6 as one mesh acquisition/persistence/deployment operation. A
-standalone maintenance run proves only its own scope and cannot claim full
-print readiness.
+Each route creates an immutable attempt. A shared acceptance ledger on the Pi
+retains a chapter only when its semantic invariants and fixed inputs remain
+compatible, then composes those accepted chapters into readiness. A failed
+rerun is rolled back to the last accepted `calib.yaml` checkpoint; diagnostics
+remain visible without replacing accepted evidence.
 
 Developer-only helpers may still support replay, calculation, and diagnostics,
 but they are not steps in the user manual and cannot be required to reach a
@@ -260,30 +264,33 @@ for relative T0/T1 Z alignment.
 
 ### 2. Multi-head-zero calibration (step 4)
 
-For T0, then T1, the runner performs the fixed 26-contact sequence:
+For T0, then T1, the runner performs the fixed 31-contact sequence:
 
 1. nine serpentine seed contacts over the configured safe envelope;
 2. one mandatory direct contact at the fitted rough summit;
-3. one mandatory eight-point `1.5 mm` ring around that summit; and
-4. one mandatory eight-point `1.5 mm` ring around the first refined centre.
+3. one mandatory eight-point `2.8 mm` ring around that summit;
+4. one mandatory eight-point `2.8 mm` ring around the first refined centre; and
+5. five final-centre contacts at the refined XY position.
 
-The ring was reduced from 2.8 mm after live runs showed the peripheral contacts
-could load the ball mount laterally and move its apparent centre by about
-0.2 mm between tools. The smaller ring retains enough sphere slope for the
-first harmonic while keeping the contact much closer to vertical.
+The `2.8 mm` ring retains enough sphere slope for the harmonic XY fit while
+keeping contacts close to vertical. Ring Z values are consumed only by that
+fit and are not exposed as an operator-facing Z diagnostic.
 
-The second ring's harmonic centre is the final X/Y measurement. The direct
-tenth contact is the Z datum. T0 completes all 26 contacts, Z lifts to the safe
-switch height, and the workflow selects T1 exactly once. Active carriage,
-extruder, logical origin, mesh state, and manual adjustment are verified for
-every contact.
+The second ring's harmonic centre is the final X/Y measurement. The median of
+the five final-centre contacts is the authoritative Z measurement. Each series
+must contain exactly five completed contacts and have population standard
+deviation `σ ≤ 15 µm`; an incomplete or noisy series fails before any
+correction is applied. T0 completes all 31 contacts, Z lifts to the safe switch
+height, and the workflow selects T1 exactly once. Active carriage, extruder,
+logical origin, mesh state, and manual adjustment are verified for every
+contact.
 
 The coordinator calculates and stages:
 
 ```text
 T0 X/Y delta = configured ball target - measured T0 centre
 T1 X/Y delta = configured ball target - measured T1 centre
-T1 Z delta   = correction that makes direct T1 contact Z equal direct T0 contact Z
+T1 Z delta   = correction that makes the T1 centre median equal the T0 centre median
 T0 Z delta   = 0
 ```
 
@@ -294,18 +301,18 @@ same final X-only latch pass before verification.
 
 ### 3. Fixed-target tool verification (step 4)
 
-T0 and T1 each perform nine mandatory contacts in their logical frames:
+T0 and T1 each perform thirteen mandatory contacts in their logical frames:
 
-1. the first contact is exactly `(75.000,-9.000)` and immediately publishes its
-   physical centre Z;
-2. the remaining contacts are E, NE, N, NW, W, SW, S, and SE on the fixed
-   `1.5 mm` ring around exactly `(75,-9)`.
+1. five contacts are exactly `(75.000,-9.000)` and publish centre-Z statistics;
+2. the remaining eight contacts are E, NE, N, NW, W, SW, S, and SE on the
+   fixed `2.8 mm` ring around exactly `(75,-9)`.
 
-The ring recovers X/Y. The first physical centre contact supplies Z. Verification
-passes only when each tool is within the configured target tolerance, the two
-recovered centres agree, and the direct T1-minus-T0 centre Z is within the Z
-tolerance. Peripheral Z statistics remain descriptive and never gate or alter
-the authoritative centre Z.
+The ring recovers X/Y. The centre median supplies Z. Verification passes only
+when each tool is within the configured target tolerance, the two recovered
+centres agree, the paired centre-median Z difference is within the Z tolerance,
+and both five-tap series satisfy `σ ≤ 15 µm`. Every check records its measured
+value, limit, pass/fail result, and a human-readable reason. A failed gate stops
+the workflow before mesh acquisition.
 
 Verification never performs a second correction. Failure marks tool alignment
 failed and stops the full workflow before bed calibration.
@@ -334,7 +341,8 @@ The final report is printable only if all of these are true under the same
 deployed target fingerprint:
 
 - multi-head-zero calibration completed for both tools;
-- fixed-target nine-contact verification passed;
+- fixed-target thirteen-contact verification passed, including both centre
+  repeatability gates;
 - the post-rebase T0 bed-reference tap passed near `Z=0`;
 - the persistent mesh equals the accepted measured matrix;
 - the default mesh is active;
@@ -354,10 +362,13 @@ performs acquisition, persistence, regeneration, deployment, profile reload,
 matrix parity, and mesh-aware physical checks; it is exposed through the
 single `scripts/refresh_idex_bed_mesh.sh` maintenance command.
 
-The dashboard is batch-scoped. A new standalone run cannot inherit chapters
-from an older batch, and a partial completed run is explicitly not printable.
-The last successful full batch is retained as history and is never merged into
-the current run's evidence.
+The dashboard uses schema-v4 acceptance state rather than attempt-only
+readiness. It shows accepted provenance (attempt, time, compatibility, and
+artifact) alongside any active or failed attempt. A T0 X/Y/Z frame change in a
+tool rerun immediately marks the accepted mesh stale; steps 5–6 must then be
+refreshed. Non-owned changes do not invalidate it. The last successful full
+composition is retained as history and is never silently mixed into the active
+attempt.
 
 The older
 `klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py` I1
@@ -456,9 +467,9 @@ bed_mesh_horizontal_move_z_mm
 ```
 
 Algorithm constants that have only one supported value are code constants, not
-configuration: the 5 mm ball radius, 1.5 mm ring, 26-contact phase layout,
-nine-contact verification layout, safe switch lift, contact order, correction
-formulae, and acceptance logic. If an implementation genuinely needs an
+configuration: the 5 mm ball radius, 2.8 mm ring, 31-contact calibration
+layout, 13-contact verification layout, five-tap centre gate, safe switch lift,
+contact order, correction formulae, and acceptance logic. If an implementation genuinely needs an
 operator-tunable physical limit, it may be added to `calib_config.yaml`; it may
 not be smuggled back into measured `calib.yaml`.
 
@@ -671,22 +682,24 @@ This chapter shows:
 
 ### Chapter 2 — Toolhead alignment (step 4)
 
-This chapter keeps both 26-contact calibration cards and both fixed-target
-nine-contact verification cards visible together. It shows:
+This chapter keeps both 31-contact calibration cards and both fixed-target
+13-contact verification cards visible together. It shows:
 
-- current tool and `n/26` or `n/9` progress;
+- current tool and `n/31` or `n/13` progress;
 - the live isometric contact plots;
 - clickable fullscreen completed PNG plots;
 - rough summit, phase-2 centre, and final phase-3 centre;
 - the prescribed `(75,-9)` target;
 - each tool's target error in micrometres;
-- the direct T0 and T1 centre Z and their difference in micrometres;
+- each tool's five-tap centre median, centre σ, and their difference in
+  micrometres;
 - source/applied/change values for the human-meaningful `T1-T0` endstop
   offsets; and
 - all verification limits and pass/fail components.
 
-The first verification contact updates centre Z immediately; the ring need not
-finish before the user can compare T0 and T1.
+The centre series is authoritative only when all five taps are complete and
+within the `σ ≤ 15 µm` gate; the ring need not finish before the user can
+inspect the in-progress XY fit.
 
 ### Chapter 3 — Mesh and readiness (steps 5–7)
 
@@ -698,7 +711,7 @@ This chapter shows:
 - source, candidate, and deployed mesh hashes;
 - mesh-aware verification residuals; and
 - whether the default profile is currently loaded; and
-- the final same-batch readiness decision.
+- the final accepted calibration-chain readiness decision.
 
 All three chapters remain visible after completion. A failed current run remains
 visible with its precise stopping condition, while the header can still link to
@@ -714,7 +727,7 @@ messages remain visible there alongside motion commands and Eddy diagnostics:
 ```text
 IDEX calibration: batch started; preflight passed
 IDEX calibration: T0 ball calibration started
-IDEX calibration: T0 ball tap 12/26 ...
+IDEX calibration: T0 ball tap 12/31 ...
 IDEX calibration: T0 final centre X=... Y=...
 IDEX calibration: lifting to Z=10 and switching T0 -> T1
 IDEX calibration: tool alignment deployed; parity passed

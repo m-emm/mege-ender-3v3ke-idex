@@ -18,6 +18,12 @@ import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
+# The acceptance ledger lives beside the deployed runtime helpers.  Keeping
+# this import local to the Pi-side publisher means every chapter writer uses
+# the same atomic schema-v4 state machine.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from idex_calibration_acceptance import apply_command as acceptance_apply
+
 import matplotlib
 import numpy as np
 
@@ -31,8 +37,10 @@ DEFAULT_DASHBOARD_ROOT = "~/printer_data/calibration"
 FIT_CONDITION_LIMIT = 1.0e6
 FIT_CONCAVITY_EPSILON = 1.0e-6
 SEED_CONTACT_COUNT = 9
-CALIBRATION_CONTACT_COUNT = 26
-VERIFICATION_CONTACT_COUNT = 9
+CENTER_TAP_COUNT = 5
+CENTER_STDDEV_LIMIT_MM = 0.015
+CALIBRATION_CONTACT_COUNT = 31
+VERIFICATION_CONTACT_COUNT = 13
 FRAME_TOLERANCE_MM = 1.0e-6
 
 
@@ -309,18 +317,9 @@ class DashboardPublisher:
                 previous = json.loads(self.path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 previous = {}
-        if previous.get("batch_id") == batch_id:
-            chapters = copy.deepcopy(previous.get("chapters") or {})
-            events = copy.deepcopy(previous.get("events") or [])
-        else:
-            chapters = {}
-            events = []
-        previous_successful = previous.get("last_successful_batch_id")
-        tool_alignment = chapters.setdefault("tool_alignment", {})
-        if workflow == "calibration":
-            # A new tool-alignment run replaces Chapter 1 only.  The full
-            # coordinator starts a fresh batch snapshot before invoking us.
-            tool_alignment.clear()
+        chapters = {"tool_alignment": {}}
+        events = []
+        tool_alignment = chapters["tool_alignment"]
         tool_alignment[workflow] = {
             "run_id": run_id,
             "status": "preparing",
@@ -328,7 +327,7 @@ class DashboardPublisher:
             "runs": {},
         }
         self.payload = {
-            "schema_version": 3,
+            "schema_version": 4,
             "kind": "idex_calibration_dashboard",
             "batch_id": batch_id,
             "run_id": run_id,
@@ -346,13 +345,32 @@ class DashboardPublisher:
                 "reasons": [],
             },
         }
-        if previous_successful and previous.get("batch_id") != batch_id:
-            self.payload["last_successful_batch_id"] = previous_successful
+        self._attempt = {
+            "attempt_id": run_id,
+            "batch_id": batch_id,
+            "run_scope": run_scope,
+            "workflow": workflow,
+            "tool_selection": tool_selection,
+            "status": "preparing",
+            "stage": "tool_alignment.%s" % workflow,
+            "chapters": {"tool_alignment": chapters["tool_alignment"]},
+        }
+        self._acceptance_begin()
         self.publish()
+
+    def _acceptance_begin(self):
+        acceptance_apply(self.root, "begin", {"attempt": self._attempt})
 
     def publish(self):
         self.payload["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
-        atomic_write_json(self.path, self.payload)
+        self._attempt.update({
+            "status": self.payload.get("status", "running"),
+            "stage": self.payload.get("stage", "tool_alignment.%s" % self.payload.get("workflow", "unknown")),
+            "updated_at": self.payload["updated_at"],
+            "events": copy.deepcopy(self.payload.get("events", [])),
+            "chapters": copy.deepcopy(self.payload.get("chapters", {})),
+        })
+        acceptance_apply(self.root, "update", self._attempt)
 
     def event(self, message):
         self.payload["events"] = (
@@ -406,6 +424,9 @@ class DashboardPublisher:
                     "Partial tool-alignment run completed; full calibration is required"
                 ],
             }
+        self._attempt["status"] = status
+        if error:
+            self._attempt["error"] = error
         self.publish()
 
 
@@ -732,6 +753,74 @@ def require_contact(record, label):
         )
 
 
+def centre_statistics(records):
+    """Summarise the completed final-centre taps in a stable unit/schema."""
+    if len(records) != CENTER_TAP_COUNT:
+        raise ContactMapError(
+            "final centre requires exactly %d taps; got %d"
+            % (CENTER_TAP_COUNT, len(records))
+        )
+    values = []
+    for record in records:
+        if record.get("status") != "completed":
+            raise ContactMapError("final centre tap did not complete")
+        try:
+            value = float(record["trigger_z"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ContactMapError("final centre tap has no numeric trigger Z") from exc
+        if not math.isfinite(value):
+            raise ContactMapError("final centre tap trigger Z is not finite")
+        values.append(value)
+    return {
+        "count": len(values),
+        "mean": float(np.mean(values)),
+        "median": float(np.median(values)),
+        "minimum": min(values),
+        "maximum": max(values),
+        "span": max(values) - min(values),
+        "standard_deviation": float(np.std(values)),
+        "standard_deviation_limit_mm": CENTER_STDDEV_LIMIT_MM,
+        "repeatability_passed": float(np.std(values)) <= CENTER_STDDEV_LIMIT_MM + 1.0e-9,
+    }
+
+
+def run_centre_taps(
+    args,
+    tool_index,
+    records,
+    *,
+    x,
+    y,
+    phase,
+    contact_function,
+    progress_callback,
+):
+    taps = []
+    for _ in range(CENTER_TAP_COUNT):
+        record = contact_function(
+            args.moonraker_url,
+            tool=args.tool,
+            tool_index=tool_index,
+            x=float(x),
+            y=float(y),
+            sample_index=len(records) + 1,
+            phase=phase,
+        )
+        records.append(record)
+        if progress_callback is not None:
+            progress_callback(record)
+        require_contact(record, "%s centre tap" % phase)
+        taps.append(record)
+    statistics = centre_statistics(taps)
+    return {
+        "target": {"x": float(x), "y": float(y)},
+        "contact_count": CENTER_TAP_COUNT,
+        "contacts": [contact_payload(record) for record in taps],
+        "statistics": statistics,
+        "repeatability_passed": statistics["repeatability_passed"],
+    }
+
+
 def run_ring_refinement(
     args,
     tool_index,
@@ -867,6 +956,16 @@ def run_calibration(
         contact_function=contact_function,
         progress_callback=progress_callback,
     )
+    centre = run_centre_taps(
+        args,
+        tool_index,
+        records,
+        x=phase_3["refined_center"]["x"],
+        y=phase_3["refined_center"]["y"],
+        phase="phase_4_centre",
+        contact_function=contact_function,
+        progress_callback=progress_callback,
+    )
     return {
         "algorithm": "three_stage_sphere_ring_calibration_v2",
         "contact_count": CALIBRATION_CONTACT_COUNT,
@@ -880,7 +979,8 @@ def run_calibration(
         },
         "phase_2": phase_2,
         "phase_3": phase_3,
-        "termination_reason": "phase_3_complete",
+        "phase_4": centre,
+        "termination_reason": "phase_4_centre_complete",
     }
 
 
@@ -889,19 +989,16 @@ def run_verification(
 ):
     if args.reference_x is None or args.reference_y is None:
         raise ContactMapError("verification requires --reference-x and --reference-y")
-    centre = contact_function(
-        args.moonraker_url,
-        tool=args.tool,
-        tool_index=tool_index,
+    centre = run_centre_taps(
+        args,
+        tool_index,
+        records,
         x=args.reference_x,
         y=args.reference_y,
-        sample_index=1,
         phase="verification_centre",
+        contact_function=contact_function,
+        progress_callback=progress_callback,
     )
-    records.append(centre)
-    if progress_callback is not None:
-        progress_callback(centre)
-    require_contact(centre, "verification centre contact")
     octagonal = (
         ("east", 0.0),
         ("north_east", math.pi / 4.0),
@@ -941,12 +1038,14 @@ def run_verification(
         args.ring_radius_mm,
     )
     return {
-        "algorithm": "nine_contact_octagonal_verification_v2",
+        "algorithm": "thirteen_contact_octagonal_verification_v2",
         "contact_count": VERIFICATION_CONTACT_COUNT,
         "ball_radius_mm": args.ball_radius_mm,
         "ring_radius_mm": args.ring_radius_mm,
         "target_center": {"x": args.reference_x, "y": args.reference_y},
-        "centre_contact": contact_payload(centre),
+        "centre_contacts": centre["contacts"],
+        "centre_statistics": centre["statistics"],
+        "repeatability_passed": centre["repeatability_passed"],
         "ring_contacts": [
             contact_payload(record)
             | {
@@ -962,14 +1061,12 @@ def run_verification(
             "dx_mm": refined["dx_mm"],
             "dy_mm": refined["dy_mm"],
         },
-        "periphery_mean_z": float(np.mean(z_values)),
-        "periphery_z_standard_deviation": float(np.std(z_values)),
         "estimated_center": {
             "x": refined["x"],
             "y": refined["y"],
-            "trigger_z": float(centre["trigger_z"]),
+            "trigger_z": centre["statistics"]["median"],
         },
-        "termination_reason": "nine_contact_complete",
+        "termination_reason": "thirteen_contact_complete",
     }
 
 
@@ -980,6 +1077,7 @@ def render_calibration(output_dir, tool, records, summary):
     phase_1 = summary["phase_1"]
     phase_2 = summary["phase_2"]
     phase_3 = summary["phase_3"]
+    phase_4 = summary["phase_4"]
     bounds = phase_1["bounds"]
     seed = [record for record in records if record["phase"] == "phase_1_seed"]
     complete_seed = completed_records(seed)
@@ -1079,43 +1177,55 @@ def render_calibration(output_dir, tool, records, summary):
         aspect="equal",
         xlabel="Commanded X (mm)",
         ylabel="Commanded Y (mm)",
-        title="26-contact calibration (%s)" % tool,
+        title="31-contact calibration (%s)" % tool,
     )
     xy_axis.grid(True, alpha=0.3)
     xy_axis.legend(fontsize=8, loc="upper right")
-    angles = phase_2["ring_angles_degrees"]
-    residuals = phase_2["sphere_residuals_mm"]
-    final_residuals = phase_3["sphere_residuals_mm"]
-    residual_axis.axhline(0.0, color="black", linewidth=0.8)
+    # Show the final refined ring's height variation directly.  The ring
+    # median is the reference datum for this diagnostic; no sphere model is
+    # fitted or subtracted here, so the plot exposes the measured bed/ball
+    # fluctuation at each ring contact.
+    ring_values = [
+        float(item["trigger_z"])
+        for item in final_ring
+        if item.get("trigger_z") is not None
+        and np.isfinite(float(item["trigger_z"]))
+    ]
+    ring_median = float(np.median(ring_values)) if ring_values else float("nan")
+    ring_residuals_um = [(value - ring_median) * 1000.0 for value in ring_values]
+    ring_labels = [
+        "%g°" % angle for angle in phase_3.get("ring_angles_degrees", [])
+    ][:len(ring_residuals_um)]
     residual_axis.plot(
-        angles, residuals, marker="o", color="tab:red", label="Phase-2 ring"
+        range(1, len(ring_residuals_um) + 1),
+        ring_residuals_um,
+        marker="o",
+        color="tab:blue",
+        label="Refined-ring taps",
     )
-    residual_axis.plot(
-        angles,
-        final_residuals,
-        marker="s",
-        color="tab:purple",
-        label="Phase-3 ring",
+    residual_axis.axhline(
+        0.0, color="tab:green", linewidth=0.9, label="Ring median",
     )
+    if ring_labels:
+        residual_axis.set_xticks(range(1, len(ring_labels) + 1), ring_labels, rotation=35, ha="right")
     residual_axis.set(
-        xticks=angles,
-        xlabel="Ring angle (degrees)",
-        ylabel="Measured − sphere Z (mm)",
-        title="Fixed-sphere diagnostics (%s)" % tool,
+        xlabel="Refined-ring contact",
+        ylabel="Z − ring median (µm)",
+        title="Refined-ring Z variation (%s)" % tool,
     )
     residual_axis.grid(True, alpha=0.3)
     residual_axis.legend(fontsize=8)
     residual_axis.text(
         0.03,
         0.03,
-        "Phase-2 XY: %.4f, %.4f\nFinal XY: %.4f, %.4f\nDirect summit Z: %.4f\nFinal RMSE: %.4f mm"
+        "Phase-2 XY: %.4f, %.4f\nFinal XY: %.4f, %.4f\nRing median Z: %.4f mm\nRing span: %.1f µm"
         % (
             phase_2_refined["x"],
             phase_2_refined["y"],
             refined["x"],
             refined["y"],
-            summit["trigger_z"],
-            phase_3["sphere_residual_rmse_mm"],
+            ring_median,
+            (max(ring_values) - min(ring_values)) * 1000.0 if ring_values else float("nan"),
         ),
         transform=residual_axis.transAxes,
         va="bottom",
@@ -1129,17 +1239,17 @@ def render_calibration(output_dir, tool, records, summary):
 
 def render_verification(output_dir, tool, records, summary):
     figure, axis = plt.subplots(figsize=(7, 6), constrained_layout=True)
-    centre = summary["centre_contact"]
+    centre = summary["centre_contacts"]
     ring = summary["ring_contacts"]
     estimated = summary["estimated_center"]
     axis.scatter(
-        [centre["x"]],
-        [centre["y"]],
+        [item["x"] for item in centre],
+        [item["y"] for item in centre],
         marker="*",
         color="gold",
         edgecolors="black",
         s=220,
-        label="Centre contact",
+        label="Five centre taps",
         zorder=3,
     )
     axis.scatter(
@@ -1171,18 +1281,18 @@ def render_verification(output_dir, tool, records, summary):
     axis.set_aspect("equal", adjustable="box")
     axis.set_xlabel("Commanded X (mm)")
     axis.set_ylabel("Commanded Y (mm)")
-    axis.set_title("Nine-contact verification (%s)" % tool)
+    axis.set_title("13-contact verification (%s)" % tool)
     axis.grid(True, alpha=0.3)
     axis.legend()
     axis.text(
         0.03,
         0.03,
-        "Estimated XY: %.4f, %.4f\nCentre direct Z: %.4f\nPeriphery mean Z: %.4f"
+        "Estimated XY: %.4f, %.4f\nCentre median Z: %.4f\nCentre sigma: %.1f um"
         % (
             estimated["x"],
             estimated["y"],
-            estimated["trigger_z"],
-            summary["periphery_mean_z"],
+            summary["centre_statistics"]["median"],
+            summary["centre_statistics"]["standard_deviation"] * 1000.0,
         ),
         transform=axis.transAxes,
         va="bottom",
@@ -1336,6 +1446,17 @@ def run_tool_workflow(
                 args, tool_index, records, progress_callback=progress
             )
             manifest["calibration"] = summary
+            if not summary["phase_4"]["repeatability_passed"]:
+                raise ContactMapError(
+                    "%s final-centre Z repeatability failed: sigma=%.3f um "
+                    "limit=%.3f um"
+                    % (
+                        tool,
+                        summary["phase_4"]["statistics"]["standard_deviation"] * 1000.0,
+                        summary["phase_4"]["statistics"]["standard_deviation_limit_mm"]
+                        * 1000.0,
+                    )
+                )
         else:
             summary = run_verification(
                 args, tool_index, records, progress_callback=progress
@@ -1378,23 +1499,29 @@ def run_tool_workflow(
         raise ContactMapError(manifest["error"])
     if workflow == "calibration":
         refined = summary["phase_3"]["refined_center"]
-        summit = summary["phase_1"]["summit"]
+        centre = summary["phase_4"]
         workflow_log(
             DEFAULT_MOONRAKER_URL,
-            "%s centre X=%.6f Y=%.6f direct summit Z=%.6f"
-            % (tool, refined["x"], refined["y"], summit["trigger_z"]),
+            "%s centre X=%.6f Y=%.6f median Z=%.6f sigma=%.3f um"
+            % (
+                tool,
+                refined["x"],
+                refined["y"],
+                centre["statistics"]["median"],
+                centre["statistics"]["standard_deviation"] * 1000.0,
+            ),
         )
     else:
         estimated = summary["estimated_center"]
         workflow_log(
             DEFAULT_MOONRAKER_URL,
-            "%s verification X=%.6f Y=%.6f direct Z=%.6f periphery mean Z=%.6f"
+            "%s verification X=%.6f Y=%.6f median Z=%.6f sigma=%.3f um"
             % (
                 tool,
                 estimated["x"],
                 estimated["y"],
                 estimated["trigger_z"],
-                summary["periphery_mean_z"],
+                summary["centre_statistics"]["standard_deviation"] * 1000.0,
             ),
         )
     return {

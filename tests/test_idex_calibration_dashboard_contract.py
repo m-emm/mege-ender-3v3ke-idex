@@ -32,8 +32,10 @@ def test_dashboard_uses_three_ordered_chapters():
     assert 'id="last-successful"' in html
     assert 'class="printer-panels"' in html
     assert 'id="printer-console"' in html
-    assert 'src="/webcam/?action=stream"' in html
+    assert 'data-stream-url="/webcam/?action=stream"' in html
     assert "Units: coordinates, absolute Z, and the common Z correction are shown in mm" in html
+    assert "31 contacts per tool" in html
+    assert "13 contacts per tool" in html
     assert 'id="events"' not in html
     assert "last_successful.json" in script
     assert "run_scope" in script or "partial" in script
@@ -44,7 +46,7 @@ def test_dashboard_uses_three_ordered_chapters():
         "T0/T1 toolhead alignment",
         "Acquire and save the Tap mesh",
         "Redeploy and verify the mesh",
-        "Same-batch readiness",
+        "Accepted calibration chain readiness",
     ):
         assert label in script
     for roadmap_id in (
@@ -55,7 +57,12 @@ def test_dashboard_uses_three_ordered_chapters():
         assert roadmap_id in html
     assert "WORKFLOW_STEPS" in script
     assert "renderRoadmap" in script
+    assert "centreTapStats" in script
+    assert "verification-checks" in script
+    assert "checks failed" in script
     assert "refreshPrinterContext" in script
+    assert "startCameraStream" in script
+    assert "printerCamera.src" in script
     assert "formatMillimetres" in script
     assert "formatConsoleTimestamp" in script
     assert "dashboardContentHash" in script
@@ -69,6 +76,8 @@ def test_dashboard_uses_three_ordered_chapters():
     assert "/printer/objects/query?webhooks&toolhead&gcode_move&print_stats&extruder&extruder1&heater_bed" in script
     assert "/server/gcode_store?count=80" in script
     assert "humaniseConsoleMessage" in script
+    assert "periphery" not in script.lower()
+    assert "periphery" not in html.lower()
     assert 'bedReferenceChapter.hidden = false' in script
     assert 'bedMeshChapter.hidden = false' in script
     for state in ("pending", "running", "passed", "failed", "blocked"):

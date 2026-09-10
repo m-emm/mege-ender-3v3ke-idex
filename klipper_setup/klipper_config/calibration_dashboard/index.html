@@ -36,7 +36,7 @@
             </div>
             <figure class="printer-camera">
               <figcaption>Main printer camera</figcaption>
-              <img src="/webcam/?action=stream" alt="Live view from the main printer camera" loading="eager">
+              <img id="printer-camera-image" data-stream-url="/webcam/?action=stream" alt="Live view from the main printer camera" loading="eager">
             </figure>
           </div>
         </article>
@@ -47,7 +47,7 @@
       </section>
       <section id="bed-reference-chapter" class="chapter" aria-labelledby="bed-reference-heading" hidden>
         <div class="chapter-heading">
-          <div><span>Chapter 1 · steps 1–3</span><h2 id="bed-reference-heading">Bed Z reference</h2></div>
+          <div><span>Chapter 1 · steps 1–3</span><h2 id="bed-reference-heading">Bed Z reference</h2><small id="bed-reference-provenance" class="provenance"></small></div>
           <strong id="bed-reference-state"></strong>
         </div>
         <div id="bed-reference-roadmap" class="workflow-roadmap" aria-label="Bed Z reference roadmap"></div>
@@ -55,24 +55,24 @@
       </section>
       <section id="tool-alignment-chapter" class="chapter" aria-labelledby="tool-alignment-heading" hidden>
         <div class="chapter-heading">
-          <div><span>Chapter 2 · step 4</span><h2 id="tool-alignment-heading">Toolhead alignment</h2></div>
+          <div><span>Chapter 2 · step 4</span><h2 id="tool-alignment-heading">Toolhead alignment</h2><small id="tool-alignment-provenance" class="provenance"></small></div>
           <strong id="tool-alignment-state"></strong>
         </div>
         <div id="tool-alignment-roadmap" class="workflow-roadmap" aria-label="Toolhead alignment roadmap"></div>
-        <section id="calibration-chapter" class="subchapter" aria-labelledby="calibration-heading" hidden>
-          <div class="subchapter-heading"><h3 id="calibration-heading">Ball alignment · 26 contacts per tool</h3><strong id="calibration-state"></strong></div>
+          <section id="calibration-chapter" class="subchapter" aria-labelledby="calibration-heading" hidden>
+          <div class="subchapter-heading"><h3 id="calibration-heading">Ball alignment · 31 contacts per tool</h3><strong id="calibration-state"></strong></div>
           <section id="calibration-tools" class="tools" aria-label="Tool calibration measurements"></section>
           <section id="calibration-outcome" class="outcome" aria-label="Calibration calculations"></section>
         </section>
         <section id="verification-chapter" class="subchapter" aria-labelledby="verification-heading" hidden>
-          <div class="subchapter-heading"><h3 id="verification-heading">Fixed-target verification · nine contacts per tool</h3><strong id="verification-state"></strong></div>
+          <div class="subchapter-heading"><h3 id="verification-heading">Fixed-target verification · 13 contacts per tool</h3><strong id="verification-state"></strong></div>
           <section id="verification-tools" class="tools" aria-label="Tool verification measurements"></section>
           <section id="verification-outcome" class="outcome" aria-label="Verification outcome"></section>
         </section>
       </section>
       <section id="bed-mesh-chapter" class="chapter" aria-labelledby="bed-mesh-heading" hidden>
         <div class="chapter-heading">
-          <div><span>Chapter 3 · steps 5–7</span><h2 id="bed-mesh-heading">Mesh and readiness</h2></div>
+          <div><span>Chapter 3 · steps 5–7</span><h2 id="bed-mesh-heading">Mesh and readiness</h2><small id="bed-mesh-provenance" class="provenance"></small></div>
           <strong id="bed-mesh-state"></strong>
         </div>
         <div id="bed-mesh-roadmap" class="workflow-roadmap" aria-label="Mesh and readiness roadmap"></div>

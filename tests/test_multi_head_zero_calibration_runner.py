@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import numpy as np
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,8 +88,8 @@ def test_calibration_adds_a_second_ring_around_the_first_refined_centre():
         progress_callback=lambda record: progress.append(record["sample_index"]),
     )
 
-    assert len(records) == 26
-    assert progress == list(range(1, 27))
+    assert len(records) == 31
+    assert progress == list(range(1, 32))
     assert [
         (record["commanded_x"], record["commanded_y"]) for record in records[:9]
     ] == [
@@ -105,7 +106,12 @@ def test_calibration_adds_a_second_ring_around_the_first_refined_centre():
     assert summary["phase_1"]["fit"]["status"] == "valid"
     phase_2_centre = summary["phase_2"]["refined_center"]
     phase_3_ring = summary["phase_3"]["ring_contacts"]
-    assert summary["contact_count"] == 26
+    assert summary["contact_count"] == 31
+    assert summary["phase_4"]["contact_count"] == 5
+    assert summary["phase_4"]["statistics"]["median"] == pytest.approx(
+        1.0 - 0.05 * ((summary["phase_4"]["target"]["x"] - 3.0) ** 2 + summary["phase_4"]["target"]["y"] ** 2)
+    )
+    assert summary["phase_4"]["repeatability_passed"] is True
     assert all(
         (
             (record["x"] - phase_2_centre["x"]) ** 2
@@ -115,6 +121,19 @@ def test_calibration_adds_a_second_ring_around_the_first_refined_centre():
         == pytest.approx(args.ring_radius_mm)
         for record in phase_3_ring
     )
+
+
+def test_final_centre_statistics_require_five_finite_taps_and_use_median():
+    runner = load_runner()
+    taps = [{"status": "completed", "trigger_z": value} for value in (1.0, 1.004, 0.998, 1.002, 1.001)]
+    statistics = runner.centre_statistics(taps)
+    assert statistics["count"] == 5
+    assert statistics["median"] == pytest.approx(1.001)
+    assert statistics["standard_deviation"] == pytest.approx(np.std([1.0, 1.004, 0.998, 1.002, 1.001]))
+    with pytest.raises(runner.ContactMapError, match="exactly 5 taps"):
+        runner.centre_statistics(taps[:4])
+    with pytest.raises(runner.ContactMapError, match="no numeric trigger Z"):
+        runner.centre_statistics(taps[:4] + [{"status": "completed", "trigger_z": None}])
 
 
 def test_verification_uses_centre_and_eight_point_ring():
@@ -142,12 +161,13 @@ def test_verification_uses_centre_and_eight_point_ring():
 
     summary = runner.run_verification(args, 0, records, contact_function=contact)
 
-    assert len(records) == 9
-    assert summary["algorithm"] == "nine_contact_octagonal_verification_v2"
-    assert summary["termination_reason"] == "nine_contact_complete"
+    assert len(records) == 13
+    assert summary["algorithm"] == "thirteen_contact_octagonal_verification_v2"
+    assert summary["termination_reason"] == "thirteen_contact_complete"
     assert summary["target_center"] == {"x": 75.0, "y": -9.0}
-    assert (records[0]["commanded_x"], records[0]["commanded_y"]) == (75.0, -9.0)
-    assert [record["direction"] for record in records[1:]] == [
+    assert all((record["commanded_x"], record["commanded_y"]) == (75.0, -9.0) for record in records[:5])
+    assert summary["centre_statistics"]["count"] == 5
+    assert [record["direction"] for record in records[5:]] == [
         "east",
         "north_east",
         "north",
@@ -158,7 +178,7 @@ def test_verification_uses_centre_and_eight_point_ring():
         "south_east",
     ]
     assert summary["estimated_center"]["trigger_z"] == pytest.approx(1.0)
-    assert summary["periphery_mean_z"] == pytest.approx(1.0)
+    assert summary["repeatability_passed"] is True
 
 
 def test_verification_runtime_args_use_the_generated_target():
@@ -409,10 +429,10 @@ def test_workflow_event_is_emitted_to_the_printer_console(monkeypatch):
         runner, "run_gcode", lambda _url, script: commands.append(script)
     )
 
-    runner.printer_log("unused", 'T0 1/26 phase_1_seed Z=0.500 "quoted"')
+    runner.printer_log("unused", 'T0 1/31 phase_1_seed Z=0.500 "quoted"')
 
     assert commands == [
-        "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 1/26 phase_1_seed Z=0.500 'quoted'\""
+        "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 1/31 phase_1_seed Z=0.500 'quoted'\""
     ]
 
 
@@ -449,7 +469,7 @@ def test_absolute_xy_endstop_rebase_places_both_tools_at_target():
     assert t1["y"] + deltas["t1"]["y_endstop"] == pytest.approx(target["y"])
 
 
-def test_applier_uses_the_second_ring_centre(tmp_path):
+def test_applier_uses_the_final_centre_median(tmp_path):
     applier = load_applier()
     run_dir = tmp_path / "T0"
     run_dir.mkdir()
@@ -460,8 +480,8 @@ def test_applier_uses_the_second_ring_centre(tmp_path):
         "status": "completed",
         "calibration": {
             "algorithm": "three_stage_sphere_ring_calibration_v2",
-            "contact_count": 26,
-            "termination_reason": "phase_3_complete",
+                "contact_count": 31,
+                "termination_reason": "phase_4_centre_complete",
             "ball_radius_mm": 5.0,
             "ring_radius_mm": 2.8,
             "phase_1": {
@@ -472,10 +492,23 @@ def test_applier_uses_the_second_ring_centre(tmp_path):
                 "ring_contact_count": 8,
                 "refined_center": {"x": 74.1, "y": -8.1},
             },
-            "phase_3": {
+                "phase_3": {
                 "ring_contact_count": 8,
                 "refined_center": {"x": 74.9, "y": -8.9},
-            },
+                },
+                "phase_4": {
+                    "contact_count": 5,
+                    "repeatability_passed": True,
+                    "contacts": [
+                        {"trigger_z": value}
+                        for value in (1.099, 1.1, 1.101, 1.1, 1.1005)
+                    ],
+                    "statistics": {
+                        "count": 5,
+                        "median": 1.1,
+                        "standard_deviation": float(np.std([1.099, 1.1, 1.101, 1.1, 1.1005])),
+                    },
+                },
         },
     }
     (run_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -486,7 +519,7 @@ def test_applier_uses_the_second_ring_centre(tmp_path):
     assert result["phase_2_y"] == pytest.approx(-8.1)
     assert result["x"] == pytest.approx(74.9)
     assert result["y"] == pytest.approx(-8.9)
-    assert result["z"] == pytest.approx(1.25)
+    assert result["z"] == pytest.approx(1.1)
 
 
 def test_generated_parked_tool_limits_preserve_measured_clearance():
@@ -498,20 +531,26 @@ def test_generated_parked_tool_limits_preserve_measured_clearance():
     assert t1_min - (-85.4) == pytest.approx(101.4)
 
 
-def test_verification_z_pass_uses_only_the_physical_centre_contact(tmp_path):
+def test_verification_z_pass_uses_five_tap_centre_medians(tmp_path):
     verifier = load_verifier()
     directions = verifier.VERIFICATION_DIRECTIONS
 
-    def measurement(name, x, y, centre_z, periphery_z):
+    def measurement(name, x, y, centre_z, ring_z):
+        centres = [centre_z - 0.002, centre_z, centre_z + 0.001, centre_z - 0.001, centre_z]
         return {
             "run_dir": tmp_path / name,
             "x": x,
             "y": y,
             "z": centre_z,
             "centre_z": centre_z,
-            "periphery_mean_z": periphery_z,
+            "centre_statistics": {
+                "count": 5,
+                "median": float(np.median(centres)),
+                "standard_deviation": float(np.std(centres)),
+            },
+            "centre_contacts": [{"x": x, "y": y, "trigger_z": value} for value in centres],
             "ring": {
-                direction: {"x": 0.0, "y": 0.0, "z": periphery_z}
+                direction: {"x": 0.0, "y": 0.0}
                 for direction in directions
             },
         }
@@ -525,8 +564,37 @@ def test_verification_z_pass_uses_only_the_physical_centre_contact(tmp_path):
 
     assert result["pass"] is True
     assert all(result["pass_components"].values())
-    assert result["z_diagnostics"]["periphery_mean_delta_mm"] == pytest.approx(0.2)
-    assert result["z_diagnostics"]["authoritative_for_z"] is False
+    assert result["measurements"]["t0"]["centre_statistics"]["count"] == 5
+    assert "periphery" not in json.dumps(result).lower()
+
+
+def test_verification_report_lists_failed_checks_with_values_and_limits(tmp_path):
+    verifier = load_verifier()
+
+    def measurement(name, x, y, centre_z, sigma):
+        values = [centre_z - sigma, centre_z, centre_z + sigma, centre_z, centre_z]
+        return {
+            "run_dir": tmp_path / name,
+            "x": x,
+            "y": y,
+            "centre_z": centre_z,
+            "centre_statistics": {"count": 5, "median": centre_z, "standard_deviation": sigma},
+            "ring": {direction: {"x": 0.0, "y": 0.0} for direction in verifier.VERIFICATION_DIRECTIONS},
+            "centre_contacts": [{"x": x, "y": y, "trigger_z": value} for value in values],
+        }
+
+    result = verifier.paired_result(
+        tmp_path / "calibration_result.json",
+        measurement("T0", 75.0, -9.0, 0.8, 0.02),
+        measurement("T1", 75.08, -9.0, 0.81, 0.001),
+        {"x": 75.0, "y": -9.0},
+    )
+    assert result["pass"] is False
+    assert result["checks"]["t0_center_repeatability"]["value_mm"] == pytest.approx(0.02)
+    assert result["checks"]["t0_center_repeatability"]["limit_mm"] == pytest.approx(0.015)
+    assert result["checks"]["t0_center_repeatability"]["passed"] is False
+    assert "T0 centre σ" in result["checks"]["t0_center_repeatability"]["reason"]
+    assert result["checks"]["t1_x"]["passed"] is False
 
 
 def test_dashboard_snapshot_is_atomic_and_retains_completed_run(tmp_path, monkeypatch):
@@ -564,7 +632,7 @@ def test_dashboard_snapshot_is_atomic_and_retains_completed_run(tmp_path, monkey
         "running",
     )
     retained = json.loads(snapshot.read_text(encoding="utf-8"))
-    assert retained["schema_version"] == 3
+    assert retained["schema_version"] == 4
     assert "calibration" not in retained["chapters"]["tool_alignment"]
     assert retained["chapters"]["tool_alignment"]["verification"]["runs"]["t0"][
         "progress"

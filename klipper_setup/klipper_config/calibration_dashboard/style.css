@@ -46,6 +46,12 @@ time, .hint, .last-successful { color: #8190a1; font-size: .86rem; }
 .chapter-heading span { display: block; color: #7f91a5; font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; }
 .chapter-heading h2 { margin: 2px 0 0; font-size: 1.2rem; }
 .chapter-heading strong { color: #9db3ca; font-size: .88rem; }
+.status-label { font-size: .88rem; letter-spacing: .01em; }
+.status-label.pending { color: #b3c0ce; }
+.status-label.running { color: #ffd479; }
+.status-label.passed { color: #87e3ad; }
+.status-label.failed { color: #ff928d; }
+.status-label.blocked { color: #d19b9b; }
 .workflow-roadmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 10px; margin: 0 0 14px; }
 .workflow-step { min-height: 132px; padding: 12px; border: 1px solid #334354; border-radius: 7px; background: #141c25; }
 .workflow-step-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #aab7c5; font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; }
@@ -78,6 +84,11 @@ time, .hint, .last-successful { color: #8190a1; font-size: .86rem; }
 .outcome-card dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; }
 .outcome-card dt { color: #8e9cab; }
 .outcome-card dd { margin: 0; font-weight: 600; }
+.verification-checks { display: grid; gap: 5px; margin: 14px 0 0; padding: 0; list-style: none; }
+.verification-check { display: flex; justify-content: space-between; gap: 12px; padding: 6px 8px; border-radius: 4px; background: #111820; font-size: .8rem; }
+.verification-check span { color: #aab7c5; text-transform: capitalize; }
+.verification-check strong { color: #87e3ad; font-variant-numeric: tabular-nums; text-align: right; }
+.verification-check.fail strong { color: #ff928d; }
 .tool h2 { margin: 0 0 4px; font-size: 1.15rem; }
 .state { font-size: .88rem; color: #9db3ca; }
 .state.completed { color: #6fd199; }

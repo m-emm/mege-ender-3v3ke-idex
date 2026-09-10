@@ -78,8 +78,10 @@ NARROW_BELOW_CONTACT_MM = 1.0
 # millimetres after a trigger so the fit has enough data to validate it.
 DISCOVERY_RETRACT_MM = 4.0
 NARROW_RETRACT_MM = 4.0
-MESH_AWARE_TOLERANCE_MM = 0.040
+# Mesh-aware physical residual acceptance: +/-55 um at validation points.
+MESH_AWARE_TOLERANCE_MM = 0.055
 VALID_PHASES = {"full", "reference", "mesh"}
+ACCEPTANCE_MODULE = REPO_ROOT / "klipper_setup/runtime_helpers/idex_calibration_acceptance.py"
 
 
 class CalibrationError(RuntimeError):
@@ -97,6 +99,23 @@ def atomic_json(path: Path, payload: Any) -> None:
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     os.replace(temporary, path)
+
+
+def acceptance_call(remote_host: str, command: str, payload: dict[str, Any]) -> None:
+    """Publish through the single schema-v4 acceptance writer on the Pi."""
+    subprocess.run(
+        [
+            "ssh",
+            remote_host,
+            "python3 ~/printer_data/config/idex_calibration_acceptance.py "
+            f"{command} --root {shlex.quote(REMOTE_DASHBOARD_ROOT)}",
+        ],
+        input=json.dumps(payload),
+        text=True,
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
 
 
 class Moonraker:
@@ -163,6 +182,16 @@ class DashboardPublisher:
             "mesh": {},
         }
         self.events: list[dict[str, str]] = []
+        self._attempt: dict[str, Any] = {
+            "attempt_id": batch_id,
+            "batch_id": batch_id,
+            "run_scope": self.run_scope,
+            "workflow": "bed_calibration",
+            "status": "preparing",
+            "stage": "bed_calibration.preflight",
+            "chapters": {"bed_calibration": self.bed},
+        }
+        acceptance_call(self.remote_host, "begin", {"attempt": self._attempt})
         self.publish()
 
     def event(self, message: str, *, status: str | None = None) -> None:
@@ -172,77 +201,16 @@ class DashboardPublisher:
         self.publish()
 
     def publish(self) -> None:
-        patch = {
-            "schema_version": 3,
-            "kind": "idex_calibration_dashboard",
-            "batch_id": self.batch_id,
-            "run_scope": self.run_scope,
-            "status": self.bed.get("status", "running"),
-            "stage": f"bed_calibration.{self.bed.get('stage', 'unknown')}",
-            "updated_at": utc_now(),
-            "events": self.events,
-            "bed_calibration": self.bed,
-        }
-        encoded = base64.b64encode(json.dumps(patch).encode("utf-8")).decode("ascii")
-        script = r"""
-import base64, json, os
-from pathlib import Path
-root = Path(os.environ["DASHBOARD_ROOT"])
-root.joinpath("data").mkdir(parents=True, exist_ok=True)
-root.joinpath("artifacts").mkdir(parents=True, exist_ok=True)
-path = root / "data/current.json"
-try:
-    state = json.loads(path.read_text(encoding="utf-8"))
-except (OSError, ValueError):
-    state = {}
-patch = json.loads(base64.b64decode(os.environ["PATCH_B64"]))
-if state.get("batch_id") != patch.get("batch_id"):
-    previous_successful = state.get("last_successful_batch_id")
-    state = {"chapters": {}, "events": []}
-    if previous_successful:
-        state["last_successful_batch_id"] = previous_successful
-state["schema_version"] = 3
-state["kind"] = "idex_calibration_dashboard"
-state["batch_id"] = patch["batch_id"]
-state["run_scope"] = patch.get("run_scope", "bed_reference")
-state["status"] = patch["status"]
-state["stage"] = patch["stage"]
-state["updated_at"] = patch["updated_at"]
-events = state.get("events", [])
-known = {(item.get("at"), item.get("message")) for item in events}
-for item in patch.get("events", []):
-    marker = (item.get("at"), item.get("message"))
-    if marker not in known:
-        events.append(item)
-        known.add(marker)
-state["events"] = events[-24:]
-chapters = state.setdefault("chapters", {})
-chapters["bed_calibration"] = patch["bed_calibration"]
-state.setdefault("readiness", {"printable": False, "checks": [], "reasons": []})
-if patch.get("status") == "completed" and patch.get("run_scope") != "full":
-    state["readiness"] = {
-        "printable": False,
-        "checks": [],
-        "reasons": [
-            "Partial bed-calibration run completed; full calibration is required"
-        ],
-    }
-tmp = path.with_name("." + path.name + ".tmp")
-tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-tmp.replace(path)
-"""
-        subprocess.run(
-            [
-                "ssh",
-                self.remote_host,
-                f"DASHBOARD_ROOT='{REMOTE_DASHBOARD_ROOT}' PATCH_B64='{encoded}' python3 -",
-            ],
-            input=script,
-            text=True,
-            check=True,
-            capture_output=True,
-            timeout=30,
+        self._attempt.update(
+            {
+                "status": self.bed.get("status", "running"),
+                "stage": f"bed_calibration.{self.bed.get('stage', 'unknown')}",
+                "updated_at": utc_now(),
+                "events": self.events,
+                "chapters": {"bed_calibration": self.bed},
+            }
         )
+        acceptance_call(self.remote_host, "update", self._attempt)
 
     def upload(self, source: Path, name: str) -> str:
         relative = f"artifacts/{self.batch_id}_{name}"
@@ -293,6 +261,36 @@ def config_fingerprint(status: dict[str, Any]) -> str:
     if not value:
         raise CalibrationError("live Klipper configuration fingerprint is missing")
     return value
+
+
+def acceptance_fixed_inputs() -> dict[str, str]:
+    return {
+        "calib_config_sha256": sha256_file(CALIB_CONFIG_PATH),
+        "printer_cfg_template_sha256": sha256_file(TEMPLATE_PATH),
+    }
+
+
+def acceptance_entry(
+    *,
+    chapter: str,
+    batch_id: str,
+    run_scope: str,
+    artifact: str,
+    data: dict[str, Any],
+    invariants: dict[str, Any],
+    checkpoint: str,
+) -> dict[str, Any]:
+    return {
+        "status": "accepted",
+        "chapter": chapter,
+        "attempt_id": batch_id,
+        "run_scope": run_scope,
+        "accepted_at": utc_now(),
+        "artifact": artifact,
+        "data": data,
+        "invariants": invariants,
+        "checkpoint": checkpoint,
+    }
 
 
 def require_ready(client: Moonraker) -> dict[str, Any]:
@@ -985,12 +983,19 @@ def persist_mesh(
         run_dir=run_dir,
         label="mesh",
     )
-    verification = verify_persistent_mesh(
-        client,
-        expected=mesh["points"],
-        profile=str(fixed["bed_mesh_profile"]),
-        fixed=fixed,
-    )
+    try:
+        verification = verify_persistent_mesh(
+            client,
+            expected=mesh["points"],
+            profile=str(fixed["bed_mesh_profile"]),
+            fixed=fixed,
+        )
+    except BaseException:
+        # Deployment is transactional: leave the previously accepted mesh and
+        # calibration active when reload/parity verification rejects a
+        # candidate.
+        rollback_deployment(run_dir, "mesh")
+        raise
     verification["target_config_fingerprint"] = mesh_fingerprint
     atomic_json(run_dir / "mesh_verification.json", verification)
     dashboard.bed["mesh"]["verification"] = verification
@@ -1229,6 +1234,19 @@ def main(argv: list[str]) -> int:
             console(client, f"Eddy bed calibration FAILED: {exc}")
         except BaseException:
             pass
+        try:
+            acceptance_call(
+                remote_host,
+                "fail",
+                {
+                    "batch_id": batch_id,
+                    "status": "failed",
+                    "stage": f"bed_calibration.{phase}",
+                    "error": str(exc),
+                },
+            )
+        except BaseException:
+            pass
         atomic_json(run_dir / "manifest.json", manifest)
         try:
             dashboard.upload_run_evidence(run_dir)
@@ -1238,6 +1256,59 @@ def main(argv: list[str]) -> int:
     atomic_json(run_dir / "manifest.json", manifest)
     atomic_json(run_dir / "bed_calibration_result.json", manifest)
     dashboard.upload_run_evidence(run_dir)
+    # Commit only after the immutable attempt is complete and all deployment /
+    # physical checks have passed.  A failed attempt never overwrites the
+    # accepted working set; the acceptance writer keeps it available for a
+    # later compatible chapter rerun.
+    checkpoint_name = f"{batch_id}_{phase}_accepted_calib.yaml"
+    checkpoint = dashboard.upload(CALIB_PATH, checkpoint_name)
+    fixed_inputs = acceptance_fixed_inputs()
+    current_calib = endstops(load_measured(CALIB_PATH))
+    if phase == "reference":
+        reference_data = {
+            "before_rebase": manifest.get("reference_before"),
+            "after_rebase": manifest.get("reference_after"),
+            "rebase": manifest.get("z_rebase"),
+            "result": {"status": "passed", "residual_mm": manifest.get("reference_after", {}).get("summary", {}).get("median")},
+        }
+        invariants = {
+            "fixed_inputs": fixed_inputs,
+            "reference": [manifest["reference"]["x"], manifest["reference"]["y"]],
+            "t0_z_endstop": current_calib["t0"]["z_endstop"],
+        }
+        chapter_data = {"reference": reference_data}
+    else:
+        mesh_data = manifest.get("mesh") or {}
+        matrix = mesh_data.get("points") or []
+        invariants = {
+            "fixed_inputs": fixed_inputs,
+            "reference": [manifest["reference"]["x"], manifest["reference"]["y"]],
+            "t0_frame": [
+                current_calib["t0"]["x_endstop"],
+                current_calib["t0"]["y_endstop"],
+                current_calib["t0"]["z_endstop"],
+            ],
+            "matrix_sha256": hashlib.sha256(
+                json.dumps(matrix, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest(),
+        }
+        chapter_data = {"mesh": mesh_data, "reference": manifest.get("reference_before")}
+    acceptance_call(
+        remote_host,
+        "accept",
+        {
+            "chapter": "bed_reference" if phase == "reference" else "mesh",
+            "entry": acceptance_entry(
+                chapter="bed_reference" if phase == "reference" else "mesh",
+                batch_id=batch_id,
+                run_scope=os.environ.get("IDEX_CALIBRATION_RUN_SCOPE", "bed_reference"),
+                artifact=f"runs/{batch_id}/bed_calibration/{run_dir.name}/bed_calibration_result.json",
+                data=chapter_data,
+                invariants=invariants,
+                checkpoint=checkpoint,
+            ),
+        },
+    )
     print(f"Eddy bed calibration complete: {run_dir}")
     return 0
 

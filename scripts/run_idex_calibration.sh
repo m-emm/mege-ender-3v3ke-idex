@@ -26,66 +26,16 @@ publish_state() {
   local printable="${4:-false}"
   local payload
   payload="$(python3 - "${batch_id}" "${status}" "${stage}" "${message}" "${printable}" <<'PY'
-import datetime as dt
-import json
-import sys
-
+import json, sys
 print(json.dumps({
-    "batch_id": sys.argv[1],
-    "status": sys.argv[2],
-    "stage": sys.argv[3],
-    "message": sys.argv[4],
-    "printable": sys.argv[5] == "true",
-    "at": dt.datetime.now(dt.timezone.utc).isoformat(),
+    "attempt_id": sys.argv[1], "batch_id": sys.argv[1],
+    "run_scope": "full", "status": sys.argv[2], "stage": sys.argv[3],
+    "message": sys.argv[4], "printable": sys.argv[5] == "true",
+    "status": sys.argv[2], "stage": sys.argv[3], "message": sys.argv[4],
 }))
 PY
 )"
-  local encoded
-  encoded="$(printf '%s' "${payload}" | base64 | tr -d '\n')"
-  ssh "${REMOTE_HOST}" "DASHBOARD_ROOT='${dashboard_root}' PAYLOAD_B64='${encoded}' python3 -" <<'PY'
-import base64
-import json
-import os
-from pathlib import Path
-
-root = Path(os.environ["DASHBOARD_ROOT"])
-path = root / "data/current.json"
-path.parent.mkdir(parents=True, exist_ok=True)
-try:
-    state = json.loads(path.read_text(encoding="utf-8"))
-except (OSError, ValueError):
-    state = {}
-payload = json.loads(base64.b64decode(os.environ["PAYLOAD_B64"]))
-if state.get("batch_id") != payload["batch_id"]:
-    previous_successful = state.get("last_successful_batch_id")
-    state = {"chapters": {}, "events": []}
-    if previous_successful:
-        state["last_successful_batch_id"] = previous_successful
-state.update({
-    "schema_version": 3,
-    "kind": "idex_calibration_dashboard",
-    "batch_id": payload["batch_id"],
-    "status": payload["status"],
-    "stage": payload["stage"],
-    "updated_at": payload["at"],
-    "run_scope": "full",
-})
-state["events"] = (state.get("events", []) + [{"at": payload["at"], "message": payload["message"]}])[-24:]
-state["readiness"] = {
-    "printable": payload["printable"],
-    "checks": state.get("readiness", {}).get("checks", []),
-    "reasons": [] if payload["printable"] else ([payload["message"]] if payload["status"] == "failed" else []),
-}
-temporary = path.with_name("." + path.name + ".tmp")
-temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-temporary.replace(path)
-if payload["printable"]:
-    state["last_successful_batch_id"] = payload["batch_id"]
-    successful = root / "data/last_successful.json"
-    successful_tmp = successful.with_name("." + successful.name + ".tmp")
-    successful_tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    successful_tmp.replace(successful)
-PY
+  printf '%s' "${payload}" | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" update
 }
 
 printer_console() {
@@ -142,10 +92,9 @@ printer_console "full calibration started"
 publish_state running bed_calibration.reference "Starting Eddy centre reference before tool alignment"
 printer_console "starting Eddy centre reference at X=150 Y=150 before ball calibration"
 IDEX_CALIBRATION_BATCH_ID="${batch_id}" \
-IDEX_EDDY_PHASE=reference \
 IDEX_CALIBRATION_RUN_SCOPE=full \
 IDEX_BED_CALIBRATION_RUN_DIR="${batch_dir}/bed_calibration/reference" \
-  "${SCRIPT_DIR}/run_eddy_tap_bed_calibration.sh"
+  "${SCRIPT_DIR}/run_idex_bed_reference.sh"
 
 publish_state running tool_alignment.calibration "Eddy centre reference passed; starting ball alignment"
 printer_console "Eddy centre reference passed; starting T0 then T1 ball alignment"
@@ -161,6 +110,7 @@ IDEX_BED_CALIBRATION_RUN_DIR="${batch_dir}/bed_calibration/mesh" \
   "${SCRIPT_DIR}/refresh_idex_bed_mesh.sh"
 
 publish_state completed completed "All calibration checks passed" true
+printf '%s' "{\"batch_id\": \"${batch_id}\"}" | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" ready
 printer_console "READY TO PRINT"
 python3 - "${batch_dir}" "${batch_id}" <<'PY'
 import datetime as dt

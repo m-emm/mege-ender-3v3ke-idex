@@ -17,6 +17,7 @@ const printerZ = document.querySelector("#printer-z");
 const printerHomed = document.querySelector("#printer-homed");
 const printerPrintState = document.querySelector("#printer-print-state");
 const printerTemperatures = document.querySelector("#printer-temperatures");
+const printerCamera = document.querySelector("#printer-camera-image");
 const consoleState = document.querySelector("#console-state");
 const printerConsole = document.querySelector("#printer-console");
 const bedReferenceChapter = document.querySelector("#bed-reference-chapter");
@@ -34,6 +35,11 @@ const empty = document.querySelector("#empty");
 const plotModal = document.querySelector("#plot-modal");
 const plotModalImage = document.querySelector("#plot-modal-image");
 const plotModalClose = document.querySelector("#plot-modal-close");
+const provenanceElements = {
+  bed_reference: document.querySelector("#bed-reference-provenance"),
+  tool_alignment: document.querySelector("#tool-alignment-provenance"),
+  mesh: document.querySelector("#bed-mesh-provenance"),
+};
 
 const WORKFLOW_STEPS = Object.freeze([
   {
@@ -58,7 +64,7 @@ const WORKFLOW_STEPS = Object.freeze([
     number: 4,
     chapter: "tool-alignment",
     title: "T0/T1 toolhead alignment",
-    description: "Align X/Y/Z with 26-contact ball calibration and nine-contact verification.",
+    description: "Align X/Y/Z with 31-contact ball calibration and 13-contact verification.",
   },
   {
     number: 5,
@@ -75,8 +81,8 @@ const WORKFLOW_STEPS = Object.freeze([
   {
     number: 7,
     chapter: "bed-mesh",
-    title: "Same-batch readiness",
-    description: "Declare READY TO PRINT only after the complete full calibration chain passes.",
+    title: "Accepted calibration chain readiness",
+    description: "Declare READY TO PRINT when the compatible accepted bed, tool, and mesh chapters are deployed and verified.",
   },
 ]);
 
@@ -91,10 +97,33 @@ const WORKFLOW_STATUS_LABELS = Object.freeze({
 let dashboardContentHash = "";
 let printerStatusContentHash = "";
 let printerConsoleContentHash = "";
+let cameraRetryTimer = null;
 
-// This is deliberately much flatter than a literal Z plot.  The probe only
-// measures a shallow ball cap; preserving the former independent Z fit made
-// millimetres in Z appear roughly 34 times larger than millimetres in XY.
+async function startCameraStream() {
+  if (!printerCamera || printerCamera.src) return;
+  // The webcam endpoint is an MJPEG stream.  Let the browser's native image
+  // decoder consume it, as Mainsail does; a fetch/read loop would hold a
+  // connection open and can delay the dashboard's JSON polls.
+  printerCamera.src = printerCamera.dataset.streamUrl || "/webcam/?action=stream";
+  printerCamera.onerror = () => {
+    if (cameraRetryTimer) clearTimeout(cameraRetryTimer);
+    cameraRetryTimer = setTimeout(() => {
+      if (printerCamera) {
+        printerCamera.removeAttribute("src");
+        startCameraStream();
+      }
+    }, 2000);
+  };
+}
+
+function stopCameraStream() {
+  if (cameraRetryTimer) clearTimeout(cameraRetryTimer);
+  cameraRetryTimer = null;
+}
+
+// Z is intentionally exaggerated for readability.  Ball-cap heights vary by
+// only a few hundred microns, so a literal 1:1 projection makes every contact
+// appear coplanar even though the measured trigger_z values are present.
 const ISOMETRIC_VIEW = Object.freeze({
   width: 540,
   height: 390,
@@ -166,25 +195,36 @@ function latestMeasurement(run) {
   return [...(run.records || [])].reverse().find((record) => record.status === "completed");
 }
 
-function verificationCentreContact(run) {
-  return (run.records || []).find(
+function verificationCentreContacts(run) {
+  return (run.records || []).filter(
     (record) => record.phase === "verification_centre" && record.status === "completed",
   );
+}
+
+function centreTapStats(run) {
+  const records = verificationCentreContacts(run);
+  const values = records.map((record) => Number(record.trigger_z)).filter(Number.isFinite);
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const sigma = Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length);
+  return { count: values.length, median, sigma };
 }
 
 function summaryNumbers(run) {
   const summary = run.summary || {};
   if (summary.phase_3?.refined_center || summary.phase_2?.refined_center) {
     const center = summary.phase_3?.refined_center || summary.phase_2.refined_center;
-    return [["Centre X", center.x, "mm"], ["Centre Y", center.y, "mm"], ["Summit Z", summary.phase_1?.summit?.trigger_z, "mm"]];
+    return [["Centre X", center.x, "mm"], ["Centre Y", center.y, "mm"], ["Centre Z median", summary.phase_4?.statistics?.median, "mm"]];
   }
   if (summary.estimated_center) {
     const center = summary.estimated_center;
     return [["Centre X", center.x, "mm"], ["Centre Y", center.y, "mm"], ["Centre Z", center.trigger_z, "mm"]];
   }
-  const verificationCentre = verificationCentreContact(run);
+  const verificationCentre = centreTapStats(run);
   if (verificationCentre) {
-    return [["Centre X", verificationCentre.commanded_x, "mm"], ["Centre Y", verificationCentre.commanded_y, "mm"], ["Centre Z", verificationCentre.trigger_z, "mm"]];
+    return [["Centre X", run.records?.[0]?.commanded_x, "mm"], ["Centre Y", run.records?.[0]?.commanded_y, "mm"], ["Centre Z median", verificationCentre.median, "mm"]];
   }
   const latest = latestMeasurement(run) || {};
   return [["Latest X", latest.commanded_x, "mm"], ["Latest Y", latest.commanded_y, "mm"], ["Trigger Z", latest.trigger_z, "mm"]];
@@ -198,20 +238,20 @@ function calculationDetails(run) {
     return `<dl class="calculation-details">
       <dt>First ring correction</dt><dd>ΔX ${formatMicrometres(first.harmonic?.dx_mm)} · ΔY ${formatMicrometres(first.harmonic?.dy_mm)}</dd>
       <dt>Final ring correction</dt><dd>ΔX ${formatMicrometres(final.harmonic.dx_mm)} · ΔY ${formatMicrometres(final.harmonic.dy_mm)}</dd>
-      <dt>Final sphere diagnostic</dt><dd>RMSE ${formatMicrometres(final.sphere_residual_rmse_mm)} · max ${formatMicrometres(final.sphere_residual_max_abs_mm)}</dd>
+      <dt>Final centre σ</dt><dd>${formatMicrometres(summary.phase_4?.statistics?.standard_deviation)} · 5/5 taps</dd>
     </dl>`;
   }
   if (summary.phase_2?.harmonic) {
     const harmonic = summary.phase_2.harmonic;
     return `<dl class="calculation-details">
       <dt>Ring correction</dt><dd>ΔX ${formatMicrometres(harmonic.dx_mm)} · ΔY ${formatMicrometres(harmonic.dy_mm)}</dd>
-      <dt>Sphere residual</dt><dd>RMSE ${formatMicrometres(summary.phase_2.sphere_residual_rmse_mm)} · max ${formatMicrometres(summary.phase_2.sphere_residual_max_abs_mm)}</dd>
+      <dt>Final centre</dt><dd>Five taps are stored after the refined XY centre.</dd>
     </dl>`;
   }
   if (summary.harmonic) {
     return `<dl class="calculation-details">
       <dt>Ring correction</dt><dd>ΔX ${formatMicrometres(summary.harmonic.dx_mm)} · ΔY ${formatMicrometres(summary.harmonic.dy_mm)}</dd>
-      <dt>Periphery Z</dt><dd>mean ${formatMillimetres(summary.periphery_mean_z)} · σ ${formatMicrometres(summary.periphery_z_standard_deviation)}</dd>
+      <dt>Centre taps</dt><dd>Five final-centre taps are required.</dd>
     </dl>`;
   }
   return "";
@@ -247,7 +287,7 @@ function plotBounds(records, priors, workflow) {
 
 function isometricPlot(records, priors, workflow) {
   const points = records.filter((record) => Number.isFinite(Number(record.commanded_x)) && Number.isFinite(Number(record.commanded_y)));
-  if (!points.length) return "<p>No contacts recorded yet.</p>";
+  if (!points.length) return "<p>No contacts available yet.</p>";
   const completed = points.filter((record) => record.status === "completed" && Number.isFinite(Number(record.trigger_z)));
   const { minX, maxX, minY, maxY } = plotBounds(points, priors, workflow);
   const minZ = completed.length ? Math.min(...completed.map((point) => Number(point.trigger_z))) : 0;
@@ -288,10 +328,11 @@ function isometricPlot(records, priors, workflow) {
     <text class="reference-label" x="10" y="${ISOMETRIC_VIEW.height - 8}">X ${format(minX, 1)}–${format(maxX, 1)} · Y ${format(minY, 1)}–${format(maxY, 1)} · Z visual scale ${ISOMETRIC_VIEW.zToXyScale}× XY</text>
     ${points.map((point, index) => {
       const [baseX, baseY] = project(Number(point.commanded_x), Number(point.commanded_y));
-      const [headX, headY] = point.status === "completed" ? project(Number(point.commanded_x), Number(point.commanded_y), Number(point.trigger_z)) : [baseX, baseY];
-      const colour = contactColour(point.trigger_z, minZ, maxZ);
+      const hasMeasuredZ = point.status === "completed" && Number.isFinite(Number(point.trigger_z));
+      const [headX, headY] = hasMeasuredZ ? project(Number(point.commanded_x), Number(point.commanded_y), Number(point.trigger_z)) : [baseX, baseY];
+      const colour = hasMeasuredZ ? contactColour(point.trigger_z, minZ, maxZ) : "#6d839a";
       const marker = point.status === "no_contact" ? "×" : "";
-      return `${point.status === "completed" ? `<line class="stalk" stroke="${colour}" x1="${baseX}" y1="${baseY}" x2="${headX}" y2="${headY}"/>` : ""}
+      return `${hasMeasuredZ ? `<line class="stalk" stroke="${colour}" x1="${baseX}" y1="${baseY}" x2="${headX}" y2="${headY}"/>` : ""}
         <circle class="point ${index === latestIndex ? "latest" : ""}" cx="${headX}" cy="${headY}" r="${point.status === "no_contact" ? 5 : 4}" fill="${colour}"/>
         ${marker ? `<text x="${headX - 3}" y="${headY + 4}" fill="#fff" font-size="12">${marker}</text>` : ""}`;
     }).join("")}
@@ -302,14 +343,60 @@ function plotButton(source, alt) {
   return `<button class="plot-button" type="button" data-plot-src="${escapeHtml(source)}" data-plot-alt="${escapeHtml(alt)}"><img src="${escapeHtml(source)}" alt="${escapeHtml(alt)}; click to expand"></button>`;
 }
 
+function normaliseStatus(value, fallback = "pending") {
+  const status = String(value || "").toLowerCase().replaceAll("-", "_");
+  if (["accepted", "completed", "passed", "recorded"].includes(status)) return "passed";
+  if (["running", "in_progress", "inprogress"].includes(status)) return "running";
+  if (["failed", "aborted", "error"].includes(status)) return "failed";
+  if (["blocked", "stale"].includes(status)) return "blocked";
+  if (status === "pending") return "pending";
+  return fallback;
+}
+
+function displayStatus(value, fallback = "pending") {
+  const status = normaliseStatus(value, fallback);
+  return WORKFLOW_STATUS_LABELS[status] || WORKFLOW_STATUS_LABELS.pending;
+}
+
+function setDisplayStatus(element, value, fallback = "pending") {
+  if (!element) return;
+  const status = normaliseStatus(value, fallback);
+  element.className = `status-label ${status}`;
+  element.textContent = WORKFLOW_STATUS_LABELS[status] || WORKFLOW_STATUS_LABELS.pending;
+}
+
+function displayRunStatus(value) {
+  const status = String(value || "idle").toLowerCase();
+  return {
+    idle: "Idle",
+    preparing: "Preparing",
+    running: "In progress",
+    completed: "Completed",
+    failed: "Failed",
+    aborted: "Aborted",
+  }[status] || "In progress";
+}
+
+function displayStage(data) {
+  const stage = String(data.stage || data.workflow || "calibration").toLowerCase();
+  if (stage.includes("tool_alignment") || stage.includes("verification")) return "Toolhead alignment";
+  if (stage.includes("mesh")) return "Mesh and readiness";
+  if (stage.includes("reference") || stage.includes("bed_calibration")) return "Bed Z reference";
+  return "Calibration workflow";
+}
+
 function renderTool(tool, run, priors) {
-  const [status, progress] = [run.state || "running", run.progress || {}];
+  const [status, progress] = [normaliseStatus(run.state, "running"), run.progress || {}];
   const numbers = summaryNumbers(run).map(([label, value, unit]) => `<div class="number"><span>${label}</span><strong>${format(value)} <small>${unit}</small></strong></div>`).join("");
+  // Keep every measured contact height in the isometric view.  Ring and seed
+  // taps are part of the height map too; hiding their Z values makes the
+  // contact geometry look flat and removes the most useful visual cue.
+  const plotRecords = run.records || [];
   return `<article class="tool"><h2>${tool}</h2>
-    <div class="state ${escapeHtml(status)}">${escapeHtml(status)} · ${progress.completed || 0}/${progress.total || "?"} contacts</div>
+    <div class="state ${escapeHtml(status)}">${escapeHtml(displayStatus(status, "running"))} · ${progress.completed || 0}/${progress.total || "?"} contacts</div>
     <div class="numbers">${numbers}</div>
     ${calculationDetails(run)}
-    ${isometricPlot(run.records || [], priors, run.workflow)}
+    ${isometricPlot(plotRecords, priors, run.workflow)}
     ${run.plot ? plotButton(run.plot, `${tool} completed plot`) : ""}
   </article>`;
 }
@@ -355,21 +442,21 @@ function calibrationCards(entry) {
     <article class="outcome-card"><h2>Measured T1−T0 calibration</h2><dl>
       <dt>ΔX refined</dt><dd>${formatMicrometres(measured.x)}</dd>
       <dt>ΔY refined</dt><dd>${formatMicrometres(measured.y)}</dd>
-      <dt>ΔZ physical summit</dt><dd>${formatMicrometres(measured.z)}</dd>
+      <dt>ΔZ centre median</dt><dd>${formatMicrometres(measured.z)}</dd>
     </dl></article>`;
 }
 
 function verificationCentreProgressCard(entry) {
   const runs = entry?.runs || {};
-  const t0 = verificationCentreContact(runs.t0 || {});
-  const t1 = verificationCentreContact(runs.t1 || {});
+  const t0 = centreTapStats(runs.t0 || {});
+  const t1 = centreTapStats(runs.t1 || {});
   if (!t0 && !t1) return "";
-  const delta = t0 && t1 ? Number(t1.trigger_z) - Number(t0.trigger_z) : undefined;
+  const delta = t0 && t1 ? Number(t1.median) - Number(t0.median) : undefined;
   return `<article class="outcome-card"><h2>Live physical centre-Z comparison</h2><dl>
-    <dt>T0 centre Z</dt><dd>${t0 ? formatMillimetres(t0.trigger_z) : "waiting for first contact"}</dd>
-    <dt>T1 centre Z</dt><dd>${t1 ? formatMillimetres(t1.trigger_z) : "waiting for first contact"}</dd>
+    <dt>T0 centre median</dt><dd>${t0 ? `${formatMillimetres(t0.median)} · σ ${formatMicrometres(t0.sigma)} · ${t0.count}/5` : "waiting for centre taps"}</dd>
+    <dt>T1 centre median</dt><dd>${t1 ? `${formatMillimetres(t1.median)} · σ ${formatMicrometres(t1.sigma)} · ${t1.count}/5` : "waiting for centre taps"}</dd>
     <dt>T1−T0 centre ΔZ</dt><dd>${formatMicrometres(delta)}</dd>
-  </dl><p>Captured by the first centre contact; ring contacts do not change it.</p></article>`;
+  </dl></article>`;
 }
 
 function verificationCards(entry) {
@@ -379,23 +466,20 @@ function verificationCards(entry) {
   const pass = Boolean(resultValue(verification, "passed", "pass"));
   const residual = resultValue(verification, "t1_minus_t0", "residuals", "residual") || verification;
   const target = verification.target_center || {};
-  const targetErrors = verification.target_error_mm || {};
-  const zDiagnostics = verification.z_diagnostics || {};
-  const components = verification.pass_components || {};
-  const verificationCard = `<article class="outcome-card ${pass ? "pass" : "fail"}"><h2>Paired verification: ${pass ? "PASS" : "FAIL"}</h2><dl>
+  const checks = verification.checks || {};
+  const checkRows = Object.entries(checks).map(([name, check]) => {
+    const value = Number(check.value_mm);
+    const limit = Number(check.limit_mm);
+    const passMark = check.passed === true;
+    return `<li class="verification-check ${passMark ? "pass" : "fail"}"><span>${escapeHtml(check.label || name.replaceAll("_", " "))}</span><strong>${formatMicrometres(value)} / limit ${formatMicrometres(limit)} — ${passMark ? "PASS" : "FAIL"}</strong></li>`;
+  }).join("");
+  const failedCount = Object.values(checks).filter((check) => check.passed !== true).length;
+  const verificationCard = `<article class="outcome-card ${pass ? "pass" : "fail"}"><h2>Paired verification: ${pass ? "PASS" : `FAIL · ${failedCount} checks failed`}</h2><dl>
     <dt>Target</dt><dd>X=${format(target.x, 3)}, Y=${format(target.y, 3)} mm</dd>
-    <dt>T0 target ΔX ${components.t0_x === false ? "✗" : ""}</dt><dd>${formatMicrometres(targetErrors.t0?.x)}</dd>
-    <dt>T0 target ΔY ${components.t0_y === false ? "✗" : ""}</dt><dd>${formatMicrometres(targetErrors.t0?.y)}</dd>
-    <dt>T1 target ΔX ${components.t1_x === false ? "✗" : ""}</dt><dd>${formatMicrometres(targetErrors.t1?.x)}</dd>
-    <dt>T1 target ΔY ${components.t1_y === false ? "✗" : ""}</dt><dd>${formatMicrometres(targetErrors.t1?.y)}</dd>
-    <dt>Paired ΔX ${components.paired_x === false ? "✗" : ""}</dt><dd>${formatMicrometres(resultValue(residual, "x", "delta_x_mm", "delta_x"))}</dd>
-    <dt>Paired ΔY ${components.paired_y === false ? "✗" : ""}</dt><dd>${formatMicrometres(resultValue(residual, "y", "delta_y_mm", "delta_y"))}</dd>
-    <dt>Centre ΔZ ${components.z_center === false ? "✗" : ""}</dt><dd>${formatMicrometres(resultValue(zDiagnostics, "centre_delta_mm") ?? residual.z)}</dd>
-    <dt>Periphery mean</dt><dd>${formatMicrometres(zDiagnostics.periphery_mean_delta_mm)}</dd>
-    <dt>Periphery σ</dt><dd>${formatMicrometres(zDiagnostics.periphery_delta_standard_deviation_mm)}</dd>
-    <dt>Centre−periphery</dt><dd>${formatMicrometres(zDiagnostics.centre_minus_periphery_mean_mm)}</dd>
-    <dt>Radial XY</dt><dd>${formatMicrometres(resultValue(verification, "radial_xy_mm", "radial_xy_error_mm", "radial_xy_error"))}</dd>
-  </dl><p>Periphery Z is diagnostic only; the physical centre contact is authoritative.</p></article>`;
+    <dt>T0 centre median</dt><dd>${formatMillimetres(verification.measurements?.t0?.centre_z)} · σ ${formatMicrometres(verification.measurements?.t0?.centre_statistics?.standard_deviation)} · 5/5 taps</dd>
+    <dt>T1 centre median</dt><dd>${formatMillimetres(verification.measurements?.t1?.centre_z)} · σ ${formatMicrometres(verification.measurements?.t1?.centre_statistics?.standard_deviation)} · 5/5 taps</dd>
+    <dt>Paired centre ΔZ</dt><dd>${formatMicrometres(residual.z_center ?? residual.z)}</dd>
+  </dl><ul class="verification-checks">${checkRows}</ul></article>`;
   const audit = entry?.audit?.data;
   if (!audit) return verificationCard;
   const auditPass = Boolean(audit.passed);
@@ -405,7 +489,7 @@ function verificationCards(entry) {
     <dt>T1 centre range</dt><dd>${formatMicrometres(metrics.t1_centre_z?.range_mm)}</dd>
     <dt>Paired ΔZ range</dt><dd>${formatMicrometres(metrics.paired_centre_delta_z?.range_mm)}</dd>
     <dt>Limit</dt><dd>${formatMicrometres(audit.limit_mm)}</dd>
-  </dl><p>${escapeHtml(audit.termination_reason || "Repeatability audit recorded")}</p></article>`;
+  </dl><p>${escapeHtml(audit.termination_reason || "Repeatability audit complete")}</p></article>`;
 }
 
 function normaliseChapters(data) {
@@ -452,6 +536,7 @@ function stepEvidence(data, chapters) {
   const alignment = chapters.tool_alignment || {};
   const calibration = alignment.calibration || {};
   const verification = alignment.verification || {};
+  const calibrationData = calibration.result?.data || calibration.data || calibration;
   const verificationData = verification.report?.data || {};
   const mesh = bed.mesh || {};
   const meshProgress = mesh.progress || {};
@@ -471,7 +556,7 @@ function stepEvidence(data, chapters) {
     Boolean((before.summary || before.discovery) && beforeComplete),
     Boolean(rebase.target_endstops || rebase.target_config_fingerprint),
     Boolean(after.summary && afterComplete),
-    calibration.status === "completed" && verificationData.passed === true,
+    (calibration.status === "completed" || calibration.result || calibrationData.workflow) && (verificationData.passed === true || verificationData.pass === true),
     mesh.status === "completed" || mesh.status === "passed" || meshComplete,
     mesh.verification?.status === "passed" && mesh.verification?.active === true,
   ];
@@ -520,18 +605,21 @@ function deriveWorkflowSteps(data, chapters) {
   const passed = stepEvidence(data, chapters);
   const activeStep = data.status === "running" ? stepFromStage(data, chapters, passed) : null;
   const failedStep = data.status === "failed" ? stepFromStage(data, chapters, passed) : null;
+  const staleMesh = chapters.bed_calibration?.mesh?.status === "stale";
   return WORKFLOW_STEPS.map((step) => {
     let status = passed[step.number - 1] ? "passed" : "pending";
     if (failedStep && step.number === failedStep) status = "failed";
     else if (failedStep && step.number > failedStep) status = "blocked";
+    else if (staleMesh && step.number >= 5) status = "blocked";
     else if (activeStep === step.number && status !== "passed") status = "running";
     let note = "";
-    if (status === "passed") note = "Evidence recorded for this batch.";
+    if (status === "passed") note = "Accepted in the calibration chain.";
     if (status === "running") note = "This is the active stage.";
-    if (status === "failed") note = conciseError(data.error || chapterForStep(chapters, step.chapter).error) || "The current run stopped here.";
+    if (status === "failed") note = [conciseError(data.error || chapterForStep(chapters, step.chapter).error) || "The current run stopped here.", data.attempt?.rollback].filter(Boolean).join(" · ");
     if (status === "blocked") note = `Waiting for step ${failedStep} to pass before continuing.`;
+    if (staleMesh && step.number >= 5) note = "Accepted mesh is stale after a T0 frame change; refresh the mesh.";
     if (status === "pending" && data.status !== "idle" && !runScopeIncludesStep(data.run_scope, step.number)) {
-      note = `Not part of this ${String(data.run_scope || "partial").replaceAll("_", " ")} run; a full batch is required.`;
+      note = `Not part of this ${String(data.run_scope || "partial").replaceAll("_", " ")} run; another compatible chapter attempt is required.`;
     }
     return {...step, status, note};
   });
@@ -616,8 +704,8 @@ function renderBedChapters(entry, referenceStatus = "pending", meshStatus = "pen
   const hasMesh = Boolean(entry && Object.keys(entry.mesh || {}).length);
   bedReferenceChapter.hidden = false;
   bedMeshChapter.hidden = false;
-  bedReferenceState.textContent = referenceStatus;
-  bedMeshState.textContent = meshStatus;
+  setDisplayStatus(bedReferenceState, referenceStatus);
+  setDisplayStatus(bedMeshState, meshStatus);
   if (hasReference) {
     bedReference.innerHTML = `${referenceCard(entry.reference)}${referenceSamples(entry.reference)}`;
   } else {
@@ -630,10 +718,23 @@ function renderBedChapters(entry, referenceStatus = "pending", meshStatus = "pen
   }
 }
 
+function renderAcceptedProvenance(data) {
+  const sources = data.accepted_sources || {};
+  Object.entries(provenanceElements).forEach(([chapter, element]) => {
+    if (!element) return;
+    const source = sources[chapter];
+    if (!source) {
+      element.textContent = "No accepted result yet";
+      return;
+    }
+    element.innerHTML = `Accepted from attempt ${escapeHtml(source.attempt_id || "—")} · ${escapeHtml(source.accepted_at ? new Date(source.accepted_at).toLocaleString() : "time unknown")} · ${escapeHtml(source.compatibility?.state || source.status || "accepted")}${source.artifact ? ` · <a href="${escapeHtml(source.artifact)}">artifact</a>` : ""}`;
+  });
+}
+
 function renderChapter(chapterElement, stateElement, toolsElement, outcomeElement, entry, priors, outcomeHtml) {
   chapterElement.hidden = !entry;
   if (!entry) return;
-  stateElement.textContent = entry.status || "recorded";
+  setDisplayStatus(stateElement, entry.status, "passed");
   const runs = entry.runs || {};
   toolsElement.innerHTML = ["t0", "t1"]
     .filter((tool) => runs[tool])
@@ -644,16 +745,17 @@ function renderChapter(chapterElement, stateElement, toolsElement, outcomeElemen
 
 function render(data) {
   const error = conciseError(data.error);
-  headline.textContent = `${data.status || "unknown"}: ${data.stage || data.workflow || "IDEX calibration"}${error ? ` — ${error}` : ""}`;
+  headline.textContent = `${displayRunStatus(data.status)}: ${displayStage(data)}${error ? ` — ${error}` : ""}`;
   updated.textContent = data.updated_at ? `Updated ${new Date(data.updated_at).toLocaleTimeString()}` : "";
   const chapters = normaliseChapters(data);
+  renderAcceptedProvenance(data);
   const roadmapSteps = deriveWorkflowSteps(data, chapters);
   renderRoadmap(data, chapters, roadmapSteps);
   const alignment = chapters.tool_alignment || {};
   const priors = data.configured_priors;
   const hasAlignment = Boolean(alignment.calibration || alignment.verification);
   toolAlignmentChapter.hidden = false;
-  toolAlignmentState.textContent = roadmapChapterStatus("tool-alignment", roadmapSteps);
+  setDisplayStatus(toolAlignmentState, roadmapChapterStatus("tool-alignment", roadmapSteps));
   renderChapter(calibrationChapter, calibrationState, calibrationTools, calibrationOutcome, alignment.calibration, priors, calibrationCards(alignment.calibration));
   renderChapter(verificationChapter, verificationState, verificationTools, verificationOutcome, alignment.verification, priors, `${verificationCentreProgressCard(alignment.verification)}${verificationCards(alignment.verification)}`);
   renderBedChapters(
@@ -669,7 +771,7 @@ function render(data) {
   empty.hidden = Boolean(hasAlignment || chapters.bed_calibration || data.status !== "idle");
   const previous = data.last_successful_batch_id;
   lastSuccessful.textContent = previous && previous !== data.batch_id
-    ? `Last fully verified printable batch: ${previous}`
+    ? `Last fully verified printable calibration chain: ${previous}`
     : "";
 }
 
@@ -838,3 +940,5 @@ refresh();
 setInterval(refresh, 1000);
 refreshPrinterContext();
 setInterval(refreshPrinterContext, 1000);
+startCameraStream();
+window.addEventListener("beforeunload", stopCameraStream);

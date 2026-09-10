@@ -33,14 +33,15 @@ homing and final slow X latch, and confirms the ball switch is physically
 3. Verify five fixed-window T0 taps from `START_Z=2` toward `Z=-1`; banded
    discovery is not repeated.
 4. **Chapter 2 — Toolhead alignment:** align T0/T1 X, Y, and relative Z with
-   the 26-contact ball calibration and nine-contact fixed-target verification.
+   the 31-contact ball calibration and 13-contact fixed-target verification.
 5. **Chapter 3 — Mesh and readiness:** acquire the native 7×7 Tap mesh and
    write the accepted matrix atomically to `calib.yaml`.
 6. Regenerate, deploy, reload, and verify the persisted active mesh, including
    the five mesh-aware physical checks.
-7. Publish **READY TO PRINT** only when all evidence belongs to this successful
-   full batch. A standalone mesh refresh proves steps 5–6 but remains
-   **NOT READY TO PRINT**.
+7. Publish **READY TO PRINT** only when the compatible accepted bed, tool, and
+   mesh chapters are all deployed and verified. The accepted chain may combine
+   chapters from different attempts; a standalone mesh refresh proves steps 5–6
+   but cannot make the chain printable by itself.
 
 The printer console mirrors the major state changes and per-contact progress.
 The dashboard retains the complete three-chapter story, including full-size plots
@@ -57,7 +58,7 @@ scripts/run_multi_head_zero_contact_map.sh
 Run only the Eddy centre reference and its post-correction verification:
 
 ```bash
-IDEX_EDDY_PHASE=reference scripts/run_eddy_tap_bed_calibration.sh
+scripts/run_idex_bed_reference.sh
 ```
 
 Run steps 5–6 as one repeatable acquisition/persistence/deployment operation:
@@ -70,14 +71,16 @@ These are complete workflows, not preparation for manual edits.
 
 ## Acceptance criteria
 
-The dashboard calls the two bed-reference phases **Initial discovery** and
-**Post-correction verification**. Those names replace ambiguous before/after
-wording; `before_rebase` and `after_rebase` are retained only as internal JSON
-keys. Tool verification requires both recovered centres to be within 0.05 mm of
-`(75,-9)`, paired X/Y within 0.05 mm, and direct centre T1−T0 Z within 0.02 mm.
-Bed reference requires a repeatable pre-rebase series and a post-deployment
-median within 0.030 mm of zero. The stored mesh must exactly equal the accepted
-live matrix, be active, and pass the mesh-aware contact checks.
+The dashboard presents the bed point once as `(150,150)`. The internal JSON
+keys `before_rebase` and `after_rebase` remain for compatibility, but the
+operator-facing phases are the Bed Center Z=0 measurement, calibration update,
+and verification. Tool verification requires both recovered centres to be
+within 0.05 mm of `(75,-9)`, paired X/Y within 0.05 mm, paired centre-median
+T1−T0 Z within 0.02 mm, and population σ no greater than 15 µm for each
+five-tap centre series. The 31-contact calibration and 13-contact verification
+must be complete; a noisy or incomplete centre series blocks correction or
+mesh progression. The stored mesh must exactly equal the accepted live matrix,
+be active, and pass the mesh-aware contact checks.
 
 If any step fails, leave the printer alone and inspect `/calibration/` and the
 batch directory printed by the script. A failed candidate deployment is rolled
@@ -87,8 +90,11 @@ causes a second speculative correction.
 ## Implementation boundary
 
 The supported operator paths are `scripts/run_idex_calibration.sh`,
+`scripts/run_idex_bed_reference.sh`,
 `scripts/run_multi_head_zero_contact_map.sh`, and
-`scripts/refresh_idex_bed_mesh.sh`. The older
+`scripts/refresh_idex_bed_mesh.sh`. Each chapter is an immutable attempt; the
+dashboard composes compatible accepted results and automatically rolls back a
+failed rerun to the last accepted checkpoint. The older
 `klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py` I1
 iteration is retained for diagnostics and historical replay only; it is not
 part of this sequence and must not be used to establish print readiness.
