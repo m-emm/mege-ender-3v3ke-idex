@@ -17,12 +17,40 @@
         <time id="updated"></time>
       </header>
       <section id="readiness" class="readiness calibrating">CALIBRATION STATE UNKNOWN</section>
-      <section id="events" class="events" aria-label="Latest calibration events"></section>
+      <p class="unit-legend">Units: coordinates, absolute Z, and the common Z correction are shown in mm; alignment corrections, errors, spans, and repeatability are shown in µm.</p>
+      <section class="printer-panels" aria-label="Printer context">
+        <article class="printer-panel panel-card">
+          <div class="panel-heading"><h2>Printer</h2><strong id="printer-state" class="printer-state">Connecting…</strong></div>
+          <div class="printer-panel-body">
+            <div class="printer-summary">
+              <dl class="printer-coordinates" aria-label="Current toolhead coordinates">
+                <div><dt>X</dt><dd id="printer-x">—</dd></div>
+                <div><dt>Y</dt><dd id="printer-y">—</dd></div>
+                <div><dt>Z</dt><dd id="printer-z">—</dd></div>
+              </dl>
+              <dl class="printer-details">
+                <div><dt>Homed axes</dt><dd id="printer-homed">—</dd></div>
+                <div><dt>Print state</dt><dd id="printer-print-state">—</dd></div>
+                <div><dt>Temperatures</dt><dd id="printer-temperatures">—</dd></div>
+              </dl>
+            </div>
+            <figure class="printer-camera">
+              <figcaption>Main printer camera</figcaption>
+              <img src="/webcam/?action=stream" alt="Live view from the main printer camera" loading="eager">
+            </figure>
+          </div>
+        </article>
+        <article class="console-panel panel-card">
+          <div class="panel-heading"><h2>Running console</h2><strong id="console-state" class="printer-state">Connecting…</strong></div>
+          <pre id="printer-console" class="printer-console" aria-live="polite">Waiting for Moonraker console output…</pre>
+        </article>
+      </section>
       <section id="bed-reference-chapter" class="chapter" aria-labelledby="bed-reference-heading" hidden>
         <div class="chapter-heading">
           <div><span>Chapter 1 · steps 1–3</span><h2 id="bed-reference-heading">Bed Z reference</h2></div>
           <strong id="bed-reference-state"></strong>
         </div>
+        <div id="bed-reference-roadmap" class="workflow-roadmap" aria-label="Bed Z reference roadmap"></div>
         <section id="bed-reference" class="outcome" aria-label="Bed reference measurements"></section>
       </section>
       <section id="tool-alignment-chapter" class="chapter" aria-labelledby="tool-alignment-heading" hidden>
@@ -30,6 +58,7 @@
           <div><span>Chapter 2 · step 4</span><h2 id="tool-alignment-heading">Toolhead alignment</h2></div>
           <strong id="tool-alignment-state"></strong>
         </div>
+        <div id="tool-alignment-roadmap" class="workflow-roadmap" aria-label="Toolhead alignment roadmap"></div>
         <section id="calibration-chapter" class="subchapter" aria-labelledby="calibration-heading" hidden>
           <div class="subchapter-heading"><h3 id="calibration-heading">Ball alignment · 26 contacts per tool</h3><strong id="calibration-state"></strong></div>
           <section id="calibration-tools" class="tools" aria-label="Tool calibration measurements"></section>
@@ -46,6 +75,7 @@
           <div><span>Chapter 3 · steps 5–7</span><h2 id="bed-mesh-heading">Mesh and readiness</h2></div>
           <strong id="bed-mesh-state"></strong>
         </div>
+        <div id="bed-mesh-roadmap" class="workflow-roadmap" aria-label="Mesh and readiness roadmap"></div>
         <section id="bed-mesh" class="bed-mesh" aria-label="Bed mesh measurement"></section>
       </section>
       <div id="empty" class="empty" hidden>No calibration run has been published yet.</div>

@@ -648,17 +648,25 @@ The fixed header shows:
 - source and deployed configuration fingerprints in shortened form;
 - last update time;
 - a large `CALIBRATING`, `READY TO PRINT`, or `NOT READY TO PRINT` badge; and
-- the latest concise printer-console-equivalent events; and
+- live printer state, coordinates, camera, and running console output; and
 - the last fully verified batch when the current run is partial or failed.
+
+The dashboard deliberately avoids ambiguous “before” and “after” labels. The
+operator-facing names are **Initial discovery** (the banded rough-height
+measurement) and **Post-correction verification** (the five fixed-window taps
+at logical `Z=0`). The JSON compatibility keys `before_rebase` and
+`after_rebase` remain internal implementation names only. Coordinates,
+absolute Z, and the common Z correction are shown in millimetres; alignment
+corrections, errors, spans, and repeatability are shown in micrometres.
 
 ### Chapter 1 — Bed Z reference (steps 1–3)
 
 This chapter shows:
 
 - the fixed `(150,150)` reference and target `Z=0`;
-- banded discovery progress and diagnostics;
-- the five fixed-window post-rebase taps, explicitly marked as no-discovery;
-- old/new T0/T1 Z endstops, common delta, and the preserved relative Z check;
+- initial banded discovery progress and diagnostics;
+- the five post-correction fixed-window taps, explicitly marked as no-discovery;
+- source/target T0/T1 Z endstops, common correction, and the preserved relative Z check;
 - zero residual and acceptance evidence.
 
 ### Chapter 2 — Toolhead alignment (step 4)
@@ -696,9 +704,12 @@ All three chapters remain visible after completion. A failed current run remains
 visible with its precise stopping condition, while the header can still link to
 the last successful full calibration.
 
-### Printer-console events
+### Live printer context and console
 
-Human-readable `RESPOND` messages mirror the dashboard milestones:
+The top of the page mirrors the useful parts of Mainsail without leaving the
+calibration workflow: printer state and homed coordinates, the main printer
+camera, and the live Moonraker G-code console. Human-readable `RESPOND`
+messages remain visible there alongside motion commands and Eddy diagnostics:
 
 ```text
 IDEX calibration: batch started; preflight passed

@@ -33,18 +33,30 @@ class FakeClient:
 
     def status(self, *objects):
         index = len(self.commands)
+        command = next(
+            (value for value in reversed(self.commands) if value.startswith("_EDDY_TAP_MEASURE")),
+            "",
+        )
+        count = int(next((part.split("=", 1)[1] for part in command.split() if part.startswith("COUNT=")), "1"))
+        samples = [
+            {"x": 150.0, "y": 150.0, "z": -0.001 * (index + offset)}
+            for offset in range(count)
+        ]
         return {
             "eddy_tap_measure": {
                 "last_tap_measurement": {
                     "tap": {
                         "status": "completed",
-                        "samples": [{"x": 150.0, "y": 150.0, "z": -0.001 * index}],
+                        "samples": samples,
                     },
                     "mesh": {"active_transform_z": None},
                 }
             },
             "gcode_move": {"homing_origin": [0, 0, 0, 0]},
-            "toolhead": {"position": [150, 150, 2, 0]},
+            "toolhead": {
+                "position": [150, 150, 2, 0],
+                "axis_minimum": [0, 0, -2.2, 0],
+            },
             "idex_manual_tuning": {"active_tool": 0, "manual_z_adjust": 0},
             "temperature_probe btt_eddy": {"temperature": 40.0},
             "configfile": {
@@ -55,6 +67,32 @@ class FakeClient:
                 }
             },
         }
+
+
+def test_initial_discovery_uses_single_tap_bands():
+    runner = load_runner()
+    client = FakeClient()
+    dashboard = FakeDashboard()
+
+    result = runner.discover_reference(
+        client,
+        dashboard,
+        x=150.0,
+        y=150.0,
+        phase="initial",
+    )
+
+    assert result["bands"][0]["status"] == "contact"
+    measurement_commands = [
+        command
+        for command in client.commands
+        if command.startswith("_EDDY_TAP_MEASURE")
+    ]
+    assert len(measurement_commands) == 1
+    assert "COUNT=1" in measurement_commands[0]
+    assert "START_Z=10.000000" in measurement_commands[0]
+    assert "TAP_TARGET_Z=6.000000" in measurement_commands[0]
+    assert "SAMPLE_RETRACT_DIST=4.000000" in measurement_commands[0]
 
 
 def test_post_rebase_reference_uses_fixed_window_without_discovery():
@@ -80,9 +118,8 @@ def test_post_rebase_reference_uses_fixed_window_without_discovery():
         for command in client.commands
         if command.startswith("_EDDY_TAP_MEASURE")
     ]
-    assert len(measurement_commands) == 5
-    assert all("START_Z=2.000000" in command for command in measurement_commands)
-    assert all("TAP_TARGET_Z=-1.000000" in command for command in measurement_commands)
-    assert all(
-        "SAMPLE_RETRACT_DIST=4.000000" in command for command in measurement_commands
-    )
+    assert len(measurement_commands) == 1
+    assert "COUNT=5" in measurement_commands[0]
+    assert "START_Z=2.000000" in measurement_commands[0]
+    assert "TAP_TARGET_Z=-1.000000" in measurement_commands[0]
+    assert "SAMPLE_RETRACT_DIST=4.000000" in measurement_commands[0]

@@ -60,6 +60,8 @@ REMOTE_DASHBOARD_ROOT = "/home/pi/printer_data/calibration"
 REFERENCE_TAP_COUNT = 5
 REFERENCE_MAX_SPAN_MM = 0.030
 REFERENCE_ZERO_TOLERANCE_MM = 0.030
+INITIAL_PREPARE_Z_MM = 30.0
+INITIAL_PREPARE_SPEED_MM_MIN = 8000.0
 DISCOVERY_START_Z_MM = 10.0
 DISCOVERY_BAND_MM = 4.0
 # Move the four-millimetre window down by only one millimetre at a time.  Thus
@@ -341,6 +343,14 @@ def prepare_t0(client: Moonraker) -> bool:
         client.gcode("T0\nM400", timeout=180)
     else:
         client.gcode("\n".join((*preparation_commands, "T0", "M400")), timeout=180)
+    # Move once to a sensible working height after preparation. The tap
+    # transaction owns its five-tap motion and restores this height only after
+    # the batch, so callers never pay this move per tap.
+    client.gcode(
+        "G90\nG1 Z%.3f F%.0f\nM400"
+        % (INITIAL_PREPARE_Z_MM, INITIAL_PREPARE_SPEED_MM_MIN),
+        timeout=60,
+    )
     status = require_ready(client)
     if status.get("idex_manual_tuning", {}).get("active_tool") != 0:
         raise CalibrationError("T0 is not physically active after preparation")
@@ -365,11 +375,12 @@ def reference_sample(
     start_z: float,
     target_z: float,
     retract: float,
+    count: int = 1,
     allow_rejected: bool = False,
 ) -> dict[str, Any]:
     rejected = " ALLOW_REJECTED=1" if allow_rejected else ""
     client.gcode(
-        f"_EDDY_TAP_MEASURE X={x:.3f} Y={y:.3f} COUNT=1 EDDY_MODE=none "
+        f"_EDDY_TAP_MEASURE X={x:.3f} Y={y:.3f} COUNT={count:d} EDDY_MODE=none "
         f"START_Z={start_z:.6f} TAP_TARGET_Z={target_z:.6f} "
         f"SAMPLE_RETRACT_DIST={retract:.6f}{rejected}",
         timeout=90,
@@ -412,11 +423,13 @@ def reference_sample(
             "diagnostics": tap.get("diagnostics", {}),
         }
     samples = tap.get("samples")
-    if not isinstance(samples, list) or len(samples) != 1:
-        raise CalibrationError("EDDY_TAP_MEASURE did not publish exactly one tap")
-    sample = samples[0]
-    if abs(float(sample["x"]) - x) > 0.020 or abs(float(sample["y"]) - y) > 0.020:
-        raise CalibrationError("Eddy Tap contact occurred at the wrong XY coordinate")
+    if not isinstance(samples, list) or len(samples) != count:
+        raise CalibrationError(
+            f"EDDY_TAP_MEASURE did not publish exactly {count} tap(s)"
+        )
+    for sample in samples:
+        if abs(float(sample["x"]) - x) > 0.020 or abs(float(sample["y"]) - y) > 0.020:
+            raise CalibrationError("Eddy Tap contact occurred at the wrong XY coordinate")
     if measurement.get("mesh", {}).get("active_transform_z") is not None:
         raise CalibrationError("reference Tap unexpectedly used an active mesh")
     tuning = status.get("idex_manual_tuning", {})
@@ -425,19 +438,35 @@ def reference_sample(
         or abs(float(tuning.get("manual_z_adjust", 0))) > 1e-9
     ):
         raise CalibrationError("reference Tap did not use clean T0 state")
-    return {
-        "status": "contact",
-        "index": index,
+    common = {
         "phase": phase,
-        "x": float(sample["x"]),
-        "y": float(sample["y"]),
-        "z": float(sample["z"]),
         "temperature_c": status.get("temperature_probe btt_eddy", {}).get(
             "temperature"
         ),
         "gcode_origin": status.get("gcode_move", {}).get("homing_origin"),
         "machine_position": status.get("toolhead", {}).get("position"),
         "config_fingerprint": config_fingerprint(status),
+    }
+    if count == 1:
+        sample = samples[0]
+        return {
+            "status": "contact",
+            "index": index,
+            "x": float(sample["x"]),
+            "y": float(sample["y"]),
+            "z": float(sample["z"]),
+            **common,
+        }
+    return {
+        "status": "contact_batch",
+        "index": index,
+        "x": x,
+        "y": y,
+        "samples": [
+            {"x": float(sample["x"]), "y": float(sample["y"]), "z": float(sample["z"])}
+            for sample in samples
+        ],
+        **common,
     }
 
 
@@ -596,23 +625,38 @@ def collect_reference(
         "target_z": target_z,
         "retract": NARROW_RETRACT_MM,
     }
-    samples = []
-    for index in range(REFERENCE_TAP_COUNT):
-        sample = reference_sample(
-            client,
-            x=x,
-            y=y,
-            index=index + 1,
-            phase=phase,
-            start_z=start_z,
-            target_z=target_z,
-            retract=NARROW_RETRACT_MM,
+    # Keep the five verification taps in one transaction. The Klipper helper
+    # moves to the reference height once, performs the complete batch, and
+    # restores the caller's height only after the final tap.
+    batch = reference_sample(
+        client,
+        x=x,
+        y=y,
+        index=1,
+        phase=phase,
+        start_z=start_z,
+        target_z=target_z,
+        retract=NARROW_RETRACT_MM,
+        count=REFERENCE_TAP_COUNT,
+    )
+    if batch["status"] != "contact_batch":
+        raise CalibrationError(
+            f"{phase} reference batch did not produce {REFERENCE_TAP_COUNT} taps"
         )
-        if sample["status"] != "contact":
-            raise CalibrationError(
-                f"{phase} reference tap {index + 1}/{REFERENCE_TAP_COUNT} "
-                "did not trigger"
-            )
+    samples = []
+    for index, raw_sample in enumerate(batch["samples"], 1):
+        sample = {
+            "status": "contact",
+            "index": index,
+            "phase": phase,
+            "x": float(raw_sample["x"]),
+            "y": float(raw_sample["y"]),
+            "z": float(raw_sample["z"]),
+            "temperature_c": batch.get("temperature_c"),
+            "gcode_origin": batch.get("gcode_origin"),
+            "machine_position": batch.get("machine_position"),
+            "config_fingerprint": batch.get("config_fingerprint"),
+        }
         samples.append(sample)
         summary = summarize(samples)
         dashboard.bed["stage"] = phase
@@ -625,7 +669,7 @@ def collect_reference(
             "summary": summary,
         }
         message = (
-            f"Eddy reference {phase} tap {index + 1}/{REFERENCE_TAP_COUNT}: "
+            f"Eddy reference {phase} tap {index}/{REFERENCE_TAP_COUNT}: "
             f"Z={sample['z']:.6f} mm"
         )
         dashboard.event(message, status="running")

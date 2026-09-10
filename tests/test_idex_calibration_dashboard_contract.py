@@ -23,14 +23,57 @@ def load_tool_runner():
 def test_dashboard_uses_three_ordered_chapters():
     html = (DASHBOARD / "index.html").read_text(encoding="utf-8")
     script = (DASHBOARD / "app.js").read_text(encoding="utf-8")
+    style = (DASHBOARD / "style.css").read_text(encoding="utf-8")
     assert "Chapter 1 · steps 1–3" in html
     assert "Chapter 2 · step 4" in html
     assert "Chapter 3 · steps 5–7" in html
     assert "Chapter 1A" not in html
     assert "Chapter 1B" not in html
     assert 'id="last-successful"' in html
+    assert 'class="printer-panels"' in html
+    assert 'id="printer-console"' in html
+    assert 'src="/webcam/?action=stream"' in html
+    assert "Units: coordinates, absolute Z, and the common Z correction are shown in mm" in html
+    assert 'id="events"' not in html
     assert "last_successful.json" in script
     assert "run_scope" in script or "partial" in script
+    for label in (
+        "Bed Center Z=0 measurement",
+        "Bed Center Z=0 calibration update",
+        "Bed Center Z=0 verification",
+        "T0/T1 toolhead alignment",
+        "Acquire and save the Tap mesh",
+        "Redeploy and verify the mesh",
+        "Same-batch readiness",
+    ):
+        assert label in script
+    for roadmap_id in (
+        'id="bed-reference-roadmap"',
+        'id="tool-alignment-roadmap"',
+        'id="bed-mesh-roadmap"',
+    ):
+        assert roadmap_id in html
+    assert "WORKFLOW_STEPS" in script
+    assert "renderRoadmap" in script
+    assert "refreshPrinterContext" in script
+    assert "formatMillimetres" in script
+    assert "formatConsoleTimestamp" in script
+    assert "dashboardContentHash" in script
+    assert "slice(-60).reverse()" in script
+    assert "printerConsole.scrollTop = 0" in script
+    assert "Initial discovery taps" in script
+    assert "Post-correction verification taps" in script
+    assert 'Bed centre</dt><dd>(150, 150), target Z=0 mm' in script
+    assert '<th>Z (${discovery ? "mm" : "µm"})</th>' in script
+    assert 'X (mm)</th><th>Y (mm)' not in script
+    assert "/printer/objects/query?webhooks&toolhead&gcode_move&print_stats&extruder&extruder1&heater_bed" in script
+    assert "/server/gcode_store?count=80" in script
+    assert "humaniseConsoleMessage" in script
+    assert 'bedReferenceChapter.hidden = false' in script
+    assert 'bedMeshChapter.hidden = false' in script
+    for state in ("pending", "running", "passed", "failed", "blocked"):
+        assert f".workflow-step.{state}" in style
+    assert "border-bottom: 1px solid #2b3745" in style
 
 
 def test_mesh_refresh_is_a_no_argument_mesh_phase_wrapper():

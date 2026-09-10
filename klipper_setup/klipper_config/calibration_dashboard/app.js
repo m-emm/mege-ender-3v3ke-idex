@@ -1,7 +1,6 @@
 const headline = document.querySelector("#headline");
 const lastSuccessful = document.querySelector("#last-successful");
 const updated = document.querySelector("#updated");
-const events = document.querySelector("#events");
 const calibrationChapter = document.querySelector("#calibration-chapter");
 const calibrationState = document.querySelector("#calibration-state");
 const calibrationTools = document.querySelector("#calibration-tools");
@@ -11,18 +10,87 @@ const verificationState = document.querySelector("#verification-state");
 const verificationTools = document.querySelector("#verification-tools");
 const verificationOutcome = document.querySelector("#verification-outcome");
 const readiness = document.querySelector("#readiness");
+const printerState = document.querySelector("#printer-state");
+const printerX = document.querySelector("#printer-x");
+const printerY = document.querySelector("#printer-y");
+const printerZ = document.querySelector("#printer-z");
+const printerHomed = document.querySelector("#printer-homed");
+const printerPrintState = document.querySelector("#printer-print-state");
+const printerTemperatures = document.querySelector("#printer-temperatures");
+const consoleState = document.querySelector("#console-state");
+const printerConsole = document.querySelector("#printer-console");
 const bedReferenceChapter = document.querySelector("#bed-reference-chapter");
 const bedReferenceState = document.querySelector("#bed-reference-state");
 const toolAlignmentChapter = document.querySelector("#tool-alignment-chapter");
 const toolAlignmentState = document.querySelector("#tool-alignment-state");
 const bedMeshChapter = document.querySelector("#bed-mesh-chapter");
 const bedMeshState = document.querySelector("#bed-mesh-state");
+const bedReferenceRoadmap = document.querySelector("#bed-reference-roadmap");
+const toolAlignmentRoadmap = document.querySelector("#tool-alignment-roadmap");
+const bedMeshRoadmap = document.querySelector("#bed-mesh-roadmap");
 const bedReference = document.querySelector("#bed-reference");
 const bedMesh = document.querySelector("#bed-mesh");
 const empty = document.querySelector("#empty");
 const plotModal = document.querySelector("#plot-modal");
 const plotModalImage = document.querySelector("#plot-modal-image");
 const plotModalClose = document.querySelector("#plot-modal-close");
+
+const WORKFLOW_STEPS = Object.freeze([
+  {
+    number: 1,
+    chapter: "bed-reference",
+    title: "Bed Center Z=0 measurement",
+    description: "Find the rough bed reference at the centre with overlapping guarded Eddy bands.",
+  },
+  {
+    number: 2,
+    chapter: "bed-reference",
+    title: "Bed Center Z=0 calibration update",
+    description: "Apply one common Z correction to both toolheads and deploy the new datum.",
+  },
+  {
+    number: 3,
+    chapter: "bed-reference",
+    title: "Bed Center Z=0 verification",
+    description: "Verify five T0 centre taps from Z=2 mm toward Z=-1 mm; no discovery is repeated.",
+  },
+  {
+    number: 4,
+    chapter: "tool-alignment",
+    title: "T0/T1 toolhead alignment",
+    description: "Align X/Y/Z with 26-contact ball calibration and nine-contact verification.",
+  },
+  {
+    number: 5,
+    chapter: "bed-mesh",
+    title: "Acquire and save the Tap mesh",
+    description: "Measure the bed surface and persist the accepted matrix to calib.yaml.",
+  },
+  {
+    number: 6,
+    chapter: "bed-mesh",
+    title: "Redeploy and verify the mesh",
+    description: "Regenerate, redeploy, reload, and prove the active mesh matches the accepted matrix.",
+  },
+  {
+    number: 7,
+    chapter: "bed-mesh",
+    title: "Same-batch readiness",
+    description: "Declare READY TO PRINT only after the complete full calibration chain passes.",
+  },
+]);
+
+const WORKFLOW_STATUS_LABELS = Object.freeze({
+  pending: "Pending",
+  running: "In progress",
+  passed: "Passed",
+  failed: "Failed",
+  blocked: "Blocked",
+});
+
+let dashboardContentHash = "";
+let printerStatusContentHash = "";
+let printerConsoleContentHash = "";
 
 // This is deliberately much flatter than a literal Z plot.  The probe only
 // measures a shallow ball cap; preserving the former independent Z fit made
@@ -40,10 +108,35 @@ function format(value, digits = 3) {
   return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : "—";
 }
 
+function formatMillimetres(value, digits = 3) {
+  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(digits)} mm` : "—";
+}
+
 function formatMicrometres(value, digits = 1) {
   return Number.isFinite(Number(value))
     ? `${(Number(value) * 1000).toFixed(digits)} µm`
     : "—";
+}
+
+function formatTemperature(value) {
+  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)} °C` : "—";
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function contentHash(value) {
+  let hash = 2166136261;
+  for (const character of stableStringify(value)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
 }
 
 function conciseError(error) {
@@ -83,18 +176,18 @@ function summaryNumbers(run) {
   const summary = run.summary || {};
   if (summary.phase_3?.refined_center || summary.phase_2?.refined_center) {
     const center = summary.phase_3?.refined_center || summary.phase_2.refined_center;
-    return [["Centre X", center.x], ["Centre Y", center.y], ["Summit Z", summary.phase_1?.summit?.trigger_z]];
+    return [["Centre X", center.x, "mm"], ["Centre Y", center.y, "mm"], ["Summit Z", summary.phase_1?.summit?.trigger_z, "mm"]];
   }
   if (summary.estimated_center) {
     const center = summary.estimated_center;
-    return [["Centre X", center.x], ["Centre Y", center.y], ["Centre Z", center.trigger_z]];
+    return [["Centre X", center.x, "mm"], ["Centre Y", center.y, "mm"], ["Centre Z", center.trigger_z, "mm"]];
   }
   const verificationCentre = verificationCentreContact(run);
   if (verificationCentre) {
-    return [["Centre X", verificationCentre.commanded_x], ["Centre Y", verificationCentre.commanded_y], ["Centre Z", verificationCentre.trigger_z]];
+    return [["Centre X", verificationCentre.commanded_x, "mm"], ["Centre Y", verificationCentre.commanded_y, "mm"], ["Centre Z", verificationCentre.trigger_z, "mm"]];
   }
   const latest = latestMeasurement(run) || {};
-  return [["Latest X", latest.commanded_x], ["Latest Y", latest.commanded_y], ["Trigger Z", latest.trigger_z]];
+  return [["Latest X", latest.commanded_x, "mm"], ["Latest Y", latest.commanded_y, "mm"], ["Trigger Z", latest.trigger_z, "mm"]];
 }
 
 function calculationDetails(run) {
@@ -118,7 +211,7 @@ function calculationDetails(run) {
   if (summary.harmonic) {
     return `<dl class="calculation-details">
       <dt>Ring correction</dt><dd>ΔX ${formatMicrometres(summary.harmonic.dx_mm)} · ΔY ${formatMicrometres(summary.harmonic.dy_mm)}</dd>
-      <dt>Periphery Z</dt><dd>mean ${format(summary.periphery_mean_z, 4)} mm · σ ${formatMicrometres(summary.periphery_z_standard_deviation)}</dd>
+      <dt>Periphery Z</dt><dd>mean ${formatMillimetres(summary.periphery_mean_z)} · σ ${formatMicrometres(summary.periphery_z_standard_deviation)}</dd>
     </dl>`;
   }
   return "";
@@ -211,7 +304,7 @@ function plotButton(source, alt) {
 
 function renderTool(tool, run, priors) {
   const [status, progress] = [run.state || "running", run.progress || {}];
-  const numbers = summaryNumbers(run).map(([label, value]) => `<div class="number"><span>${label}</span><strong>${format(value)}</strong></div>`).join("");
+  const numbers = summaryNumbers(run).map(([label, value, unit]) => `<div class="number"><span>${label}</span><strong>${format(value)} <small>${unit}</small></strong></div>`).join("");
   return `<article class="tool"><h2>${tool}</h2>
     <div class="state ${escapeHtml(status)}">${escapeHtml(status)} · ${progress.completed || 0}/${progress.total || "?"} contacts</div>
     <div class="numbers">${numbers}</div>
@@ -237,10 +330,10 @@ function renderOffsetCard(calibration) {
   const rows = ["X", "Y", "Z"].map((axis) => {
     const sourceOffset = endstopOffset(source, axis);
     const appliedOffset = endstopOffset(applied, axis);
-    return `<tr><td>${axis}</td><td>${format(sourceOffset, 4)} mm</td><td>${format(appliedOffset, 4)} mm</td><td>${format(appliedOffset - sourceOffset, 4)} mm</td></tr>`;
+    return `<tr><td>${axis}</td><td>${format(sourceOffset)}</td><td>${format(appliedOffset)}</td><td>${format(appliedOffset - sourceOffset)}</td></tr>`;
   }).join("");
   return `<article class="outcome-card"><h2>T1−T0 endstop offsets</h2>
-    <table class="offset-table"><thead><tr><th>Axis</th><th>Source</th><th>Applied</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="offset-table"><thead><tr><th>Axis</th><th>Source (mm)</th><th>Applied (mm)</th><th>Change (mm)</th></tr></thead><tbody>${rows}</tbody></table>
     <p>Endstop offsets, not raw T1 values.</p></article>`;
 }
 
@@ -254,9 +347,9 @@ function calibrationCards(entry) {
   return `${renderOffsetCard(calibration)}
     <article class="outcome-card"><h2>Absolute ball target</h2><dl>
       <dt>Target</dt><dd>X=${format(target.x, 3)}, Y=${format(target.y, 3)} mm</dd>
-      <dt>T0 measured</dt><dd>X=${format(centres.t0?.x, 4)}, Y=${format(centres.t0?.y, 4)}</dd>
+      <dt>T0 measured</dt><dd>X=${format(centres.t0?.x, 3)}, Y=${format(centres.t0?.y, 3)} mm</dd>
       <dt>T0 target error</dt><dd>X=${formatMicrometres(errors.t0?.x)}, Y=${formatMicrometres(errors.t0?.y)}</dd>
-      <dt>T1 measured</dt><dd>X=${format(centres.t1?.x, 4)}, Y=${format(centres.t1?.y, 4)}</dd>
+      <dt>T1 measured</dt><dd>X=${format(centres.t1?.x, 3)}, Y=${format(centres.t1?.y, 3)} mm</dd>
       <dt>T1 target error</dt><dd>X=${formatMicrometres(errors.t1?.x)}, Y=${formatMicrometres(errors.t1?.y)}</dd>
     </dl></article>
     <article class="outcome-card"><h2>Measured T1−T0 calibration</h2><dl>
@@ -273,8 +366,8 @@ function verificationCentreProgressCard(entry) {
   if (!t0 && !t1) return "";
   const delta = t0 && t1 ? Number(t1.trigger_z) - Number(t0.trigger_z) : undefined;
   return `<article class="outcome-card"><h2>Live physical centre-Z comparison</h2><dl>
-    <dt>T0 centre Z</dt><dd>${t0 ? `${format(t0.trigger_z, 4)} mm` : "waiting for first contact"}</dd>
-    <dt>T1 centre Z</dt><dd>${t1 ? `${format(t1.trigger_z, 4)} mm` : "waiting for first contact"}</dd>
+    <dt>T0 centre Z</dt><dd>${t0 ? formatMillimetres(t0.trigger_z) : "waiting for first contact"}</dd>
+    <dt>T1 centre Z</dt><dd>${t1 ? formatMillimetres(t1.trigger_z) : "waiting for first contact"}</dd>
     <dt>T1−T0 centre ΔZ</dt><dd>${formatMicrometres(delta)}</dd>
   </dl><p>Captured by the first centre contact; ring contacts do not change it.</p></article>`;
 }
@@ -343,19 +436,146 @@ function normaliseChapters(data) {
   return { tool_alignment: chapters };
 }
 
+function chapterForStep(chapters, chapter) {
+  if (chapter === "bed-reference" || chapter === "bed-mesh") {
+    return chapters.bed_calibration || {};
+  }
+  return chapters.tool_alignment || {};
+}
+
+function stepEvidence(data, chapters) {
+  const bed = chapters.bed_calibration || {};
+  const reference = bed.reference || {};
+  const before = reference.before_rebase || {};
+  const after = reference.after_rebase || {};
+  const rebase = reference.rebase || {};
+  const alignment = chapters.tool_alignment || {};
+  const calibration = alignment.calibration || {};
+  const verification = alignment.verification || {};
+  const verificationData = verification.report?.data || {};
+  const mesh = bed.mesh || {};
+  const meshProgress = mesh.progress || {};
+  const meshComplete = Number(meshProgress.completed || 0) >= Number(meshProgress.total || 1);
+  const afterTapCount = Math.max(
+    Number(after.progress?.completed || 0),
+    Array.isArray(after.samples) ? after.samples.length : 0,
+  );
+  const beforeTapCount = Math.max(
+    Number(before.progress?.completed || 0),
+    Array.isArray(before.samples) ? before.samples.length : 0,
+  );
+  const beforeComplete = beforeTapCount >= 5;
+  const afterComplete = afterTapCount >= 5;
+
+  const evidence = [
+    Boolean((before.summary || before.discovery) && beforeComplete),
+    Boolean(rebase.target_endstops || rebase.target_config_fingerprint),
+    Boolean(after.summary && afterComplete),
+    calibration.status === "completed" && verificationData.passed === true,
+    mesh.status === "completed" || mesh.status === "passed" || meshComplete,
+    mesh.verification?.status === "passed" && mesh.verification?.active === true,
+  ];
+  return [...evidence, data.run_scope === "full" && data.readiness?.printable === true && evidence.every(Boolean)];
+}
+
+function stepFromStage(data, chapters, passed) {
+  const stage = String(data.stage || "").toLowerCase();
+  if (stage.includes("mesh_deployment")) return 6;
+  if (stage.includes("mesh_acquisition")) return 5;
+  if (stage.includes("tool_alignment")) return 4;
+  if (stage.includes("reference_deployment")) return 2;
+  if (stage.includes("bed_calibration.reference")) {
+    return passed[1] ? 3 : (passed[0] ? 2 : 1);
+  }
+  if (stage.includes("completed")) return 7;
+
+  const bed = chapters.bed_calibration || {};
+  const reference = bed.reference || {};
+  const before = reference.before_rebase || {};
+  const beforeTapCount = Math.max(
+    Number(before.progress?.completed || 0),
+    Array.isArray(before.samples) ? before.samples.length : 0,
+  );
+  const after = reference.after_rebase || {};
+  const afterTapCount = Math.max(
+    Number(after.progress?.completed || 0),
+    Array.isArray(after.samples) ? after.samples.length : 0,
+  );
+  if (reference.rebase && afterTapCount < 5) return 3;
+  if (reference.before_rebase && !reference.rebase) return beforeTapCount >= 5 ? 2 : 1;
+  if (bed.mesh?.verification && !passed[5]) return 6;
+  if (Object.keys(bed.mesh || {}).length && !passed[4]) return 5;
+  return passed.findIndex((value) => !value) + 1 || 7;
+}
+
+function runScopeIncludesStep(scope, number) {
+  if (!scope || scope === "full") return true;
+  if (scope === "bed_reference") return number <= 3;
+  if (scope === "tool_alignment") return number === 4;
+  if (scope === "mesh_refresh") return number >= 5 && number <= 6;
+  return false;
+}
+
+function deriveWorkflowSteps(data, chapters) {
+  const passed = stepEvidence(data, chapters);
+  const activeStep = data.status === "running" ? stepFromStage(data, chapters, passed) : null;
+  const failedStep = data.status === "failed" ? stepFromStage(data, chapters, passed) : null;
+  return WORKFLOW_STEPS.map((step) => {
+    let status = passed[step.number - 1] ? "passed" : "pending";
+    if (failedStep && step.number === failedStep) status = "failed";
+    else if (failedStep && step.number > failedStep) status = "blocked";
+    else if (activeStep === step.number && status !== "passed") status = "running";
+    let note = "";
+    if (status === "passed") note = "Evidence recorded for this batch.";
+    if (status === "running") note = "This is the active stage.";
+    if (status === "failed") note = conciseError(data.error || chapterForStep(chapters, step.chapter).error) || "The current run stopped here.";
+    if (status === "blocked") note = `Waiting for step ${failedStep} to pass before continuing.`;
+    if (status === "pending" && data.status !== "idle" && !runScopeIncludesStep(data.run_scope, step.number)) {
+      note = `Not part of this ${String(data.run_scope || "partial").replaceAll("_", " ")} run; a full batch is required.`;
+    }
+    return {...step, status, note};
+  });
+}
+
+function roadmapChapterStatus(chapter, steps) {
+  const states = steps.filter((step) => step.chapter === chapter).map((step) => step.status);
+  if (states.includes("failed")) return "failed";
+  if (states.includes("running")) return "running";
+  if (states.length && states.every((state) => state === "passed")) return "passed";
+  if (states.length && states.every((state) => state === "blocked")) return "blocked";
+  return "pending";
+}
+
+function renderRoadmap(data, chapters, steps = deriveWorkflowSteps(data, chapters)) {
+  const containers = {
+    "bed-reference": bedReferenceRoadmap,
+    "tool-alignment": toolAlignmentRoadmap,
+    "bed-mesh": bedMeshRoadmap,
+  };
+  const roadmapSteps = steps;
+  Object.entries(containers).forEach(([chapter, container]) => {
+    container.innerHTML = roadmapSteps.filter((step) => step.chapter === chapter).map((step) => `
+      <article class="workflow-step ${step.status}" data-step="${step.number}" aria-label="Step ${step.number}: ${escapeHtml(step.title)} — ${WORKFLOW_STATUS_LABELS[step.status]}">
+        <div class="workflow-step-heading"><span class="workflow-step-number">Step ${step.number}</span><strong>${WORKFLOW_STATUS_LABELS[step.status]}</strong></div>
+        <h3>${escapeHtml(step.title)}</h3>
+        <p>${escapeHtml(step.description)}</p>
+        ${step.note ? `<small>${escapeHtml(step.note)}</small>` : ""}
+      </article>`).join("");
+  });
+}
+
 function referenceCard(reference) {
   if (!reference || !Object.keys(reference).length) return "";
   const before = reference.before_rebase?.summary || {};
   const after = reference.after_rebase?.summary || {};
   const rebase = reference.rebase || {};
-  const target = reference.before_rebase?.target || reference.after_rebase?.target || {};
   return `<article class="outcome-card"><h2>Absolute bed Z datum</h2><dl>
-    <dt>Reference</dt><dd>X=${format(target.x, 3)}, Y=${format(target.y, 3)}, target Z=0</dd>
-    <dt>Before median</dt><dd>${formatMicrometres(before.median)}</dd>
-    <dt>Before span</dt><dd>${formatMicrometres(before.span)}</dd>
-    <dt>Common T0/T1 delta</dt><dd>${formatMicrometres(rebase.common_delta_mm)}</dd>
-    <dt>After median</dt><dd>${formatMicrometres(after.median)}</dd>
-    <dt>After span</dt><dd>${formatMicrometres(after.span)}</dd>
+    <dt>Bed centre</dt><dd>(150, 150), target Z=0 mm</dd>
+    <dt>Discovery median</dt><dd>${formatMillimetres(before.median)}</dd>
+    <dt>Discovery span</dt><dd>${formatMicrometres(before.span)}</dd>
+    <dt>Common T0/T1 correction</dt><dd>${formatMillimetres(rebase.common_delta_mm)}</dd>
+    <dt>Verification median</dt><dd>${formatMicrometres(after.median)}</dd>
+    <dt>Verification span</dt><dd>${formatMicrometres(after.span)}</dd>
     <dt>Relative Z preserved</dt><dd>${rebase.difference_preserved === true ? "YES" : "—"}</dd>
   </dl></article>`;
 }
@@ -364,9 +584,11 @@ function referenceSamples(reference) {
   return ["before_rebase", "after_rebase"].map((name) => {
     const item = reference?.[name];
     if (!item) return "";
-    const rows = (item.samples || []).map((sample) => `<tr><td>${sample.index}</td><td>${format(sample.x, 3)}</td><td>${format(sample.y, 3)}</td><td>${formatMicrometres(sample.z)}</td></tr>`).join("");
-    return `<article class="outcome-card"><h2>${name === "before_rebase" ? "Before common Z rebase" : "After deployment"}</h2>
-      <table class="offset-table"><thead><tr><th>Tap</th><th>X</th><th>Y</th><th>Z</th></tr></thead><tbody>${rows}</tbody></table></article>`;
+    const discovery = name === "before_rebase";
+    const rows = (item.samples || []).map((sample) => `<tr><td>${sample.index}</td><td>${discovery ? format(sample.z) : format(Number(sample.z) * 1000, 1)}</td></tr>`).join("");
+    return `<article class="outcome-card"><h2>${discovery ? "Initial discovery taps" : "Post-correction verification taps"}</h2>
+      <p class="measurement-note">${discovery ? "Banded descent finds the rough bed height; values are absolute Z in mm." : "Five fixed-window taps confirm logical Z=0; residuals are shown in µm."}</p>
+      <table class="offset-table"><thead><tr><th>Tap</th><th>Z (${discovery ? "mm" : "µm"})</th></tr></thead><tbody>${rows}</tbody></table></article>`;
   }).join("");
 }
 
@@ -378,29 +600,33 @@ function meshCard(mesh) {
   const percent = total ? Math.min(100, 100 * complete / total) : 0;
   const verification = mesh.verification || {};
   return `<article class="outcome-card"><h2>Persistent Tap mesh</h2>
-    <p>${escapeHtml(mesh.status || "preparing")} · ${complete}/${total || "?"} points${mesh.latest_point ? ` · latest X=${format(mesh.latest_point.x)} Y=${format(mesh.latest_point.y)}` : ""}</p>
+    <p>${escapeHtml(mesh.status || "preparing")} · ${complete}/${total || "?"} points${mesh.latest_point ? ` · latest X=${format(mesh.latest_point.x)} mm · Y=${format(mesh.latest_point.y)} mm` : ""}</p>
     <div class="mesh-progress"><span style="width:${percent}%"></span></div><dl>
-      <dt>Minimum</dt><dd>${formatMicrometres(mesh.minimum)}</dd>
-      <dt>Maximum</dt><dd>${formatMicrometres(mesh.maximum)}</dd>
-      <dt>Peak to peak</dt><dd>${formatMicrometres(mesh.range)}</dd>
+      <dt>Minimum</dt><dd>${formatMillimetres(mesh.minimum)}</dd>
+      <dt>Maximum</dt><dd>${formatMillimetres(mesh.maximum)}</dd>
+      <dt>Peak to peak</dt><dd>${formatMillimetres(mesh.range)}</dd>
       <dt>Zero reference</dt><dd>${Array.isArray(mesh.zero_reference_position) ? mesh.zero_reference_position.join(", ") : "—"}</dd>
       <dt>Matrix hash</dt><dd>${escapeHtml(String(mesh.matrix_sha256 || "—").slice(0, 12))}</dd>
       <dt>Deployed and active</dt><dd>${verification.active === true ? "YES" : "—"}</dd>
     </dl>${mesh.plot ? plotButton(mesh.plot, "Eddy Tap bed mesh") : ""}</article>`;
 }
 
-function renderBedChapters(entry) {
+function renderBedChapters(entry, referenceStatus = "pending", meshStatus = "pending") {
   const hasReference = Boolean(entry && Object.keys(entry.reference || {}).length);
   const hasMesh = Boolean(entry && Object.keys(entry.mesh || {}).length);
-  bedReferenceChapter.hidden = !hasReference;
-  bedMeshChapter.hidden = !hasMesh;
+  bedReferenceChapter.hidden = false;
+  bedMeshChapter.hidden = false;
+  bedReferenceState.textContent = referenceStatus;
+  bedMeshState.textContent = meshStatus;
   if (hasReference) {
-    bedReferenceState.textContent = entry.status || "recorded";
     bedReference.innerHTML = `${referenceCard(entry.reference)}${referenceSamples(entry.reference)}`;
+  } else {
+    bedReference.innerHTML = "";
   }
   if (hasMesh) {
-    bedMeshState.textContent = entry.status || "recorded";
     bedMesh.innerHTML = meshCard(entry.mesh);
+  } else {
+    bedMesh.innerHTML = "";
   }
 }
 
@@ -420,26 +646,154 @@ function render(data) {
   const error = conciseError(data.error);
   headline.textContent = `${data.status || "unknown"}: ${data.stage || data.workflow || "IDEX calibration"}${error ? ` — ${error}` : ""}`;
   updated.textContent = data.updated_at ? `Updated ${new Date(data.updated_at).toLocaleTimeString()}` : "";
-  events.innerHTML = (data.events || []).slice(-6).reverse().map((event) => `<span class="event">${escapeHtml(event.message)}</span>`).join("");
   const chapters = normaliseChapters(data);
+  const roadmapSteps = deriveWorkflowSteps(data, chapters);
+  renderRoadmap(data, chapters, roadmapSteps);
   const alignment = chapters.tool_alignment || {};
   const priors = data.configured_priors;
   const hasAlignment = Boolean(alignment.calibration || alignment.verification);
-  toolAlignmentChapter.hidden = !hasAlignment;
-  toolAlignmentState.textContent = alignment.status || data.status || "recorded";
+  toolAlignmentChapter.hidden = false;
+  toolAlignmentState.textContent = roadmapChapterStatus("tool-alignment", roadmapSteps);
   renderChapter(calibrationChapter, calibrationState, calibrationTools, calibrationOutcome, alignment.calibration, priors, calibrationCards(alignment.calibration));
   renderChapter(verificationChapter, verificationState, verificationTools, verificationOutcome, alignment.verification, priors, `${verificationCentreProgressCard(alignment.verification)}${verificationCards(alignment.verification)}`);
-  renderBedChapters(chapters.bed_calibration);
+  renderBedChapters(
+    chapters.bed_calibration,
+    roadmapChapterStatus("bed-reference", roadmapSteps),
+    roadmapChapterStatus("bed-mesh", roadmapSteps),
+  );
   const printable = data.readiness?.printable === true;
   const partial = data.status === "completed" && !printable;
   const failed = data.status === "failed" || partial || (data.readiness?.reasons || []).length > 0;
   readiness.className = `readiness ${printable ? "ready" : (failed ? "failed" : "calibrating")}`;
   readiness.textContent = printable ? "READY TO PRINT" : (failed ? "NOT READY TO PRINT" : "CALIBRATING");
-  empty.hidden = Boolean(hasAlignment || chapters.bed_calibration);
+  empty.hidden = Boolean(hasAlignment || chapters.bed_calibration || data.status !== "idle");
   const previous = data.last_successful_batch_id;
   lastSuccessful.textContent = previous && previous !== data.batch_id
     ? `Last fully verified printable batch: ${previous}`
     : "";
+}
+
+function setPrinterText(element, value) {
+  if (element) element.textContent = value;
+}
+
+function renderPrinterStatus(payload) {
+  const status = payload?.result?.status || {};
+  const webhooks = status.webhooks || {};
+  const toolhead = status.toolhead || {};
+  const motion = status.gcode_move || {};
+  const printStats = status.print_stats || {};
+  const position = motion.gcode_position || motion.position || toolhead.position || [];
+  const state = webhooks.state || "unknown";
+  const temperatures = [
+    ["T0", status.extruder?.temperature],
+    ["T1", status.extruder1?.temperature],
+    ["Bed", status.heater_bed?.temperature],
+  ].filter(([, value]) => Number.isFinite(Number(value)));
+  const view = {
+    state,
+    stateMessage: webhooks.state_message || "",
+    position: position.slice(0, 3).map((value) => format(value)),
+    homedAxes: toolhead.homed_axes || "not homed",
+    printState: printStats.state || "standby",
+    temperatures: temperatures.map(([name, value]) => [name, Number(value).toFixed(1)]),
+  };
+  const statusHash = contentHash(view);
+  if (statusHash === printerStatusContentHash) return;
+  printerStatusContentHash = statusHash;
+  setPrinterText(printerState, `${state}${webhooks.state_message ? ` · ${webhooks.state_message}` : ""}`);
+  setPrinterText(printerX, `${format(position[0])} mm`);
+  setPrinterText(printerY, `${format(position[1])} mm`);
+  setPrinterText(printerZ, `${format(position[2])} mm`);
+  setPrinterText(printerHomed, toolhead.homed_axes || "not homed");
+  setPrinterText(printerPrintState, printStats.state || "standby");
+  setPrinterText(printerTemperatures, temperatures.length
+    ? temperatures.map(([name, value]) => `${name} ${formatTemperature(value)}`).join(" · ")
+    : "—");
+}
+
+function formatConsoleTimestamp(value) {
+  const milliseconds = Number(value) * 1000;
+  if (!Number.isFinite(milliseconds)) return "—:—:—";
+  return new Date(milliseconds).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+function humaniseConsoleMessage(message) {
+  let text = String(message ?? "").replace(/\r/g, "").trim();
+  const respond = text.match(/^RESPOND TYPE=echo MSG="([\s\S]*)"$/);
+  if (respond) text = `echo: ${respond[1].replace(/\\"/g, '"')}`;
+  return text
+    .replaceAll("before_rebase", "initial discovery")
+    .replaceAll("after_rebase", "post-correction verification");
+}
+
+function consoleLines(entries) {
+  const normalised = (entries || []).flatMap((entry) => {
+    const message = humaniseConsoleMessage(entry.message);
+    return message.split("\n").map((line) => ({
+      line: line.trim(),
+      type: entry.type || "response",
+      time: entry.time,
+    })).filter((item) => item.line);
+  });
+  const seenResponses = new Set();
+  return normalised.filter((item, index) => {
+    const next = normalised[index + 1];
+    if (item.type === "command" && item.line.startsWith("echo: ") && next?.line === item.line) return false;
+    if (item.type !== "command" && item.line.startsWith("echo: ")) {
+      if (seenResponses.has(item.line)) return false;
+      seenResponses.add(item.line);
+    }
+    return index === 0 || normalised[index - 1].line !== item.line;
+  });
+}
+
+function renderPrinterConsole(payload) {
+  const entries = payload?.result?.gcode_store || [];
+  // The gcode store is chronological (oldest first), while Mainsail presents
+  // the newest console entry at the top. Keep the bounded window, then invert
+  // it for the operator-facing view.
+  const lines = consoleLines(entries).slice(-60).reverse();
+  const consoleHash = contentHash(lines);
+  if (consoleHash === printerConsoleContentHash) return;
+  printerConsoleContentHash = consoleHash;
+  setPrinterText(consoleState, `${lines.length} recent lines`);
+  if (printerConsole) {
+    printerConsole.innerHTML = lines.length
+      ? lines.map((item) => `<span class="console-line ${item.type === "command" ? "command" : "response"}"><span class="console-time">${escapeHtml(formatConsoleTimestamp(item.time))}</span><span>${escapeHtml(item.line)}</span></span>`).join("")
+      : "No console output yet.";
+    // Newest entries are at the top, so keep the viewport anchored there.
+    printerConsole.scrollTop = 0;
+  }
+}
+
+async function refreshPrinterContext() {
+  const [statusResult, consoleResult] = await Promise.allSettled([
+    fetch("/printer/objects/query?webhooks&toolhead&gcode_move&print_stats&extruder&extruder1&heater_bed", { cache: "no-store" }).then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    }),
+    fetch("/server/gcode_store?count=80", { cache: "no-store" }).then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    }),
+  ]);
+  if (statusResult.status === "fulfilled") {
+    renderPrinterStatus(statusResult.value);
+  } else {
+    setPrinterText(printerState, "Unavailable");
+  }
+  if (consoleResult.status === "fulfilled") {
+    renderPrinterConsole(consoleResult.value);
+  } else {
+    setPrinterText(consoleState, "Unavailable");
+    setPrinterText(printerConsole, "Moonraker console unavailable.");
+  }
 }
 
 function closePlot() { plotModal.close(); }
@@ -470,7 +824,11 @@ async function refresh() {
     } catch (_) {
       // The current snapshot remains useful when no successful history exists.
     }
-    render(current);
+    const currentHash = contentHash(current);
+    if (currentHash !== dashboardContentHash) {
+      dashboardContentHash = currentHash;
+      render(current);
+    }
   } catch (error) {
     headline.textContent = `Calibration dashboard unavailable: ${error.message}`;
   }
@@ -478,3 +836,5 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 1000);
+refreshPrinterContext();
+setInterval(refreshPrinterContext, 1000);

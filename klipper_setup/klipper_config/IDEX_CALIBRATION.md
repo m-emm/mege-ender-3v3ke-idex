@@ -54,7 +54,7 @@ Rerun only tool alignment and fixed-target verification:
 scripts/run_multi_head_zero_contact_map.sh
 ```
 
-Run only the Eddy centre reference/rebase and its post-deploy check:
+Run only the Eddy centre reference and its post-correction verification:
 
 ```bash
 IDEX_EDDY_PHASE=reference scripts/run_eddy_tap_bed_calibration.sh
@@ -70,7 +70,10 @@ These are complete workflows, not preparation for manual edits.
 
 ## Acceptance criteria
 
-Tool verification requires both recovered centres to be within 0.05 mm of
+The dashboard calls the two bed-reference phases **Initial discovery** and
+**Post-correction verification**. Those names replace ambiguous before/after
+wording; `before_rebase` and `after_rebase` are retained only as internal JSON
+keys. Tool verification requires both recovered centres to be within 0.05 mm of
 `(75,-9)`, paired X/Y within 0.05 mm, and direct centre T1−T0 Z within 0.02 mm.
 Bed reference requires a repeatable pre-rebase series and a post-deployment
 median within 0.030 mm of zero. The stored mesh must exactly equal the accepted
