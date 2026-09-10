@@ -23,40 +23,27 @@ scripts/run_idex_calibration.sh
 
 ## What the command does
 
-1. It validates local and live configuration parity and homes XYZ only when
-   needed. Immediately after homing, it requires the physically clear
-   multi-head-zero switch to report `RELEASED`; otherwise it reports a fault and
-   stops before further motion. It then performs one final slow X-only latch
-   pass so both chapters use the same settled carriage datum.
-2. T0 first performs a fixed high-to-low Eddy discovery at `(150,150)` using
-   overlapping guarded 2 mm bands. The windows begin `10→8`, then advance by
-   1 mm (`9→7`, `8→6`, …) until the final `0→-2.2` window. No-trigger bands
-   are logged and continue downward, so a contact on an endpoint is also
-   covered by the neighbouring window. A rejected fit exactly at a lower
-   endpoint is treated as ambiguous and retried in the next overlapping
-   window; a rejected fit in the interior (or in the final window) aborts
-   safely. Only then does
-   T0 make five narrow-range Eddy Tap contacts, starting 2 mm above the
-   discovery and stopping 1 mm below it. Their median establishes the absolute
-   bed-Z datum; the same correction is applied to both tool endstops,
-   preserving their relative Z exactly. The probe retracts 4 mm after each
-   trigger so the deformation fit has enough samples. A fresh staged discovery
-   and five-tap reference check after deployment must be within `0.030 mm` of
-   logical Z=0.
-3. T0 and T1 each make 26 guarded ball contacts in that rebased Z frame. Their logical X/Y frames are
-   independently rebased so the measured ball centre is exactly `(75,-9)`.
-   T0 remains the Z anchor and T1 Z is aligned to T0's direct centre contact.
-4. Both tools make nine fixed-target verification contacts. The centre contact
-   supplies Z; the 1.5 mm crown-adjacent octagonal ring verifies X/Y. Failure
-   stops here.
-5. T0 measures the 7×7 native Tap mesh. The profile is zero-referenced at
-   `(150,150)`, written atomically to `calib.yaml`, regenerated, deployed, and
-   loaded as `default`.
-6. Five physical mesh-aware Tap checks must all place contact within 0.040 mm
-   of commanded Z=0. Only then does the dashboard say **READY TO PRINT**.
+The preflight gate validates local/live parity, performs only the required
+homing and final slow X latch, and confirms the ball switch is physically
+`RELEASED`. The numbered workflow then runs as follows:
+
+1. **Chapter 1 — Bed Z reference:** find rough T0 bed Z at `(150,150)` using
+   overlapping guarded Eddy bands.
+2. Apply the common correction to both T0/T1 Z endstops and deploy it.
+3. Verify five fixed-window T0 taps from `START_Z=2` toward `Z=-1`; banded
+   discovery is not repeated.
+4. **Chapter 2 — Toolhead alignment:** align T0/T1 X, Y, and relative Z with
+   the 26-contact ball calibration and nine-contact fixed-target verification.
+5. **Chapter 3 — Mesh and readiness:** acquire the native 7×7 Tap mesh and
+   write the accepted matrix atomically to `calib.yaml`.
+6. Regenerate, deploy, reload, and verify the persisted active mesh, including
+   the five mesh-aware physical checks.
+7. Publish **READY TO PRINT** only when all evidence belongs to this successful
+   full batch. A standalone mesh refresh proves steps 5–6 but remains
+   **NOT READY TO PRINT**.
 
 The printer console mirrors the major state changes and per-contact progress.
-The dashboard retains the complete two-chapter story, including full-size plots
+The dashboard retains the complete three-chapter story, including full-size plots
 and exact failure reasons.
 
 ## Independent maintenance
@@ -73,10 +60,10 @@ Run only the Eddy centre reference/rebase and its post-deploy check:
 IDEX_EDDY_PHASE=reference scripts/run_eddy_tap_bed_calibration.sh
 ```
 
-Run only the final Eddy mesh acquisition after tool alignment:
+Run steps 5–6 as one repeatable acquisition/persistence/deployment operation:
 
 ```bash
-IDEX_EDDY_PHASE=mesh scripts/run_eddy_tap_bed_calibration.sh
+scripts/refresh_idex_bed_mesh.sh
 ```
 
 These are complete workflows, not preparation for manual edits.
@@ -93,6 +80,15 @@ If any step fails, leave the printer alone and inspect `/calibration/` and the
 batch directory printed by the script. A failed candidate deployment is rolled
 back automatically. A physical verification failure is preserved and never
 causes a second speculative correction.
+
+## Implementation boundary
+
+The supported operator paths are `scripts/run_idex_calibration.sh`,
+`scripts/run_multi_head_zero_contact_map.sh`, and
+`scripts/refresh_idex_bed_mesh.sh`. The older
+`klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py` I1
+iteration is retained for diagnostics and historical replay only; it is not
+part of this sequence and must not be used to establish print readiness.
 
 ## Files and evidence
 

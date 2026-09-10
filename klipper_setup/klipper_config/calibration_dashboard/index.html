@@ -12,33 +12,40 @@
         <div>
           <h1>IDEX calibration</h1>
           <p id="headline">Loading latest calibration status…</p>
+          <p id="last-successful" class="last-successful"></p>
         </div>
         <time id="updated"></time>
       </header>
       <section id="readiness" class="readiness calibrating">CALIBRATION STATE UNKNOWN</section>
       <section id="events" class="events" aria-label="Latest calibration events"></section>
-      <section id="calibration-chapter" class="chapter" aria-labelledby="calibration-heading" hidden>
+      <section id="bed-reference-chapter" class="chapter" aria-labelledby="bed-reference-heading" hidden>
         <div class="chapter-heading">
-          <div><span>Chapter 1A</span><h2 id="calibration-heading">Ball alignment · 26 contacts per tool</h2></div>
-          <strong id="calibration-state"></strong>
-        </div>
-        <section id="calibration-tools" class="tools" aria-label="Tool calibration measurements"></section>
-        <section id="calibration-outcome" class="outcome" aria-label="Calibration calculations"></section>
-      </section>
-      <section id="verification-chapter" class="chapter" aria-labelledby="verification-heading" hidden>
-        <div class="chapter-heading">
-          <div><span>Chapter 1B</span><h2 id="verification-heading">Fixed-target verification · nine contacts per tool</h2></div>
-          <strong id="verification-state"></strong>
-        </div>
-        <section id="verification-tools" class="tools" aria-label="Tool verification measurements"></section>
-        <section id="verification-outcome" class="outcome" aria-label="Verification outcome"></section>
-      </section>
-      <section id="bed-chapter" class="chapter" aria-labelledby="bed-heading" hidden>
-        <div class="chapter-heading">
-          <div><span>Chapter 2</span><h2 id="bed-heading">Eddy Tap bed reference and surface</h2></div>
-          <strong id="bed-state"></strong>
+          <div><span>Chapter 1 · steps 1–3</span><h2 id="bed-reference-heading">Bed Z reference</h2></div>
+          <strong id="bed-reference-state"></strong>
         </div>
         <section id="bed-reference" class="outcome" aria-label="Bed reference measurements"></section>
+      </section>
+      <section id="tool-alignment-chapter" class="chapter" aria-labelledby="tool-alignment-heading" hidden>
+        <div class="chapter-heading">
+          <div><span>Chapter 2 · step 4</span><h2 id="tool-alignment-heading">Toolhead alignment</h2></div>
+          <strong id="tool-alignment-state"></strong>
+        </div>
+        <section id="calibration-chapter" class="subchapter" aria-labelledby="calibration-heading" hidden>
+          <div class="subchapter-heading"><h3 id="calibration-heading">Ball alignment · 26 contacts per tool</h3><strong id="calibration-state"></strong></div>
+          <section id="calibration-tools" class="tools" aria-label="Tool calibration measurements"></section>
+          <section id="calibration-outcome" class="outcome" aria-label="Calibration calculations"></section>
+        </section>
+        <section id="verification-chapter" class="subchapter" aria-labelledby="verification-heading" hidden>
+          <div class="subchapter-heading"><h3 id="verification-heading">Fixed-target verification · nine contacts per tool</h3><strong id="verification-state"></strong></div>
+          <section id="verification-tools" class="tools" aria-label="Tool verification measurements"></section>
+          <section id="verification-outcome" class="outcome" aria-label="Verification outcome"></section>
+        </section>
+      </section>
+      <section id="bed-mesh-chapter" class="chapter" aria-labelledby="bed-mesh-heading" hidden>
+        <div class="chapter-heading">
+          <div><span>Chapter 3 · steps 5–7</span><h2 id="bed-mesh-heading">Mesh and readiness</h2></div>
+          <strong id="bed-mesh-state"></strong>
+        </div>
         <section id="bed-mesh" class="bed-mesh" aria-label="Bed mesh measurement"></section>
       </section>
       <div id="empty" class="empty" hidden>No calibration run has been published yet.</div>

@@ -153,6 +153,7 @@ class DashboardPublisher:
     def __init__(self, batch_id: str, remote_host: str) -> None:
         self.batch_id = batch_id
         self.remote_host = remote_host
+        self.run_scope = os.environ.get("IDEX_CALIBRATION_RUN_SCOPE", "bed_reference")
         self.bed: dict[str, Any] = {
             "status": "preparing",
             "stage": "preflight",
@@ -173,6 +174,7 @@ class DashboardPublisher:
             "schema_version": 3,
             "kind": "idex_calibration_dashboard",
             "batch_id": self.batch_id,
+            "run_scope": self.run_scope,
             "status": self.bed.get("status", "running"),
             "stage": f"bed_calibration.{self.bed.get('stage', 'unknown')}",
             "updated_at": utc_now(),
@@ -192,9 +194,15 @@ try:
 except (OSError, ValueError):
     state = {}
 patch = json.loads(base64.b64decode(os.environ["PATCH_B64"]))
+if state.get("batch_id") != patch.get("batch_id"):
+    previous_successful = state.get("last_successful_batch_id")
+    state = {"chapters": {}, "events": []}
+    if previous_successful:
+        state["last_successful_batch_id"] = previous_successful
 state["schema_version"] = 3
 state["kind"] = "idex_calibration_dashboard"
 state["batch_id"] = patch["batch_id"]
+state["run_scope"] = patch.get("run_scope", "bed_reference")
 state["status"] = patch["status"]
 state["stage"] = patch["stage"]
 state["updated_at"] = patch["updated_at"]
@@ -209,6 +217,14 @@ state["events"] = events[-24:]
 chapters = state.setdefault("chapters", {})
 chapters["bed_calibration"] = patch["bed_calibration"]
 state.setdefault("readiness", {"printable": False, "checks": [], "reasons": []})
+if patch.get("status") == "completed" and patch.get("run_scope") != "full":
+    state["readiness"] = {
+        "printable": False,
+        "checks": [],
+        "reasons": [
+            "Partial bed-calibration run completed; full calibration is required"
+        ],
+    }
 tmp = path.with_name("." + path.name + ".tmp")
 tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 tmp.replace(path)
@@ -560,11 +576,21 @@ def collect_reference(
     x: float,
     y: float,
     phase: str,
-    discovery: dict[str, Any],
+    discovery: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    discovery_z = float(discovery["found_z"])
-    start_z = discovery_z + NARROW_START_MARGIN_MM
-    target_z = max(float(discovery["z_min"]), discovery_z - NARROW_BELOW_CONTACT_MM)
+    if discovery is None:
+        # Post-rebase verification is deliberately not another search.  The
+        # first discovery established the physical datum and the common Z
+        # correction was deployed; verify that datum in a fixed logical-Z
+        # window only.
+        start_z = NARROW_START_MARGIN_MM
+        target_z = -NARROW_BELOW_CONTACT_MM
+        method = "fixed_zero_window"
+    else:
+        discovery_z = float(discovery["found_z"])
+        start_z = discovery_z + NARROW_START_MARGIN_MM
+        target_z = max(float(discovery["z_min"]), discovery_z - NARROW_BELOW_CONTACT_MM)
+        method = "discovery_relative_window"
     window = {
         "start_z": start_z,
         "target_z": target_z,
@@ -612,7 +638,8 @@ def collect_reference(
         )
     return {
         "target": {"x": x, "y": y, "z": 0.0},
-        "discovery": discovery,
+        "verification_method": method,
+        **({"discovery": discovery} if discovery is not None else {}),
         "window": window,
         "samples": samples,
         "summary": summary,
@@ -1079,16 +1106,13 @@ def main(argv: list[str]) -> int:
             ] = target_fingerprint
             atomic_json(run_dir / "z_rebase_result.json", rebase)
             prepare_t0(client)
-            after_discovery = discover_reference(
-                client, dashboard, x=x, y=y, phase="after_rebase"
-            )
             after = collect_reference(
                 client,
                 dashboard,
                 x=x,
                 y=y,
                 phase="after_rebase",
-                discovery=after_discovery,
+                discovery=None,
             )
             atomic_json(run_dir / "reference_after.json", after)
             residual = float(after["summary"]["median"])

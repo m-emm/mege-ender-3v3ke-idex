@@ -10,7 +10,7 @@ main { max-width: 1650px; margin: 0 auto; padding: 22px; }
 header { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
 h1 { margin: 0; font-size: 1.5rem; }
 p { color: #aab7c5; }
-time, .hint { color: #8190a1; font-size: .86rem; }
+time, .hint, .last-successful { color: #8190a1; font-size: .86rem; }
 .readiness { margin-top: 14px; padding: 10px 14px; border: 1px solid #5e7186; border-radius: 7px; font-size: 1rem; font-weight: 800; letter-spacing: .04em; }
 .readiness.ready { color: #87e3ad; border-color: #4ba878; background: #14291f; }
 .readiness.failed { color: #ff928d; border-color: #bc635f; background: #2b1919; }
@@ -23,6 +23,11 @@ time, .hint { color: #8190a1; font-size: .86rem; }
 .chapter-heading span { display: block; color: #7f91a5; font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; }
 .chapter-heading h2 { margin: 2px 0 0; font-size: 1.2rem; }
 .chapter-heading strong { color: #9db3ca; font-size: .88rem; }
+.subchapter { margin-top: 16px; }
+.subchapter[hidden] { display: none; }
+.subchapter-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+.subchapter-heading h3 { margin: 0; font-size: 1.05rem; }
+.subchapter-heading strong { color: #9db3ca; font-size: .84rem; }
 .tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 16px; }
 .tool { background: #18202a; border: 1px solid #2b3745; border-radius: 8px; padding: 15px; }
 .outcome { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }

@@ -16,6 +16,7 @@ dashboard_root="/home/pi/printer_data/calibration"
 mkdir -p "${batch_dir}/source"
 cp "${REPO_ROOT}/klipper_setup/klipper_config/calib.yaml" "${batch_dir}/source/calib.yaml"
 cp "${REPO_ROOT}/klipper_setup/klipper_config/calib_config.yaml" "${batch_dir}/source/calib_config.yaml"
+cp "${REPO_ROOT}/klipper_setup/klipper_config/printer.cfg.template" "${batch_dir}/source/printer.cfg.template"
 cp "${REPO_ROOT}/klipper_setup/klipper_config/printer.cfg" "${batch_dir}/source/printer.cfg"
 
 publish_state() {
@@ -56,7 +57,10 @@ except (OSError, ValueError):
     state = {}
 payload = json.loads(base64.b64decode(os.environ["PAYLOAD_B64"]))
 if state.get("batch_id") != payload["batch_id"]:
+    previous_successful = state.get("last_successful_batch_id")
     state = {"chapters": {}, "events": []}
+    if previous_successful:
+        state["last_successful_batch_id"] = previous_successful
 state.update({
     "schema_version": 3,
     "kind": "idex_calibration_dashboard",
@@ -64,6 +68,7 @@ state.update({
     "status": payload["status"],
     "stage": payload["stage"],
     "updated_at": payload["at"],
+    "run_scope": "full",
 })
 state["events"] = (state.get("events", []) + [{"at": payload["at"], "message": payload["message"]}])[-24:]
 state["readiness"] = {
@@ -75,6 +80,7 @@ temporary = path.with_name("." + path.name + ".tmp")
 temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 temporary.replace(path)
 if payload["printable"]:
+    state["last_successful_batch_id"] = payload["batch_id"]
     successful = root / "data/last_successful.json"
     successful_tmp = successful.with_name("." + successful.name + ".tmp")
     successful_tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -137,20 +143,22 @@ publish_state running bed_calibration.reference "Starting Eddy centre reference 
 printer_console "starting Eddy centre reference at X=150 Y=150 before ball calibration"
 IDEX_CALIBRATION_BATCH_ID="${batch_id}" \
 IDEX_EDDY_PHASE=reference \
+IDEX_CALIBRATION_RUN_SCOPE=full \
 IDEX_BED_CALIBRATION_RUN_DIR="${batch_dir}/bed_calibration/reference" \
   "${SCRIPT_DIR}/run_eddy_tap_bed_calibration.sh"
 
 publish_state running tool_alignment.calibration "Eddy centre reference passed; starting ball alignment"
 printer_console "Eddy centre reference passed; starting T0 then T1 ball alignment"
 IDEX_CALIBRATION_BATCH_ID="${batch_id}" LOCAL_OUT_DIR="${batch_dir}/tool_alignment" \
+IDEX_CALIBRATION_RUN_SCOPE=full \
   "${SCRIPT_DIR}/run_multi_head_zero_contact_map.sh"
 
 publish_state running bed_calibration.mesh "Tool alignment passed; starting Eddy mesh acquisition"
 printer_console "tool alignment passed; starting Eddy mesh acquisition"
 IDEX_CALIBRATION_BATCH_ID="${batch_id}" \
-IDEX_EDDY_PHASE=mesh \
+IDEX_CALIBRATION_RUN_SCOPE=full \
 IDEX_BED_CALIBRATION_RUN_DIR="${batch_dir}/bed_calibration/mesh" \
-  "${SCRIPT_DIR}/run_eddy_tap_bed_calibration.sh"
+  "${SCRIPT_DIR}/refresh_idex_bed_mesh.sh"
 
 publish_state completed completed "All calibration checks passed" true
 printer_console "READY TO PRINT"

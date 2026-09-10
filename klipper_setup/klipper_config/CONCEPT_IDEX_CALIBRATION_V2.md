@@ -1,7 +1,8 @@
 # IDEX Calibration V2 — One Automatic Path to a Printable Machine
 
-Status: proposed architecture. This document defines the implementation target;
-it does not claim that the current scripts or file schemas already satisfy it.
+Status: authoritative workflow definition. The local scripts and dashboard now
+follow the reconciled sequence; live deployment and physical acceptance remain
+separate verification activities.
 
 ## Purpose
 
@@ -151,18 +152,19 @@ From the repository root, the user runs one command:
 scripts/run_idex_calibration.sh
 ```
 
-The command performs the following sequence without asking the user to edit a
-file, copy a number, restart Klipper, load a mesh, or run a verifier manually.
+The command performs the following seven-step sequence without asking the user
+to edit a file, copy a number, restart Klipper, load a mesh, or run a verifier
+manually.
 
-1. Preflight the local configuration and live printer.
-2. Establish T0 bed contact `Z=0` at `(150,150)` with Eddy Tap.
-3. Apply the same Z correction to both tools, deploy, and verify the reference
-   tap after re-homing.
-4. Calibrate T0 and T1 against the multi-head-zero ball in that rebased Z frame.
-5. Atomically apply the X/Y and relative-Z corrections, then require live parity.
-6. Verify both tools at the fixed ball target.
-7. Measure, validate, persist, deploy, and activate the bed mesh.
-8. Verify the active mesh and publish the final printable/not-printable result.
+1. Find rough T0 bed Z at `(150,150)` with banded Eddy descent.
+2. Apply the common T0/T1 Z correction, deploy, and re-home.
+3. Verify five fixed-window T0 taps at logical `Z=0`; no banded descent is
+   allowed here because the bed height is already known.
+4. Align and verify T0/T1 X, Y, and relative Z against the ball.
+5. Measure the native Tap mesh and persist the accepted matrix to `calib.yaml`.
+6. Regenerate, deploy, reload, and verify the persisted active mesh.
+7. Publish `READY TO PRINT` only when every preceding check belongs to the same
+   successful batch.
 
 The dashboard is opened separately at:
 
@@ -180,12 +182,13 @@ applier commands:
 
 ```bash
 scripts/run_multi_head_zero_contact_map.sh
-scripts/run_eddy_tap_bed_calibration.sh
+scripts/refresh_idex_bed_mesh.sh
 ```
 
-The first reruns toolhead alignment and its verification. The second preserves
-the existing T0/T1 relative offsets, rebases both Z endstops together, and
-replaces the bed mesh. The full workflow is the normal documented route.
+The first reruns toolhead alignment and its verification. The second reruns
+steps 5–6 as one mesh acquisition/persistence/deployment operation. A
+standalone maintenance run proves only its own scope and cannot claim full
+print readiness.
 
 Developer-only helpers may still support replay, calculation, and diagnostics,
 but they are not steps in the user manual and cannot be required to reach a
@@ -221,7 +224,7 @@ The coordinator:
 Every later candidate names this source fingerprint. A stale result cannot be
 applied to a changed `calib.yaml` or a different live configuration.
 
-### 1. Eddy Tap absolute bed reference
+### 1. Eddy Tap absolute bed reference (steps 1–3)
 
 The first physical datum is always the T0 Eddy Tap centre at exactly
 `(150,150)` with the mesh cleared. Discovery is deliberately staged from high
@@ -245,16 +248,17 @@ After discovery, five narrow-range centre taps start 2 mm above that contact
 and stop 1 mm below it. The probe retracts 4 mm after each trigger so the
 deformation fit has enough samples. Only their median establishes the absolute bed-Z datum;
 the common correction is applied to both Z endstops, preserving the
-T1-minus-T0 Z difference. The candidate is deployed and the same staged
-discovery plus five-tap batch must return within the absolute-Z tolerance before
-the ball workflow starts. No ball or mesh motion is attempted until this stage
-passes.
+T1-minus-T0 Z difference. The candidate is deployed and the post-rebase check
+repeats only the fixed window `START_Z=2` to target `Z=-1` for five taps. It
+must return within the absolute-Z tolerance before the ball workflow starts.
+No second banded discovery, ball motion, or mesh motion is attempted until this
+stage passes.
 
 This ordering is deliberate: the ball's measured summit is then expressed in
 the final bed-referenced logical Z frame, while the ball remains the authority
 for relative T0/T1 Z alignment.
 
-### 2. Multi-head-zero calibration
+### 2. Multi-head-zero calibration (step 4)
 
 For T0, then T1, the runner performs the fixed 26-contact sequence:
 
@@ -288,7 +292,7 @@ X limits, generates a candidate `printer.cfg`, deploys it, checks file and live
 fingerprints, re-homes once if the restart invalidated homing, and repeats the
 same final X-only latch pass before verification.
 
-### 3. Fixed-target tool verification
+### 3. Fixed-target tool verification (step 4)
 
 T0 and T1 each perform nine mandatory contacts in their logical frames:
 
@@ -306,7 +310,7 @@ the authoritative centre Z.
 Verification never performs a second correction. Failure marks tool alignment
 failed and stops the full workflow before bed calibration.
 
-### 4. Eddy Tap mesh acquisition and persistence
+### 4. Eddy Tap mesh acquisition and persistence (steps 5–6)
 
 With the absolute reference verified before ball alignment, the coordinator:
 
@@ -324,7 +328,7 @@ With the absolute reference verified before ball alignment, the coordinator:
 No one copies the matrix from a console. A failed scan or verification retains
 the previous stored mesh.
 
-### 5. Final readiness decision
+### 5. Final readiness decision (step 7)
 
 The final report is printable only if all of these are true under the same
 deployed target fingerprint:
@@ -340,6 +344,27 @@ deployed target fingerprint:
 
 Anything else is prominently `NOT READY TO PRINT`; a sea of green unit tests
 does not get a veto over physics.
+
+## Implementation status and known boundaries
+
+The current implementation now follows the reference-first ordering in the
+full coordinator. The post-rebase reference check is a fixed five-tap window;
+banded descent is reserved for initial discovery. The mesh runner already
+performs acquisition, persistence, regeneration, deployment, profile reload,
+matrix parity, and mesh-aware physical checks; it is exposed through the
+single `scripts/refresh_idex_bed_mesh.sh` maintenance command.
+
+The dashboard is batch-scoped. A new standalone run cannot inherit chapters
+from an older batch, and a partial completed run is explicitly not printable.
+The last successful full batch is retained as history and is never merged into
+the current run's evidence.
+
+The older
+`klipper_setup/klipper_config/calibrate_idex_bed_surface_eddy_tap.py` I1
+iteration remains in the repository for diagnostics and historical replay. Its
+workflow and transient-mesh behavior are not authoritative and must not be
+used as the operator path; the coordinator and the two maintenance commands
+above are the supported interface.
 
 ## Configuration ownership
 
@@ -579,6 +604,7 @@ The V2 dashboard snapshot has this top-level shape:
   "schema_version": 3,
   "kind": "idex_calibration_dashboard",
   "batch_id": "...",
+  "run_scope": "full|tool_alignment|bed_reference|mesh_refresh",
   "status": "running|completed|failed",
   "stage": "tool_alignment.calibration.t0",
   "updated_at": "...",
@@ -622,9 +648,20 @@ The fixed header shows:
 - source and deployed configuration fingerprints in shortened form;
 - last update time;
 - a large `CALIBRATING`, `READY TO PRINT`, or `NOT READY TO PRINT` badge; and
-- the latest concise printer-console-equivalent events.
+- the latest concise printer-console-equivalent events; and
+- the last fully verified batch when the current run is partial or failed.
 
-### Chapter 1 — Toolhead alignment
+### Chapter 1 — Bed Z reference (steps 1–3)
+
+This chapter shows:
+
+- the fixed `(150,150)` reference and target `Z=0`;
+- banded discovery progress and diagnostics;
+- the five fixed-window post-rebase taps, explicitly marked as no-discovery;
+- old/new T0/T1 Z endstops, common delta, and the preserved relative Z check;
+- zero residual and acceptance evidence.
+
+### Chapter 2 — Toolhead alignment (step 4)
 
 This chapter keeps both 26-contact calibration cards and both fixed-target
 nine-contact verification cards visible together. It shows:
@@ -643,23 +680,19 @@ nine-contact verification cards visible together. It shows:
 The first verification contact updates centre Z immediately; the ring need not
 finish before the user can compare T0 and T1.
 
-### Chapter 2 — Bed reference and surface
+### Chapter 3 — Mesh and readiness (steps 5–7)
 
 This chapter shows:
 
-- the fixed reference `(150,150)` and target `Z=0`;
-- every pre-rebase centre tap and its statistics;
-- old T0/T1 Z endstops, common delta, new endstops, and an explicit
-  `T1-T0 difference preserved` check;
-- every post-deployment centre tap and zero residual in micrometres;
 - live mesh-point progress and latest contact;
 - a readable bed heatmap/3D surface with zero emphasized;
 - mesh minimum, maximum, peak-to-peak range, and reference interpolation;
 - source, candidate, and deployed mesh hashes;
 - mesh-aware verification residuals; and
-- whether the default profile is currently loaded.
+- whether the default profile is currently loaded; and
+- the final same-batch readiness decision.
 
-Both chapters remain visible after completion. A failed current run remains
+All three chapters remain visible after completion. A failed current run remains
 visible with its precise stopping condition, while the header can still link to
 the last successful full calibration.
 

@@ -565,12 +565,7 @@ def test_dashboard_snapshot_is_atomic_and_retains_completed_run(tmp_path, monkey
     )
     retained = json.loads(snapshot.read_text(encoding="utf-8"))
     assert retained["schema_version"] == 3
-    assert retained["chapters"]["tool_alignment"]["calibration"]["runs"]["t0"][
-        "progress"
-    ] == {
-        "completed": 1,
-        "total": 18,
-    }
+    assert "calibration" not in retained["chapters"]["tool_alignment"]
     assert retained["chapters"]["tool_alignment"]["verification"]["runs"]["t0"][
         "progress"
     ] == {

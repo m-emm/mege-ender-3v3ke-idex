@@ -103,6 +103,7 @@ run_remote_batch() {
   local remote_command
   local remote_output_root="${DASHBOARD_ROOT}/runs/${batch_id:-${run_id}}/tool_alignment"
   remote_command="MULTI_HEAD_ZERO_BATCH_MODE=$(printf '%q' "${mode}") MULTI_HEAD_ZERO_BATCH_RUN_ID=$(printf '%q' "${run_id}") IDEX_CALIBRATION_BATCH_ID=$(printf '%q' "${batch_id:-${run_id}}") MULTI_HEAD_ZERO_OUTPUT_DIR=$(printf '%q' "${remote_output_root}")"
+  remote_command+=" IDEX_CALIBRATION_RUN_SCOPE=$(printf '%q' "${IDEX_CALIBRATION_RUN_SCOPE:-tool_alignment}")"
   remote_command+=" ${REMOTE_HELPER} --tool ${tool}"
   local remote_status
   set +e

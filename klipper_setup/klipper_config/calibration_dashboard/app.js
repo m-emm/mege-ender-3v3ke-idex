@@ -1,4 +1,5 @@
 const headline = document.querySelector("#headline");
+const lastSuccessful = document.querySelector("#last-successful");
 const updated = document.querySelector("#updated");
 const events = document.querySelector("#events");
 const calibrationChapter = document.querySelector("#calibration-chapter");
@@ -10,8 +11,12 @@ const verificationState = document.querySelector("#verification-state");
 const verificationTools = document.querySelector("#verification-tools");
 const verificationOutcome = document.querySelector("#verification-outcome");
 const readiness = document.querySelector("#readiness");
-const bedChapter = document.querySelector("#bed-chapter");
-const bedState = document.querySelector("#bed-state");
+const bedReferenceChapter = document.querySelector("#bed-reference-chapter");
+const bedReferenceState = document.querySelector("#bed-reference-state");
+const toolAlignmentChapter = document.querySelector("#tool-alignment-chapter");
+const toolAlignmentState = document.querySelector("#tool-alignment-state");
+const bedMeshChapter = document.querySelector("#bed-mesh-chapter");
+const bedMeshState = document.querySelector("#bed-mesh-state");
 const bedReference = document.querySelector("#bed-reference");
 const bedMesh = document.querySelector("#bed-mesh");
 const empty = document.querySelector("#empty");
@@ -384,12 +389,19 @@ function meshCard(mesh) {
     </dl>${mesh.plot ? plotButton(mesh.plot, "Eddy Tap bed mesh") : ""}</article>`;
 }
 
-function renderBedChapter(entry) {
-  bedChapter.hidden = !entry;
-  if (!entry) return;
-  bedState.textContent = entry.status || "recorded";
-  bedReference.innerHTML = `${referenceCard(entry.reference)}${referenceSamples(entry.reference)}`;
-  bedMesh.innerHTML = meshCard(entry.mesh);
+function renderBedChapters(entry) {
+  const hasReference = Boolean(entry && Object.keys(entry.reference || {}).length);
+  const hasMesh = Boolean(entry && Object.keys(entry.mesh || {}).length);
+  bedReferenceChapter.hidden = !hasReference;
+  bedMeshChapter.hidden = !hasMesh;
+  if (hasReference) {
+    bedReferenceState.textContent = entry.status || "recorded";
+    bedReference.innerHTML = `${referenceCard(entry.reference)}${referenceSamples(entry.reference)}`;
+  }
+  if (hasMesh) {
+    bedMeshState.textContent = entry.status || "recorded";
+    bedMesh.innerHTML = meshCard(entry.mesh);
+  }
 }
 
 function renderChapter(chapterElement, stateElement, toolsElement, outcomeElement, entry, priors, outcomeHtml) {
@@ -412,14 +424,22 @@ function render(data) {
   const chapters = normaliseChapters(data);
   const alignment = chapters.tool_alignment || {};
   const priors = data.configured_priors;
+  const hasAlignment = Boolean(alignment.calibration || alignment.verification);
+  toolAlignmentChapter.hidden = !hasAlignment;
+  toolAlignmentState.textContent = alignment.status || data.status || "recorded";
   renderChapter(calibrationChapter, calibrationState, calibrationTools, calibrationOutcome, alignment.calibration, priors, calibrationCards(alignment.calibration));
   renderChapter(verificationChapter, verificationState, verificationTools, verificationOutcome, alignment.verification, priors, `${verificationCentreProgressCard(alignment.verification)}${verificationCards(alignment.verification)}`);
-  renderBedChapter(chapters.bed_calibration);
+  renderBedChapters(chapters.bed_calibration);
   const printable = data.readiness?.printable === true;
-  const failed = data.status === "failed" || (data.readiness?.reasons || []).length > 0;
+  const partial = data.status === "completed" && !printable;
+  const failed = data.status === "failed" || partial || (data.readiness?.reasons || []).length > 0;
   readiness.className = `readiness ${printable ? "ready" : (failed ? "failed" : "calibrating")}`;
   readiness.textContent = printable ? "READY TO PRINT" : (failed ? "NOT READY TO PRINT" : "CALIBRATING");
-  empty.hidden = Boolean(alignment.calibration || alignment.verification || chapters.bed_calibration);
+  empty.hidden = Boolean(hasAlignment || chapters.bed_calibration);
+  const previous = data.last_successful_batch_id;
+  lastSuccessful.textContent = previous && previous !== data.batch_id
+    ? `Last fully verified printable batch: ${previous}`
+    : "";
 }
 
 function closePlot() { plotModal.close(); }
@@ -440,7 +460,17 @@ async function refresh() {
   try {
     const response = await fetch(`data/current.json?t=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    render(await response.json());
+    const current = await response.json();
+    try {
+      const previousResponse = await fetch(`data/last_successful.json?t=${Date.now()}`, { cache: "no-store" });
+      if (previousResponse.ok) {
+        const previous = await previousResponse.json();
+        if (previous.batch_id && previous.batch_id !== current.batch_id) current.last_successful_batch_id = previous.batch_id;
+      }
+    } catch (_) {
+      // The current snapshot remains useful when no successful history exists.
+    }
+    render(current);
   } catch (error) {
     headline.textContent = `Calibration dashboard unavailable: ${error.message}`;
   }

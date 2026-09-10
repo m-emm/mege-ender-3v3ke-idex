@@ -302,13 +302,20 @@ class DashboardPublisher:
         self.root = Path(DEFAULT_DASHBOARD_ROOT).expanduser()
         self.path = self.root / "data" / "current.json"
         batch_id = os.environ.get("IDEX_CALIBRATION_BATCH_ID", run_id)
+        run_scope = os.environ.get("IDEX_CALIBRATION_RUN_SCOPE", "tool_alignment")
         previous = {}
         if self.path.is_file():
             try:
                 previous = json.loads(self.path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 previous = {}
-        chapters = copy.deepcopy(previous.get("chapters") or {})
+        if previous.get("batch_id") == batch_id:
+            chapters = copy.deepcopy(previous.get("chapters") or {})
+            events = copy.deepcopy(previous.get("events") or [])
+        else:
+            chapters = {}
+            events = []
+        previous_successful = previous.get("last_successful_batch_id")
         tool_alignment = chapters.setdefault("tool_alignment", {})
         if workflow == "calibration":
             # A new tool-alignment run replaces Chapter 1 only.  The full
@@ -330,18 +337,17 @@ class DashboardPublisher:
             "status": "preparing",
             "started_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "updated_at": None,
-            "events": (
-                copy.deepcopy(previous.get("events") or [])
-                if previous.get("batch_id") == batch_id
-                else []
-            ),
+            "events": events,
             "chapters": chapters,
+            "run_scope": run_scope,
             "readiness": {
                 "printable": False,
                 "checks": [],
                 "reasons": [],
             },
         }
+        if previous_successful and previous.get("batch_id") != batch_id:
+            self.payload["last_successful_batch_id"] = previous_successful
         self.publish()
 
     def publish(self):
@@ -392,6 +398,14 @@ class DashboardPublisher:
         if error:
             self.payload["error"] = error
             chapter["error"] = error
+        if status == "completed" and self.payload.get("run_scope") != "full":
+            self.payload["readiness"] = {
+                "printable": False,
+                "checks": [],
+                "reasons": [
+                    "Partial tool-alignment run completed; full calibration is required"
+                ],
+            }
         self.publish()
 
 
