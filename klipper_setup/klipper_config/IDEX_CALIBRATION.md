@@ -74,8 +74,8 @@ These are complete workflows, not preparation for manual edits.
 The dashboard presents the bed point once as `(150,150)`. The internal JSON
 keys `before_rebase` and `after_rebase` remain for compatibility, but the
 operator-facing phases are the Bed Center Z=0 measurement, calibration update,
-and verification. Tool verification requires both recovered centres to be
-within 0.05 mm of `(75,-9)`, paired X/Y within 0.05 mm, paired centre-median
+and verification. Tool verification requires each recovered centre to be
+within 0.06 mm of `(75,-9)`, paired X/Y within 0.05 mm, paired centre-median
 T1−T0 Z within 0.02 mm, and population σ no greater than 15 µm for each
 five-tap centre series. The 31-contact calibration and 13-contact verification
 must be complete; a noisy or incomplete centre series blocks correction or
@@ -112,3 +112,25 @@ part of this sequence and must not be used to establish print readiness.
 
 The architecture and ownership rationale are in
 `CONCEPT_IDEX_CALIBRATION_V2.md`.
+
+## Local dashboard simulator (development and UI testing only)
+
+Do not use the printer to test dashboard states. The localhost-only simulator
+serves the production dashboard unchanged at `http://127.0.0.1:8787/calibration/`
+against captured, read-only representative data. It never opens an SSH or
+Moonraker connection and cannot send G-code.
+
+```bash
+scripts/run_idex_calibration_dashboard_simulator.sh
+scripts/idex_calibration_simulate.sh scenario active-step-4
+scripts/idex_calibration_simulate.sh fail-step 4 "paired X/Y limit exceeded"
+```
+
+The injected local control panel exposes the same presets and shows its
+consistency checks. `scripts/idex_calibration_simulate.sh --help` lists the
+deterministic event commands for scripted tests. Refresh representative fixture
+data only with the explicitly read-only capture command:
+
+```bash
+scripts/capture_idex_calibration_dashboard_simulator_fixtures.sh
+```

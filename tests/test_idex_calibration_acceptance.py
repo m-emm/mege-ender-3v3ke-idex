@@ -87,3 +87,20 @@ def test_active_attempt_cannot_report_printable_even_with_complete_acceptance(tm
     current = json.loads((root / "data/current.json").read_text())
     assert current["readiness"]["printable"] is False
     assert "active calibration attempt" in current["readiness"]["reasons"][0]
+
+
+def test_stale_mesh_acceptance_status_is_visible_to_dashboard_roadmap(tmp_path):
+    module = load_module()
+    state = module.empty_state()
+    state["accepted"] = {
+        "mesh": {
+            "status": "stale",
+            "stale_reason": "T0 frame changed",
+            "data": {"mesh": {"status": "completed", "plot": "historical.png"}},
+        },
+    }
+    module.write_state(tmp_path, state)
+    current = json.loads((tmp_path / "data/current.json").read_text())
+    mesh = current["chapters"]["bed_calibration"]["mesh"]
+    assert mesh["status"] == "stale"
+    assert mesh["stale_reason"] == "T0 frame changed"

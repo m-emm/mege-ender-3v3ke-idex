@@ -365,7 +365,17 @@ def project_current(state: dict[str, Any]) -> dict[str, Any]:
         chapters["tool_alignment"] = copy.deepcopy(tools)
     if mesh:
         target = chapters.setdefault("bed_calibration", {})
-        target["mesh"] = copy.deepcopy(mesh.get("mesh", mesh))
+        projected_mesh = copy.deepcopy(mesh.get("mesh", mesh))
+        # The mesh entry's acceptance status owns readiness.  Its measured
+        # data may still say "completed" because those points are useful
+        # history, but exposing that as the effective live status hides a
+        # stale dependency from the roadmap.
+        mesh_entry = accepted.get("mesh") or {}
+        if mesh_entry.get("status") == "stale":
+            projected_mesh["status"] = "stale"
+            if mesh_entry.get("stale_reason"):
+                projected_mesh["stale_reason"] = mesh_entry["stale_reason"]
+        target["mesh"] = projected_mesh
 
     attempt = state.get("attempt")
     if isinstance(attempt, dict):
@@ -402,7 +412,11 @@ def project_current(state: dict[str, Any]) -> dict[str, Any]:
         "status": attempt.get("status", "idle") if isinstance(attempt, dict) else "idle",
         "stage": attempt.get("stage", "idle") if isinstance(attempt, dict) else "idle",
         "updated_at": state.get("updated_at"),
-        "attempt": {key: copy.deepcopy(value) for key, value in attempt.items() if key != "activity"},
+        "attempt": {
+            key: copy.deepcopy(value)
+            for key, value in (attempt or {}).items()
+            if key != "activity"
+        },
         "accepted": copy.deepcopy(accepted),
         "accepted_sources": {
             chapter: {

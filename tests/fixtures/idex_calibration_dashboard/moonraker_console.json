@@ -1,0 +1,402 @@
+[
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128850.1504729,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(76.993000, -7.045750, 2.320000)",
+    "time": 1789128853.5640044,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(76.991, -7.041) trigger_mean=(76.993000, -7.045750, 2.320000) count=1 mean=2.320000 median=2.320000 min=2.320000 max=2.320000 span=0.000000 stddev=0.000000",
+    "time": 1789128853.5647504,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 20/31 phase_3_ring Z=2.3200\"",
+    "time": 1789128854.1556203,
+    "type": "command"
+  },
+  {
+    "message": "echo: MHZ calibration: T0 20/31 phase_3_ring Z=2.3200",
+    "time": 1789128854.1568189,
+    "type": "response"
+  },
+  {
+    "message": "MULTI_HEAD_ZERO_CONTACT X=75.011 Y=-6.221 TOOL=0\nM400",
+    "time": 1789128854.654795,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero: preparing T0 at logical X=75.011 Y=-6.221 START_Z=4.000 (1 tap)",
+    "time": 1789128854.6572285,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128856.926949,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(75.013000, -6.220750, 2.340000)",
+    "time": 1789128860.3258932,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(75.011, -6.221) trigger_mean=(75.013000, -6.220750, 2.340000) count=1 mean=2.340000 median=2.340000 min=2.340000 max=2.340000 span=0.000000 stddev=0.000000",
+    "time": 1789128860.3266323,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 21/31 phase_3_ring Z=2.3400\"",
+    "time": 1789128860.9500926,
+    "type": "command"
+  },
+  {
+    "message": "echo: MHZ calibration: T0 21/31 phase_3_ring Z=2.3400",
+    "time": 1789128860.951228,
+    "type": "response"
+  },
+  {
+    "message": "MULTI_HEAD_ZERO_CONTACT X=73.031 Y=-7.041 TOOL=0\nM400",
+    "time": 1789128861.4175472,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero: preparing T0 at logical X=73.031 Y=-7.041 START_Z=4.000 (1 tap)",
+    "time": 1789128861.4215567,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128863.6919851,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(73.033000, -7.045750, 2.340000)",
+    "time": 1789128867.0834901,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(73.031, -7.041) trigger_mean=(73.033000, -7.045750, 2.340000) count=1 mean=2.340000 median=2.340000 min=2.340000 max=2.340000 span=0.000000 stddev=0.000000",
+    "time": 1789128867.0849416,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 22/31 phase_3_ring Z=2.3400\"",
+    "time": 1789128867.7086427,
+    "type": "command"
+  },
+  {
+    "message": "echo: MHZ calibration: T0 22/31 phase_3_ring Z=2.3400",
+    "time": 1789128867.710633,
+    "type": "response"
+  },
+  {
+    "message": "MULTI_HEAD_ZERO_CONTACT X=72.211 Y=-9.021 TOOL=0\nM400",
+    "time": 1789128868.1847873,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero: preparing T0 at logical X=72.211 Y=-9.021 START_Z=4.000 (1 tap)",
+    "time": 1789128868.1871169,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128870.4543293,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(72.211750, -9.014500, 2.357500)",
+    "time": 1789128873.8474543,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(72.211, -9.021) trigger_mean=(72.211750, -9.014500, 2.357500) count=1 mean=2.357500 median=2.357500 min=2.357500 max=2.357500 span=0.000000 stddev=0.000000",
+    "time": 1789128873.8485785,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 23/31 phase_3_ring Z=2.3575\"",
+    "time": 1789128874.5090797,
+    "type": "command"
+  },
+  {
+    "message": "echo: MHZ calibration: T0 23/31 phase_3_ring Z=2.3575",
+    "time": 1789128874.5101626,
+    "type": "response"
+  },
+  {
+    "message": "MULTI_HEAD_ZERO_CONTACT X=73.031 Y=-11.001 TOOL=0\nM400",
+    "time": 1789128874.9498992,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero: preparing T0 at logical X=73.031 Y=-11.001 START_Z=4.000 (1 tap)",
+    "time": 1789128874.9518616,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128877.2217636,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(73.033000, -11.002000, 2.317500)",
+    "time": 1789128880.6470277,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(73.031, -11.001) trigger_mean=(73.033000, -11.002000, 2.317500) count=1 mean=2.317500 median=2.317500 min=2.317500 max=2.317500 span=0.000000 stddev=0.000000",
+    "time": 1789128880.6480951,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 24/31 phase_3_ring Z=2.3175\"",
+    "time": 1789128881.244558,
+    "type": "command"
+  },
+  {
+    "message": "echo: MHZ calibration: T0 24/31 phase_3_ring Z=2.3175",
+    "time": 1789128881.2468345,
+    "type": "response"
+  },
+  {
+    "message": "MULTI_HEAD_ZERO_CONTACT X=75.011 Y=-11.821 TOOL=0\nM400",
+    "time": 1789128881.7164326,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero: preparing T0 at logical X=75.011 Y=-11.821 START_Z=4.000 (1 tap)",
+    "time": 1789128881.7184672,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128883.9883409,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(75.013000, -11.827000, 2.312500)",
+    "time": 1789128887.4143078,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(75.011, -11.821) trigger_mean=(75.013000, -11.827000, 2.312500) count=1 mean=2.312500 median=2.312500 min=2.312500 max=2.312500 span=0.000000 stddev=0.000000",
+    "time": 1789128887.415055,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 25/31 phase_3_ring Z=2.3125\"",
+    "time": 1789128887.9827495,
+    "type": "command"
+  },
+  {
+    "message": "echo: MHZ calibration: T0 25/31 phase_3_ring Z=2.3125",
+    "time": 1789128887.9845946,
+    "type": "response"
+  },
+  {
+    "message": "MULTI_HEAD_ZERO_CONTACT X=76.991 Y=-11.001 TOOL=0\nM400",
+    "time": 1789128888.481311,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero: preparing T0 at logical X=76.991 Y=-11.001 START_Z=4.000 (1 tap)",
+    "time": 1789128888.4855235,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128890.7537992,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(76.993000, -11.002000, 2.360000)",
+    "time": 1789128894.128585,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(76.991, -11.001) trigger_mean=(76.993000, -11.002000, 2.360000) count=1 mean=2.360000 median=2.360000 min=2.360000 max=2.360000 span=0.000000 stddev=0.000000",
+    "time": 1789128894.129325,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 26/31 phase_3_ring Z=2.3600\"",
+    "time": 1789128894.8223243,
+    "type": "command"
+  },
+  {
+    "message": "echo: MHZ calibration: T0 26/31 phase_3_ring Z=2.3600",
+    "time": 1789128894.8233707,
+    "type": "response"
+  },
+  {
+    "message": "MULTI_HEAD_ZERO_CONTACT X=75.017 Y=-9.015 TOOL=0\nM400",
+    "time": 1789128895.2557433,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero: preparing T0 at logical X=75.017 Y=-9.015 START_Z=4.000 (1 tap)",
+    "time": 1789128895.2575698,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128897.5248911,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(75.013000, -9.014500, 2.797500)",
+    "time": 1789128900.4438064,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(75.017, -9.015) trigger_mean=(75.013000, -9.014500, 2.797500) count=1 mean=2.797500 median=2.797500 min=2.797500 max=2.797500 span=0.000000 stddev=0.000000",
+    "time": 1789128900.444535,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 27/31 phase_4_centre Z=2.7975\"",
+    "time": 1789128901.0490012,
+    "type": "command"
+  },
+  {
+    "message": "echo: MHZ calibration: T0 27/31 phase_4_centre Z=2.7975",
+    "time": 1789128901.0507772,
+    "type": "response"
+  },
+  {
+    "message": "MULTI_HEAD_ZERO_CONTACT X=75.017 Y=-9.015 TOOL=0\nM400",
+    "time": 1789128901.5143836,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero: preparing T0 at logical X=75.017 Y=-9.015 START_Z=4.000 (1 tap)",
+    "time": 1789128901.51601,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero: upward recovery to machine Z=10.000",
+    "time": 1789128903.682503,
+    "type": "response"
+  },
+  {
+    "message": "M400",
+    "time": 1789128904.5490785,
+    "type": "command"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"IDEX calibration: FAILED; inspect /calibration/\"",
+    "time": 1789128905.0488732,
+    "type": "command"
+  },
+  {
+    "message": "// Multi-head-zero contact: T0 tap 1/1 logical trigger=(75.013000, -9.014500, 2.797500)",
+    "time": 1789128906.5969672,
+    "type": "response"
+  },
+  {
+    "message": "// Multi-head-zero statistics: T0 target=(75.017, -9.015) trigger_mean=(75.013000, -9.014500, 2.797500) count=1 mean=2.797500 median=2.797500 min=2.797500 max=2.797500 span=0.000000 stddev=0.000000",
+    "time": 1789128906.598368,
+    "type": "response"
+  },
+  {
+    "message": "echo: IDEX calibration: FAILED; inspect /calibration/",
+    "time": 1789128906.598434,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"IDEX calibration: full calibration started\"",
+    "time": 1789129091.941559,
+    "type": "command"
+  },
+  {
+    "message": "echo: IDEX calibration: full calibration started",
+    "time": 1789129091.9432504,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"IDEX calibration: starting Eddy centre reference at X=150 Y=150 before ball calibration\"",
+    "time": 1789129094.2364125,
+    "type": "command"
+  },
+  {
+    "message": "echo: IDEX calibration: starting Eddy centre reference at X=150 Y=150 before ball calibration",
+    "time": 1789129094.2378962,
+    "type": "response"
+  },
+  {
+    "message": "M140 S0\nM104 T0 S0\nM104 T1 S0\nBED_MESH_CLEAR\nSET_GCODE_OFFSET X=0 Y=0 Z=0 MOVE=0\nG28\nM400",
+    "time": 1789129099.4586263,
+    "type": "command"
+  },
+  {
+    "message": "QUERY_MULTI_HEAD_ZERO",
+    "time": 1789129138.786143,
+    "type": "command"
+  },
+  {
+    "message": "// multi_head_zero: RELEASED",
+    "time": 1789129139.0394785,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"IDEX calibration: post-home multi-head-zero safety check passed: RELEASED\"",
+    "time": 1789129139.5467715,
+    "type": "command"
+  },
+  {
+    "message": "echo: IDEX calibration: post-home multi-head-zero safety check passed: RELEASED",
+    "time": 1789129139.548454,
+    "type": "response"
+  },
+  {
+    "message": "T0\nM400",
+    "time": 1789129139.7245634,
+    "type": "command"
+  },
+  {
+    "message": "echo: IDEX active carriage: X-left",
+    "time": 1789129139.742323,
+    "type": "response"
+  },
+  {
+    "message": "// No mesh loaded to offset",
+    "time": 1789129139.7472465,
+    "type": "response"
+  },
+  {
+    "message": "echo: IDEX T0 offsets applied: gcode X=0 Y=0.0 static Z=0.0 plus manual tuning; mesh X=0 Y=0.0 ZFADE=0.0; MOVE=1",
+    "time": 1789129139.748127,
+    "type": "response"
+  },
+  {
+    "message": "G90\nG1 Z30.000 F8000\nM400",
+    "time": 1789129140.7163398,
+    "type": "command"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"IDEX calibration: Eddy bed reference started; homing_required=True\"",
+    "time": 1789129151.2246428,
+    "type": "command"
+  },
+  {
+    "message": "echo: IDEX calibration: Eddy bed reference started; homing_required=True",
+    "time": 1789129151.2258868,
+    "type": "response"
+  },
+  {
+    "message": "RESPOND TYPE=echo MSG=\"IDEX calibration: Eddy bed calibration FAILED: \"",
+    "time": 1789129152.3062508,
+    "type": "command"
+  },
+  {
+    "message": "echo: IDEX calibration: Eddy bed calibration FAILED: ",
+    "time": 1789129152.3074832,
+    "type": "response"
+  }
+]

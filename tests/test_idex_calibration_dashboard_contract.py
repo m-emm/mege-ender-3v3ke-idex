@@ -101,6 +101,27 @@ def test_mesh_refresh_is_a_no_argument_mesh_phase_wrapper():
     assert 'printer.cfg.template" "${batch_dir}/source/printer.cfg.template"' in full
 
 
+def test_local_dashboard_simulator_is_explicitly_local_and_has_public_event_scripts():
+    simulator = (ROOT / "scripts/idex_calibration_dashboard_simulator.py").read_text(encoding="utf-8")
+    launcher = (ROOT / "scripts/run_idex_calibration_dashboard_simulator.sh").read_text(encoding="utf-8")
+    events = (ROOT / "scripts/idex_calibration_simulate.sh").read_text(encoding="utf-8")
+    controls = (ROOT / "scripts/idex_calibration_dashboard_simulator_ui.js").read_text(encoding="utf-8")
+    capture = (ROOT / "scripts/capture_idex_calibration_dashboard_simulator_fixtures.sh").read_text(encoding="utf-8")
+    assert 'ThreadingHTTPServer(("127.0.0.1", args.port)' in simulator
+    assert '"/printer/objects/query"' in simulator
+    assert '"/server/gcode_store"' in simulator
+    assert '"/webcam/"' in simulator
+    assert 'window.__IDEX_SIMULATOR__=true' in simulator
+    assert "--port" in launcher
+    for action in ("reset", "scenario", "start", "step", "progress", "heartbeat", "complete-step", "complete-chapter", "fail-step", "restart", "set-heartbeat-age", "set-printer"):
+        assert action in events
+    assert "Local simulator" in controls
+    assert "Consistency checks" in controls
+    assert "Event log" in controls
+    assert "sim-progress" in controls
+    assert "read-only" in capture
+
+
 def test_new_dashboard_batch_does_not_inherit_old_chapters(tmp_path, monkeypatch):
     runner = load_tool_runner()
     monkeypatch.setattr(runner, "DEFAULT_DASHBOARD_ROOT", str(tmp_path))

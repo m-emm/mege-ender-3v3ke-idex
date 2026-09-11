@@ -111,9 +111,12 @@ def test_installed_overlay_is_used_after_mainsail_and_in_live_deployment():
     updater = UPDATER.read_text(encoding="utf-8")
     deployer = INSTALLED_DEPLOY.read_text(encoding="utf-8")
     mainsail_overlay = INSTALLED_ROOTFS / "var/www/mainsail/index.html"
+    service_worker_overlay = INSTALLED_ROOTFS / "var/www/mainsail/sw.js"
     nginx_overlay = INSTALLED_ROOTFS / "etc/nginx/sites-available/mainsail"
+    overlay_readme = (INSTALLED_OVERLAY / "README.md").read_text(encoding="utf-8")
 
     assert mainsail_overlay.is_file()
+    assert service_worker_overlay.is_file()
     assert nginx_overlay.is_file()
     assert 'wget -q "${MAINSAIL_URL}" -O "${TMP_ZIP}"' in image_installer
     assert 'rmdir /var/www/mainsail/mainsail' in image_installer
@@ -122,6 +125,12 @@ def test_installed_overlay_is_used_after_mainsail_and_in_live_deployment():
         '"${FILES_DIR}/installed_overlay/rootfs/" /'
     )
     assert 'crossorigin="use-credentials"' in mainsail_overlay.read_text(encoding="utf-8")
+    service_worker = service_worker_overlay.read_text(encoding="utf-8")
+    assert r"^\/(calibration|eddy|vision)(?:\/|$)" in service_worker
+    assert "index.html" in overlay_readme
+    assert "sw.js" in overlay_readme
+    assert "v2.9.1" in overlay_readme
+    assert "/calibration/" in overlay_readme
     nginx = nginx_overlay.read_text(encoding="utf-8")
     assert nginx.count("proxy_set_header X-Forwarded-For $remote_addr;") == 2
     assert nginx.count("proxy_set_header X-Real-IP $remote_addr;") == 2

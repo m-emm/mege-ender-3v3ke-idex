@@ -1,0 +1,36 @@
+{
+  "accepted": {
+    "bed_reference": {
+      "accepted_at": "2026-09-11T12:10:52.588666+00:00",
+      "artifact": "runs/20260911T120433Z_full/bed_calibration/reference/bed_calibration_result.json",
+      "attempt_id": "20260911T120433Z_full",
+      "status": "accepted"
+    },
+    "mesh": {
+      "accepted_at": "2026-09-10T17:33:38.089706+00:00",
+      "artifact": "runs/20260910T172427Z/bed_calibration/bed_calibration/bed_calibration_result.json",
+      "attempt_id": "20260910T172427Z",
+      "status": "stale"
+    },
+    "tool_alignment": {
+      "accepted_at": "2026-09-10T16:13:18.897643+00:00",
+      "artifact": "artifacts/2026-09-10_17-58-07_T0_T1_verification_verification_report.json",
+      "attempt_id": "2026-09-10_17-58-07_T0_T1",
+      "status": "accepted"
+    }
+  },
+  "activity": {
+    "operation": "bed_calibration.reference",
+    "progress": "",
+    "state": "failed",
+    "step": null
+  },
+  "attempt": {
+    "attempt_id": "20260911T121809Z_full",
+    "run_scope": "full",
+    "stage": "bed_calibration.reference",
+    "status": "failed"
+  },
+  "kind": "curated_idex_dashboard_context",
+  "last_successful_batch_id": null
+}

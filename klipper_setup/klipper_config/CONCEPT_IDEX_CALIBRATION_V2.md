@@ -595,7 +595,9 @@ canonical remote root becomes:
 
 ```text
 /home/pi/printer_data/calibration/
+  data/accepted.json
   data/current.json
+  data/activity.json
   data/last_successful.json
   runs/<batch-id>/...
   artifacts/<content-addressed-or-batch-named-files>
@@ -603,8 +605,12 @@ canonical remote root becomes:
 
 Nginx continues to expose this root at `/calibration/`.
 
-`current.json` is an atomically replaced, compact snapshot. It is mutable by
-design and contains links or summaries, not the sole copy of evidence.
+`accepted.json` is the durable acceptance ledger. `current.json` is its
+atomically replaced compact dashboard projection; it is mutable by design and
+contains links or summaries, not the sole copy of evidence. `activity.json` is
+the separately locked volatile heartbeat/activity record. It may inform the UI
+that a transaction is busy, delayed, or stale, but cannot alter acceptance or
+print readiness.
 `last_successful.json` points to the last full batch that reached printable
 state. Starting or failing a new run does not erase that history.
 
@@ -612,7 +618,7 @@ The V2 dashboard snapshot has this top-level shape:
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "kind": "idex_calibration_dashboard",
   "batch_id": "...",
   "run_scope": "full|tool_alignment|bed_reference|mesh_refresh",
@@ -621,6 +627,9 @@ The V2 dashboard snapshot has this top-level shape:
   "updated_at": "...",
   "source_config_fingerprint": "...",
   "target_config_fingerprint": "...",
+  "attempt": {},
+  "accepted": {},
+  "accepted_sources": {},
   "events": [],
   "chapters": {
     "tool_alignment": {
@@ -645,6 +654,26 @@ The publisher updates it after every multi-head-zero contact, every Eddy
 reference contact, every mesh point, every calculation, every deployment state
 change, and every abort. Writes use temporary-file-plus-rename so the one-second
 browser poll never observes partial JSON.
+
+### Local dashboard simulator
+
+Dashboard behavior must be exercised without waiting for a physical calibration
+or moving the printer. `scripts/run_idex_calibration_dashboard_simulator.sh`
+starts a localhost-only server at
+`http://127.0.0.1:8787/calibration/`. It serves the exact production static
+dashboard assets, injecting controls only into that local response, and mocks
+the calibration projections, activity record, Moonraker object query, G-code
+store, webcam still, artifacts, and plots.
+
+`scripts/idex_calibration_simulate.sh` is the deterministic event interface
+for reset, scenarios, starts, explicit steps, contact progress, heartbeats,
+chapter completion, failures, restarts, heartbeat age, and printer state.
+It uses the real acceptance-ledger module to compose its projections. Its
+fixtures are captured by the read-only
+`scripts/capture_idex_calibration_dashboard_simulator_fixtures.sh`, which keeps
+a small provenance-manifested subset of real evidence in
+`tests/fixtures/idex_calibration_dashboard/`. The simulator binds only to
+`127.0.0.1` and never contacts Moonraker, SSH, or motion workflows.
 
 ## Calibration dashboard
 

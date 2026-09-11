@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-09-11T14:35:55.875285+00:00",
+  "files": [
+    {
+      "path": "artifacts/2026-09-10_17-58-07_T0_T1_calibration_T0_calibration.png",
+      "sha256": "4b7a3670bfa99b86d60e0e6ad2c350e01441ee0eb92eef080b14f411b0b84b3c"
+    },
+    {
+      "path": "artifacts/2026-09-10_17-58-07_T0_T1_calibration_T1_calibration.png",
+      "sha256": "7770ddf215137e3de0ac8372d73c499bbc41a1a9a9c40a8f8f7fa983473aa217"
+    },
+    {
+      "path": "artifacts/2026-09-10_17-58-07_T0_T1_verification_T0_verification.png",
+      "sha256": "60d89c3c9843877dedecd5c2fe826ba78693e21a7071e0da0e936e8ea8cdc3de"
+    },
+    {
+      "path": "artifacts/2026-09-10_17-58-07_T0_T1_verification_T1_verification.png",
+      "sha256": "c51cd4464bbd761353bbe239c1ea8e1883975d2595bff2b0a613a699f8e8dd6e"
+    },
+    {
+      "path": "artifacts/20260910T172427Z_bed_mesh.png",
+      "sha256": "4a22c581f6e0251e5f40db8031dae1130597f34f3035966fd4f4d56c4796bd16"
+    },
+    {
+      "path": "camera.jpg",
+      "sha256": "1179ac4634d5c2a80c458e43c23cb312e16b04d5abab4a8ce5ba0c8f2820cf37"
+    },
+    {
+      "path": "captured_context.json",
+      "sha256": "a31e82d91b5aaab452d1a2d5d4caa0174807e1e6dd490741d7c8d3dbc151985d"
+    },
+    {
+      "path": "moonraker_console.json",
+      "sha256": "93fc87de11304d7647c6a25d333a44c5d196c3de31d9b50c1e627e897f66189c"
+    },
+    {
+      "path": "moonraker_status.json",
+      "sha256": "13e9c122c23377b619632b5229d52e4d91854879010108aacf2596d64287c79f"
+    },
+    {
+      "path": "seed_accepted.json",
+      "sha256": "be952c2dc3260c6cc8be2766cb646d2304c776fde5e2065cbc8cb67ba31ef115"
+    }
+  ],
+  "kind": "idex_calibration_dashboard_simulator_fixture",
+  "read_only": true,
+  "source_calibration_root": "/home/pi/printer_data/calibration",
+  "source_host": "pi@menderpi.local"
+}
