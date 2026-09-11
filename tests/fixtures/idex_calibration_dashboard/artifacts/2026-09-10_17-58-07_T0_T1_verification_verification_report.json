@@ -1,0 +1,149 @@
+{
+  "calibration_result": "/Users/mege/git/mege-ender-3v3ke-idex/runs/multi_head_zero_contact/2026-09-10_17-58-07_T0_T1_calibration/calibration_result.json",
+  "checks": {
+    "paired_x": {
+      "label": "Paired \u0394X",
+      "limit_mm": 0.05,
+      "passed": true,
+      "reason": "Paired \u0394X: 12.5 \u00b5m / limit 50.0 \u00b5m \u2014 PASS",
+      "value_mm": 0.012515725194603533
+    },
+    "paired_y": {
+      "label": "Paired \u0394Y",
+      "limit_mm": 0.05,
+      "passed": true,
+      "reason": "Paired \u0394Y: 11.3 \u00b5m / limit 50.0 \u00b5m \u2014 PASS",
+      "value_mm": 0.011273776172155081
+    },
+    "t0_center_repeatability": {
+      "label": "T0 centre \u03c3",
+      "limit_mm": 0.015,
+      "passed": true,
+      "reason": "T0 centre \u03c3: 2.0 \u00b5m / limit 15.0 \u00b5m \u2014 PASS",
+      "value_mm": 0.002000000000269253
+    },
+    "t0_x": {
+      "label": "T0 target \u0394X",
+      "limit_mm": 0.05,
+      "passed": true,
+      "reason": "T0 target \u0394X: 5.9 \u00b5m / limit 50.0 \u00b5m \u2014 PASS",
+      "value_mm": 0.005884480653307378
+    },
+    "t0_y": {
+      "label": "T0 target \u0394Y",
+      "limit_mm": 0.05,
+      "passed": true,
+      "reason": "T0 target \u0394Y: -1.5 \u00b5m / limit 50.0 \u00b5m \u2014 PASS",
+      "value_mm": -0.0014855554091219858
+    },
+    "t1_center_repeatability": {
+      "label": "T1 centre \u03c3",
+      "limit_mm": 0.015,
+      "passed": true,
+      "reason": "T1 centre \u03c3: 0.0 \u00b5m / limit 15.0 \u00b5m \u2014 PASS",
+      "value_mm": 7.335649406780473e-14
+    },
+    "t1_x": {
+      "label": "T1 target \u0394X",
+      "limit_mm": 0.05,
+      "passed": true,
+      "reason": "T1 target \u0394X: 18.4 \u00b5m / limit 50.0 \u00b5m \u2014 PASS",
+      "value_mm": 0.01840020584791091
+    },
+    "t1_y": {
+      "label": "T1 target \u0394Y",
+      "limit_mm": 0.05,
+      "passed": true,
+      "reason": "T1 target \u0394Y: 9.8 \u00b5m / limit 50.0 \u00b5m \u2014 PASS",
+      "value_mm": 0.009788220763033095
+    },
+    "z_center": {
+      "label": "Paired centre \u0394Z",
+      "limit_mm": 0.02,
+      "passed": true,
+      "reason": "Paired centre \u0394Z: 0.0 \u00b5m / limit 20.0 \u00b5m \u2014 PASS",
+      "value_mm": 5.090905474958163e-10
+    }
+  },
+  "created_at": "2026-09-10T16:13:18.897643+00:00",
+  "failure_reasons": [],
+  "limits_mm": {
+    "centre_sigma": 0.015,
+    "x": 0.05,
+    "y": 0.05,
+    "z": 0.02
+  },
+  "measurements": {
+    "t0": {
+      "centre_statistics": {
+        "count": 5,
+        "maximum": 2.7734999994908245,
+        "mean": 2.772499999490402,
+        "median": 2.773499999490441,
+        "minimum": 2.7684999994898636,
+        "repeatability_passed": true,
+        "span": 0.0050000000009609025,
+        "standard_deviation": 0.002000000000269253,
+        "standard_deviation_limit_mm": 0.015
+      },
+      "centre_z": 2.773499999490441,
+      "x": 75.00588448065331,
+      "y": -9.001485555409122
+    },
+    "t1": {
+      "centre_statistics": {
+        "count": 5,
+        "maximum": 2.773499999999636,
+        "mean": 2.773499999999532,
+        "median": 2.7734999999995313,
+        "minimum": 2.7734999999994283,
+        "repeatability_passed": true,
+        "span": 2.078337502098293e-13,
+        "standard_deviation": 7.335649406780473e-14,
+        "standard_deviation_limit_mm": 0.015
+      },
+      "centre_z": 2.7734999999995313,
+      "x": 75.01840020584791,
+      "y": -8.990211779236967
+    }
+  },
+  "pass": true,
+  "pass_components": {
+    "paired_x": true,
+    "paired_y": true,
+    "t0_center_repeatability": true,
+    "t0_x": true,
+    "t0_y": true,
+    "t1_center_repeatability": true,
+    "t1_x": true,
+    "t1_y": true,
+    "z_center": true
+  },
+  "radial_xy_mm": 0.016844625443347958,
+  "runs": {
+    "t0": "/Users/mege/git/mege-ender-3v3ke-idex/runs/multi_head_zero_contact/2026-09-10_17-58-07_T0_T1_verification/T0",
+    "t1": "/Users/mege/git/mege-ender-3v3ke-idex/runs/multi_head_zero_contact/2026-09-10_17-58-07_T0_T1_verification/T1"
+  },
+  "schema_version": 3,
+  "t1_minus_t0": {
+    "x": 0.012515725194603533,
+    "y": 0.011273776172155081,
+    "z": 5.090905474958163e-10,
+    "z_center": 5.090905474958163e-10
+  },
+  "target_center": {
+    "x": 75.0,
+    "y": -9.0
+  },
+  "target_error_mm": {
+    "t0": {
+      "x": 0.005884480653307378,
+      "y": -0.0014855554091219858
+    },
+    "t1": {
+      "x": 0.01840020584791091,
+      "y": 0.009788220763033095
+    }
+  },
+  "workflow": "multi_head_zero_verification_report"
+}

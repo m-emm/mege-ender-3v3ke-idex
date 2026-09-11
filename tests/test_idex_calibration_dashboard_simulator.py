@@ -34,6 +34,7 @@ def test_fixture_set_has_read_only_provenance_and_real_dashboard_inputs():
     assert {"seed_accepted.json", "captured_context.json", "moonraker_status.json", "moonraker_console.json", "camera.jpg"} <= paths
     assert any(path.endswith("T0_calibration.png") for path in paths)
     assert any(path.endswith("bed_mesh.png") for path in paths)
+    assert any(path.endswith("verification_report.json") for path in paths)
     for item in provenance["files"]:
         assert sha256(FIXTURES / item["path"]) == item["sha256"]
 

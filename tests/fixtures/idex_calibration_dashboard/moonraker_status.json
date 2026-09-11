@@ -1,6 +1,6 @@
 {
   "result": {
-    "eventtime": 17402.227551108,
+    "eventtime": 17657.522986438,
     "status": {
       "webhooks": {
         "state": "ready",
@@ -22,7 +22,7 @@
         ],
         "print_time": 11799.00695025,
         "stalls": 0,
-        "estimated_print_time": 17417.0807285,
+        "estimated_print_time": 17672.369273333334,
         "extruder": "extruder",
         "position": [
           0.0,
@@ -82,7 +82,7 @@
         }
       },
       "extruder": {
-        "temperature": 20.69,
+        "temperature": 20.61,
         "target": 0.0,
         "power": 0.0,
         "can_extrude": false,
@@ -91,7 +91,7 @@
         "motion_queue": null
       },
       "extruder1": {
-        "temperature": 21.45,
+        "temperature": 21.47,
         "target": 0.0,
         "power": 0.0,
         "can_extrude": false,
@@ -100,7 +100,7 @@
         "motion_queue": null
       },
       "heater_bed": {
-        "temperature": 20.57,
+        "temperature": 20.21,
         "target": 0.0,
         "power": 0.0
       }

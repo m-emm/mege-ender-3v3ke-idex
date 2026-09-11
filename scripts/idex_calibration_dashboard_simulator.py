@@ -485,7 +485,13 @@ class Handler(BaseHTTPRequestHandler):
             target = self.simulator.fixture_root / "artifacts" / Path(path).name
             if target.is_file():
                 self._send(200, target.read_bytes(), mimetypes.guess_type(target.name)[0] or "application/octet-stream")
-            else: self._json({"error": "fixture artifact not found"}, 404)
+            else: self._json({"fixture": "curated acceptance evidence", "source": path, "note": "This artifact was not selected for the compact local fixture set."})
+            return
+        if path.startswith("/calibration/runs/"):
+            # Accepted provenance can legitimately point to a full immutable
+            # archive. The simulator deliberately does not copy those archives,
+            # but its link remains inspectable rather than becoming a 404.
+            self._json({"fixture": "curated acceptance evidence", "source": path, "note": "Full run archives are intentionally excluded from local simulator fixtures."})
             return
         if path in {"/calibration/", "/calibration/index.html"}:
             html = (DASHBOARD_ROOT / "index.html").read_text(encoding="utf-8")

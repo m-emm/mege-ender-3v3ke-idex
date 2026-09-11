@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-11T14:35:55.875285+00:00",
+  "captured_at": "2026-09-11T14:40:11.252142+00:00",
   "files": [
     {
       "path": "artifacts/2026-09-10_17-58-07_T0_T1_calibration_T0_calibration.png",
@@ -18,12 +18,20 @@
       "sha256": "c51cd4464bbd761353bbe239c1ea8e1883975d2595bff2b0a613a699f8e8dd6e"
     },
     {
+      "path": "artifacts/2026-09-10_17-58-07_T0_T1_verification_verification_report.json",
+      "sha256": "6f33dd4fd9f7665639403730eec43a8a2b43bed266f2bd0d21f7dccbedb2e314"
+    },
+    {
       "path": "artifacts/20260910T172427Z_bed_mesh.png",
       "sha256": "4a22c581f6e0251e5f40db8031dae1130597f34f3035966fd4f4d56c4796bd16"
     },
     {
+      "path": "artifacts/20260910T172427Z_mesh_result.json",
+      "sha256": "e027f90158220cca99f109284b625384ad856511ed1a8a42f7d2ff685bd2a781"
+    },
+    {
       "path": "camera.jpg",
-      "sha256": "1179ac4634d5c2a80c458e43c23cb312e16b04d5abab4a8ce5ba0c8f2820cf37"
+      "sha256": "a721f966eb1a5b6abc70c25267641c36a716d6f1137044003b8c1988292a77cb"
     },
     {
       "path": "captured_context.json",
@@ -35,7 +43,7 @@
     },
     {
       "path": "moonraker_status.json",
-      "sha256": "13e9c122c23377b619632b5229d52e4d91854879010108aacf2596d64287c79f"
+      "sha256": "928866f49c44619c92bca5c46821d23b50409a092afce3f958b0826110679b76"
     },
     {
       "path": "seed_accepted.json",

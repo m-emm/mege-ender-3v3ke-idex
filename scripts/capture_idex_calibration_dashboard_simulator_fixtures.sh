@@ -66,9 +66,15 @@ declare -a REMOTE_ASSETS=(
 for asset in "${REMOTE_ASSETS[@]}"; do
     scp -q "${HOST}:${REMOTE_ROOT}/artifacts/${asset}" "${temporary}/${asset}"
 done
+scp -q "${HOST}:${REMOTE_ROOT}/artifacts/2026-09-10_17-58-07_T0_T1_verification_verification_report.json" \
+    "${temporary}/2026-09-10_17-58-07_T0_T1_verification_verification_report.json"
+scp -q "${HOST}:${REMOTE_ROOT}/runs/20260910T172427Z/bed_calibration/mesh_result.json" \
+    "${temporary}/20260910T172427Z_mesh_result.json"
 
 cp "${temporary}/moonraker_status.json" "${temporary}/moonraker_console.json" "${temporary}/camera.jpg" "${DESTINATION}/"
 cp "${temporary}"/*.png "${DESTINATION}/artifacts/"
+cp "${temporary}/2026-09-10_17-58-07_T0_T1_verification_verification_report.json" \
+   "${temporary}/20260910T172427Z_mesh_result.json" "${DESTINATION}/artifacts/"
 
 # The seed is a faithful copy of captured accepted evidence. The simulator
 # creates a local 'ready' composition by marking the captured persisted mesh
