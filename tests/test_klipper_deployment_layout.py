@@ -89,7 +89,8 @@ def test_mege_outside_client_is_canonical_and_not_enabled_in_the_image():
     assert "systemctl_enable_safe mege-printer-tunnel" not in image_installer
     assert "AllowedIPs = 10.203.71.1/32, fd1c:4436:beaf:1::1/128" in template
     assert "-R 127.0.0.1:17125:127.0.0.1:80" in unit
-    assert "AddressFamily=inet6" in unit
+    assert "AddressFamily=" not in unit
+    assert "AAAA-only" in unit
     assert "StrictHostKeyChecking=yes" in unit
 
 

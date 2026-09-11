@@ -10,8 +10,7 @@ ConditionPathExists=/home/pi/.ssh/mege-outside-printer-tunnel
 Type=simple
 User=pi
 Group=pi
-ExecStart=/usr/bin/ssh -6 -NT \
-  -o AddressFamily=inet6 \
+ExecStart=/usr/bin/ssh -NT \
   -o BatchMode=yes \
   -o ExitOnForwardFailure=yes \
   -o IdentitiesOnly=yes \
@@ -24,6 +23,8 @@ ExecStart=/usr/bin/ssh -6 -NT \
   -i /home/pi/.ssh/mege-outside-printer-tunnel \
   -R 127.0.0.1:17125:127.0.0.1:80 \
   printer-tunnel@os.meges-world.net
+# os.meges-world.net is AAAA-only. Leave AddressFamily unset so SSH uses IPv6
+# for the endpoint while the reverse-forward target remains IPv4 loopback.
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
