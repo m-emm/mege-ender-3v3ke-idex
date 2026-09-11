@@ -162,7 +162,8 @@ apt-get install -y --no-install-recommends \
   build-essential \
   libatlas-base-dev \
   libopenblas-dev \
-  libsodium23
+  libsodium23 \
+  wireguard-tools
 python3 -c 'from scipy.stats import theilslopes'
 
 # You install these later; keeping them separate is fine, but installing here makes it deterministic.
@@ -478,6 +479,10 @@ require_file "${FILES_DIR}/webcam_health_probe.py"
 require_file "${FILES_DIR}/nozzle_cam_profiles.json"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs.service"
 require_file "${FILES_DIR}/klipperpi-expand-rootfs-once.sh"
+require_file "${FILES_DIR}/mege_outside/mege-outside-enroll.sh"
+require_file "${FILES_DIR}/mege_outside/mege-outside-activate.sh"
+require_file "${FILES_DIR}/mege_outside/mege.conf.template"
+require_file "${FILES_DIR}/mege_outside/mege-printer-tunnel.service"
 # Note: klipperscreen.service not needed - LightDM handles KlipperScreen
 
 install -m 0644 "${FILES_DIR}/klipper.service" /etc/systemd/system/klipper.service
@@ -490,6 +495,11 @@ install -m 0644 "${FILES_DIR}/vision-capture.service" /etc/systemd/system/vision
 install -m 0644 "${FILES_DIR}/vision-capture-nozzle-cam.service" /etc/systemd/system/vision-capture-nozzle-cam.service
 install -m 0644 "${FILES_DIR}/klipperpi-expand-rootfs.service" /etc/systemd/system/klipperpi-expand-rootfs.service
 install -m 0755 "${FILES_DIR}/klipperpi-expand-rootfs-once.sh" /usr/local/sbin/klipperpi-expand-rootfs-once.sh
+install -d -m 0755 /usr/local/share/mege-outside
+install -m 0755 "${FILES_DIR}/mege_outside/mege-outside-enroll.sh" /usr/local/sbin/mege-outside-enroll
+install -m 0755 "${FILES_DIR}/mege_outside/mege-outside-activate.sh" /usr/local/sbin/mege-outside-activate
+install -m 0644 "${FILES_DIR}/mege_outside/mege.conf.template" /usr/local/share/mege-outside/mege.conf.template
+install -m 0644 "${FILES_DIR}/mege_outside/mege-printer-tunnel.service" /etc/systemd/system/mege-printer-tunnel.service
 install -m 0755 "${FILES_DIR}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 install -m 0755 "${FILES_DIR}/vision_capture.py" /usr/local/bin/vision_capture.py
 install -m 0755 "${FILES_DIR}/vision_calibration.py" /usr/local/bin/vision_calibration.py

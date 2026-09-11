@@ -1,0 +1,9 @@
+[Interface]
+PrivateKey = __MEGE_PRIVATE_KEY__
+Address = 10.203.71.20/24, fd1c:4436:beaf:1::20/64
+
+[Peer]
+PublicKey = __HUB_WIREGUARD_PUBLIC_KEY__
+AllowedIPs = 10.203.71.1/32, fd1c:4436:beaf:1::1/128
+Endpoint = os.meges-world.net:51820
+PersistentKeepalive = 25

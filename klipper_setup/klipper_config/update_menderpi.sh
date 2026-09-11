@@ -3,10 +3,17 @@ set -euo pipefail
 
 if [ "$#" -eq 1 ] && [ "$1" = "--check" ]; then
   MODE=check
+elif [ "$#" -eq 1 ] && [ "$1" = "--mege-outside-enroll" ]; then
+  MODE=outside_enroll
+elif [ "$#" -eq 4 ] && [ "$1" = "--mege-outside-activate" ]; then
+  MODE=outside_activate
+  HUB_WG_PUBLIC_KEY=$2
+  OUTSIDE_HOST=$3
+  HUB_SSH_HOST_KEY=$4
 elif [ "$#" -eq 0 ]; then
   MODE=update
 else
-  echo "Usage: $0 [--check]" >&2
+  echo "Usage: $0 [--check|--mege-outside-enroll|--mege-outside-activate <hub-wireguard-public-key> os.meges-world.net <hub-ssh-ed25519-public-key>]" >&2
   exit 2
 fi
 
@@ -16,6 +23,7 @@ SOURCE_CFG="$SCRIPT_DIR/printer.cfg"
 SOURCE_HOST_ROOT="$SETUP_DIR/klipper_host"
 SOURCE_HOST_OVERLAY="$SOURCE_HOST_ROOT/klippy"
 SOURCE_RUNTIME_HELPERS="$SETUP_DIR/runtime_helpers"
+SOURCE_OUTSIDE_CLIENT_ROOT="$SETUP_DIR/image_build/overlays/stage2/99-klipperpi/files/mege_outside"
 SOURCE_KLIPPER_COMMIT="$SETUP_DIR/KLIPPER_COMMIT"
 
 REMOTE_HOST=${MENDERPI_HOST-}
@@ -65,6 +73,7 @@ validate_local_sources() {
   [ -f "$SOURCE_CFG" ] || { echo "Missing $SOURCE_CFG" >&2; exit 1; }
   [ -d "$SOURCE_HOST_OVERLAY" ] || { echo "Missing $SOURCE_HOST_OVERLAY" >&2; exit 1; }
   [ -d "$SOURCE_RUNTIME_HELPERS" ] || { echo "Missing $SOURCE_RUNTIME_HELPERS" >&2; exit 1; }
+  [ -d "$SOURCE_OUTSIDE_CLIENT_ROOT" ] || { echo "Missing $SOURCE_OUTSIDE_CLIENT_ROOT" >&2; exit 1; }
   [ -f "$SOURCE_KLIPPER_COMMIT" ] || { echo "Missing $SOURCE_KLIPPER_COMMIT" >&2; exit 1; }
   local commit
   commit=$(tr -d '[:space:]' < "$SOURCE_KLIPPER_COMMIT")
@@ -80,6 +89,7 @@ for root_arg in sys.argv[1:]:
 PY
   manifest_tree "$SOURCE_HOST_OVERLAY" > "$LOCAL_TMP_DIR/host.manifest"
   manifest_tree "$SOURCE_RUNTIME_HELPERS" > "$LOCAL_TMP_DIR/runtime.manifest"
+  manifest_tree "$SOURCE_OUTSIDE_CLIENT_ROOT" > "$LOCAL_TMP_DIR/outside.manifest"
 }
 
 remote_payload() {
@@ -112,7 +122,40 @@ payload = {
     "managed_state": state,
     "host_targets": {p: digest(klipper / p) for p in state.get("host", {})},
     "runtime_targets": {p: digest(config / p) for p in state.get("runtime", {})},
+    "outside_targets": {},
 }
+outside_targets = {
+    "mege-outside-enroll.sh": Path("/usr/local/sbin/mege-outside-enroll"),
+    "mege-outside-activate.sh": Path("/usr/local/sbin/mege-outside-activate"),
+    "mege.conf.template": Path("/usr/local/share/mege-outside/mege.conf.template"),
+    "mege-printer-tunnel.service": Path("/etc/systemd/system/mege-printer-tunnel.service"),
+}
+payload["outside_targets"] = {
+    relative: digest(target) for relative, target in outside_targets.items()
+    if relative in state.get("outside", {})
+}
+def active(unit):
+    return subprocess.run(
+        ["systemctl", "is-active", "--quiet", unit], check=False
+    ).returncode == 0
+payload["outside"] = {
+    "enrolled": Path("/etc/wireguard/mege.key").is_file()
+    and Path("/home/pi/.ssh/mege-outside-printer-tunnel").is_file(),
+    "wireguard_config": Path("/etc/wireguard/mege.conf").is_file(),
+    "wireguard_active": active("wg-quick@mege.service"),
+    "tunnel_active": active("mege-printer-tunnel.service"),
+    "handshake_epoch": 0,
+}
+try:
+    for line in subprocess.check_output(
+        ["wg", "show", "mege", "latest-handshakes"], text=True
+    ).splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[1].isdigit():
+            payload["outside"]["handshake_epoch"] = int(fields[1])
+            break
+except (FileNotFoundError, subprocess.CalledProcessError):
+    pass
 try:
     payload["klipper_commit"] = subprocess.check_output(
         ["git", "-C", str(klipper), "rev-parse", "HEAD"], text=True
@@ -156,6 +199,7 @@ check_live_config() {
   CHECK_EXPECTED_FINGERPRINT=$expected_fingerprint \
   CHECK_LOCAL_HOST_MANIFEST="$(cat "$LOCAL_TMP_DIR/host.manifest")" \
   CHECK_LOCAL_RUNTIME_MANIFEST="$(cat "$LOCAL_TMP_DIR/runtime.manifest")" \
+  CHECK_LOCAL_OUTSIDE_MANIFEST="$(cat "$LOCAL_TMP_DIR/outside.manifest")" \
   CHECK_EXPECTED_KLIPPER_COMMIT="$(tr -d '[:space:]' < "$SOURCE_KLIPPER_COMMIT")" \
   CHECK_REMOTE_PAYLOAD=$payload \
   python3 - "$SCRIPT_DIR/generate_printer_cfg.py" <<'PY'
@@ -163,6 +207,7 @@ import importlib.util
 import json
 import os
 import sys
+import time
 spec = importlib.util.spec_from_file_location("generate_printer_cfg", sys.argv[1])
 generator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(generator)
@@ -172,6 +217,7 @@ def manifest(value):
 local_config = os.environ["CHECK_LOCAL_CONFIG_SHA"]
 local_host = manifest(os.environ["CHECK_LOCAL_HOST_MANIFEST"])
 local_runtime = manifest(os.environ["CHECK_LOCAL_RUNTIME_MANIFEST"])
+local_outside = manifest(os.environ["CHECK_LOCAL_OUTSIDE_MANIFEST"])
 remote = json.loads(os.environ["CHECK_REMOTE_PAYLOAD"])
 state = remote.get("managed_state", {})
 errors = []
@@ -186,6 +232,7 @@ if not remote.get("dependency_ok"):
 for label, local, section, target_key in (
     ("host overlay", local_host, "host", "host_targets"),
     ("runtime bundle", local_runtime, "runtime", "runtime_targets"),
+    ("outside-client bundle", local_outside, "outside", "outside_targets"),
 ):
     managed = state.get(section, {})
     missing = sorted(set(local) - set(managed))
@@ -197,6 +244,17 @@ for label, local, section, target_key in (
     for relative, expected in local.items():
         if remote.get(target_key, {}).get(relative) != expected:
             errors.append(f"{label} mismatch at {relative}")
+outside = remote.get("outside", {})
+if outside.get("wireguard_config"):
+    if not outside.get("wireguard_active"):
+        errors.append("WireGuard configuration exists but wg-quick@mege is not active")
+    if not outside.get("tunnel_active"):
+        errors.append("WireGuard configuration exists but mege-printer-tunnel is not active")
+    handshake = outside.get("handshake_epoch", 0)
+    if not isinstance(handshake, int) or handshake <= 0 or time.time() - handshake > 300:
+        errors.append("WireGuard handshake is absent or older than 300 seconds")
+elif outside.get("wireguard_active") or outside.get("tunnel_active"):
+    errors.append("outside services are active before mege.conf exists")
 status = remote.get("status", {})
 errors.extend(generator.live_config_check_errors(
     local_sha256=local_config,
@@ -217,6 +275,12 @@ print(f"  Remote Klipper commit: {remote.get('klipper_commit')}")
 print(f"  Klippy state: {status.get('webhooks', {}).get('state')}")
 print(f"  Managed host files: {len(state.get('host', {}))}")
 print(f"  Managed runtime files: {len(state.get('runtime', {}))}")
+print(f"  Managed outside-client files: {len(state.get('outside', {}))}")
+print(f"  Outside enrollment: {'yes' if outside.get('enrolled') else 'no'}")
+if outside.get("wireguard_config"):
+    print(f"  Outside WireGuard handshake epoch: {outside.get('handshake_epoch')}")
+else:
+    print("  Outside activation: not activated")
 if errors:
     print("Directory deployment check failed:", file=sys.stderr)
     for error in errors:
@@ -233,6 +297,21 @@ if [ "$MODE" = check ]; then
   exit 0
 fi
 
+if [ "$MODE" = outside_activate ]; then
+  echo "Activating the enrolled Mege outside client on $REMOTE_HOST..."
+  HUB_WG_PUBLIC_KEY_B64=$(printf '%s' "$HUB_WG_PUBLIC_KEY" | base64 | tr -d '\n')
+  OUTSIDE_HOST_B64=$(printf '%s' "$OUTSIDE_HOST" | base64 | tr -d '\n')
+  HUB_SSH_HOST_KEY_B64=$(printf '%s' "$HUB_SSH_HOST_KEY" | base64 | tr -d '\n')
+  ssh "$REMOTE_HOST" "sudo -n bash -s" <<REMOTE_SCRIPT
+set -euo pipefail
+hub_wg_public_key=\$(printf '%s' '$HUB_WG_PUBLIC_KEY_B64' | base64 -d)
+outside_host=\$(printf '%s' '$OUTSIDE_HOST_B64' | base64 -d)
+hub_ssh_host_key=\$(printf '%s' '$HUB_SSH_HOST_KEY_B64' | base64 -d)
+/usr/local/sbin/mege-outside-activate "\$hub_wg_public_key" "\$outside_host" "\$hub_ssh_host_key"
+REMOTE_SCRIPT
+  exit 0
+fi
+
 python3 "$SCRIPT_DIR/generate_printer_cfg.py"
 validate_local_sources
 REMOTE_TMP_DIR=$(ssh "$REMOTE_HOST" "mktemp -d /tmp/klipperpi-update.XXXXXX")
@@ -241,20 +320,23 @@ case "$REMOTE_TMP_DIR" in
   *) echo "Refusing unexpected remote temporary directory: $REMOTE_TMP_DIR" >&2; exit 1 ;;
 esac
 
-echo "Staging config, canonical host overlay, and runtime-helper bundle..."
-scp -r "$SOURCE_HOST_ROOT" "$SOURCE_RUNTIME_HELPERS" "$SOURCE_CFG" \
+echo "Staging config, canonical host overlay, runtime helpers, and outside-client files..."
+scp -r "$SOURCE_HOST_ROOT" "$SOURCE_RUNTIME_HELPERS" "$SOURCE_OUTSIDE_CLIENT_ROOT" "$SOURCE_CFG" \
   "$SOURCE_KLIPPER_COMMIT" "$LOCAL_TMP_DIR/host.manifest" \
-  "$LOCAL_TMP_DIR/runtime.manifest" "$REMOTE_HOST:$REMOTE_TMP_DIR/"
+  "$LOCAL_TMP_DIR/runtime.manifest" "$LOCAL_TMP_DIR/outside.manifest" \
+  "$REMOTE_HOST:$REMOTE_TMP_DIR/"
 
 ssh "$REMOTE_HOST" \
   "REMOTE_TMP_DIR='$REMOTE_TMP_DIR' REMOTE_KLIPPER_DIR='$REMOTE_KLIPPER_DIR' REMOTE_CONFIG_DIR='$REMOTE_CONFIG_DIR' REMOTE_MANAGED_STATE='$REMOTE_MANAGED_STATE' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 HOST_OVERLAY="$REMOTE_TMP_DIR/klipper_host/klippy"
 RUNTIME_HELPERS="$REMOTE_TMP_DIR/runtime_helpers"
+OUTSIDE_CLIENT="$REMOTE_TMP_DIR/mege_outside"
 CFG="$REMOTE_TMP_DIR/printer.cfg"
 COMMIT_FILE="$REMOTE_TMP_DIR/KLIPPER_COMMIT"
 HOST_MANIFEST="$REMOTE_TMP_DIR/host.manifest"
 RUNTIME_MANIFEST="$REMOTE_TMP_DIR/runtime.manifest"
+OUTSIDE_MANIFEST="$REMOTE_TMP_DIR/outside.manifest"
 MAIN_CFG="$REMOTE_CONFIG_DIR/printer.cfg"
 BACKUP_ROOT="$HOME/printer_data/backup/klipperpi-update-$(date +%Y%m%d-%H%M%S)"
 
@@ -270,12 +352,13 @@ for path in sorted(root.rglob("*")):
         print(f"{relative.as_posix()}\t{hashlib.sha256(path.read_bytes()).hexdigest()}")
 PY
 }
-[ -d "$HOST_OVERLAY" ] && [ -d "$RUNTIME_HELPERS" ] && [ -f "$CFG" ] && [ -f "$COMMIT_FILE" ] || {
+[ -d "$HOST_OVERLAY" ] && [ -d "$RUNTIME_HELPERS" ] && [ -d "$OUTSIDE_CLIENT" ] && [ -f "$CFG" ] && [ -f "$COMMIT_FILE" ] || {
   echo "Staged deployment bundle is incomplete" >&2
   exit 1
 }
 cmp -s "$HOST_MANIFEST" <(manifest_tree "$HOST_OVERLAY") || { echo "Host manifest mismatch" >&2; exit 1; }
 cmp -s "$RUNTIME_MANIFEST" <(manifest_tree "$RUNTIME_HELPERS") || { echo "Runtime manifest mismatch" >&2; exit 1; }
+cmp -s "$OUTSIDE_MANIFEST" <(manifest_tree "$OUTSIDE_CLIENT") || { echo "Outside-client manifest mismatch" >&2; exit 1; }
 COMMIT=$(tr -d '[:space:]' < "$COMMIT_FILE")
 [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid shared Klipper commit" >&2; exit 1; }
 [ "$(git -C "$REMOTE_KLIPPER_DIR" rev-parse HEAD)" = "$COMMIT" ] || {
@@ -310,13 +393,13 @@ if [ -f "$MAIN_CFG" ]; then sudo cp -a "$MAIN_CFG" "$BACKUP_ROOT/printer.cfg"; f
 sudo install -m 0644 "$CFG" "$MAIN_CFG"
 echo "Installed printer.cfg -> $MAIN_CFG"
 
-sudo python3 - "$REMOTE_MANAGED_STATE" "$HOST_OVERLAY" "$RUNTIME_HELPERS" "$BACKUP_ROOT" "$REMOTE_KLIPPER_DIR" "$REMOTE_CONFIG_DIR" <<'PY'
+sudo python3 - "$REMOTE_MANAGED_STATE" "$HOST_OVERLAY" "$RUNTIME_HELPERS" "$OUTSIDE_CLIENT" "$BACKUP_ROOT" "$REMOTE_KLIPPER_DIR" "$REMOTE_CONFIG_DIR" <<'PY'
 import hashlib
 import json
 import shutil
 import sys
 from pathlib import Path
-state_path, host_source, runtime_source, backup_root, host_target, runtime_target = map(Path, sys.argv[1:])
+state_path, host_source, runtime_source, outside_source, backup_root, host_target, runtime_target = map(Path, sys.argv[1:])
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 def safe_join(root, relative):
@@ -331,14 +414,26 @@ def read_manifest(path):
             relative, checksum = line.split("\t", 1)
             result[relative] = checksum
     return result
+def outside_target(relative):
+    targets = {
+        "mege-outside-enroll.sh": Path("/usr/local/sbin/mege-outside-enroll"),
+        "mege-outside-activate.sh": Path("/usr/local/sbin/mege-outside-activate"),
+        "mege.conf.template": Path("/usr/local/share/mege-outside/mege.conf.template"),
+        "mege-printer-tunnel.service": Path("/etc/systemd/system/mege-printer-tunnel.service"),
+    }
+    try:
+        return targets[relative]
+    except KeyError:
+        raise SystemExit(f"unsupported outside-client path: {relative}")
 try:
     old_state = json.loads(state_path.read_text(encoding="utf-8"))
 except FileNotFoundError:
     old_state = {}
 new_state = {
-    "version": 1,
+    "version": 2,
     "host": read_manifest(host_source.parent.parent / "host.manifest"),
     "runtime": read_manifest(runtime_source.parent / "runtime.manifest"),
+    "outside": read_manifest(outside_source.parent / "outside.manifest"),
 }
 for section, target in (("host", host_target), ("runtime", runtime_target)):
     for relative, checksum in old_state.get(section, {}).items():
@@ -354,6 +449,19 @@ for section, target in (("host", host_target), ("runtime", runtime_target)):
         shutil.copy2(target_path, backup)
         target_path.unlink()
         print(f"Pruned retired {section} path: {relative}")
+for relative, checksum in old_state.get("outside", {}).items():
+    if relative in new_state["outside"]:
+        continue
+    target_path = outside_target(relative)
+    if not target_path.exists():
+        continue
+    if not target_path.is_file() or digest(target_path) != checksum:
+        raise SystemExit(f"refusing to prune modified outside-client path: {relative}")
+    backup = safe_join(backup_root / "outside", relative)
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(target_path, backup)
+    target_path.unlink()
+    print(f"Pruned retired outside-client path: {relative}")
 state_tmp = backup_root / "managed-overlay.json"
 state_tmp.write_text(json.dumps(new_state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
@@ -362,9 +470,16 @@ sudo rsync -a --checksum --backup --backup-dir="$BACKUP_ROOT/host" \
   --exclude '__pycache__/' --exclude '*.pyc' "$HOST_OVERLAY/" "$REMOTE_KLIPPER_DIR/"
 sudo rsync -a --checksum --backup --backup-dir="$BACKUP_ROOT/runtime" \
   --exclude '__pycache__/' --exclude '*.pyc' "$RUNTIME_HELPERS/" "$REMOTE_CONFIG_DIR/"
+sudo install -d -m 0755 /usr/local/share/mege-outside
+sudo install -m 0755 "$OUTSIDE_CLIENT/mege-outside-enroll.sh" /usr/local/sbin/mege-outside-enroll
+sudo install -m 0755 "$OUTSIDE_CLIENT/mege-outside-activate.sh" /usr/local/sbin/mege-outside-activate
+sudo install -m 0644 "$OUTSIDE_CLIENT/mege.conf.template" /usr/local/share/mege-outside/mege.conf.template
+sudo install -m 0644 "$OUTSIDE_CLIENT/mege-printer-tunnel.service" /etc/systemd/system/mege-printer-tunnel.service
+sudo systemctl daemon-reload
 sudo install -m 0644 "$BACKUP_ROOT/managed-overlay.json" "$REMOTE_MANAGED_STATE"
 echo "Installed klipper_host/klippy/ -> $REMOTE_KLIPPER_DIR/"
 echo "Installed runtime_helpers/ -> $REMOTE_CONFIG_DIR/"
+echo "Installed mege_outside/ enrollment, activation, and tunnel units"
 echo "Managed backups -> $BACKUP_ROOT"
 
 sudo systemctl restart klipper
@@ -396,4 +511,12 @@ echo "Deploying the Eddy tap trace dashboard..."
 MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_eddy_tap_dashboard.sh"
 echo "Deploying the complete tracked vision code set..."
 MENDERPI_HOST="$REMOTE_HOST" "$SCRIPT_DIR/deploy_vision_code.sh"
+if [ "$MODE" = outside_enroll ]; then
+  if ! ssh "$REMOTE_HOST" "command -v wg >/dev/null 2>&1"; then
+    echo "Installing the required wireguard-tools package on $REMOTE_HOST..."
+    ssh "$REMOTE_HOST" "sudo -n apt-get update && sudo -n apt-get install -y --no-install-recommends wireguard-tools"
+  fi
+  echo "Creating or reusing the printer's Mege outside key pairs..."
+  ssh "$REMOTE_HOST" "sudo -n /usr/local/sbin/mege-outside-enroll"
+fi
 echo "Update complete."

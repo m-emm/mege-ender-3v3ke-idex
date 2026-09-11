@@ -13,6 +13,7 @@ OVERLAY_DUPLICATE_ROOT = (
 )
 UPDATER = SETUP / "klipper_config/update_menderpi.sh"
 IMAGE_STAGE = SETUP / "image_build/overlays/stage2/99-klipperpi"
+OUTSIDE_ROOT = IMAGE_STAGE / "files/mege_outside"
 
 
 def manifest(root):
@@ -63,6 +64,42 @@ def test_shared_pin_and_recursive_install_order_are_declared():
     assert '"${FILES_DIR}/runtime_helpers/." "${CONFIG_DIR}/"' in image_installer
     assert "KLIPPER_COMMIT" in image_stage
     assert "RUNTIME_HELPERS_SRC" in renderer
+
+
+def test_mege_outside_client_is_canonical_and_not_enabled_in_the_image():
+    expected = {
+        "mege-outside-enroll.sh",
+        "mege-outside-activate.sh",
+        "mege.conf.template",
+        "mege-printer-tunnel.service",
+    }
+    assert {path.name for path in OUTSIDE_ROOT.iterdir()} == expected
+
+    image_installer = (IMAGE_STAGE / "01-run-chroot.sh").read_text(encoding="utf-8")
+    updater = UPDATER.read_text(encoding="utf-8")
+    unit = (OUTSIDE_ROOT / "mege-printer-tunnel.service").read_text(encoding="utf-8")
+    template = (OUTSIDE_ROOT / "mege.conf.template").read_text(encoding="utf-8")
+
+    assert 'SOURCE_OUTSIDE_CLIENT_ROOT="$SETUP_DIR/image_build/overlays/stage2/99-klipperpi/files/mege_outside"' in updater
+    assert '"$SOURCE_OUTSIDE_CLIENT_ROOT"' in updater
+    assert "wireguard-tools" in image_installer
+    assert "mege-outside-enroll" in image_installer
+    assert "mege-outside-activate" in image_installer
+    assert "systemctl_enable_safe wg-quick@mege" not in image_installer
+    assert "systemctl_enable_safe mege-printer-tunnel" not in image_installer
+    assert "AllowedIPs = 10.203.71.1/32, fd1c:4436:beaf:1::1/128" in template
+    assert "-R 127.0.0.1:17125:127.0.0.1:80" in unit
+    assert "AddressFamily=inet6" in unit
+    assert "StrictHostKeyChecking=yes" in unit
+
+
+def test_mege_outside_scripts_have_valid_shell_syntax():
+    for path in (
+        OUTSIDE_ROOT / "mege-outside-enroll.sh",
+        OUTSIDE_ROOT / "mege-outside-activate.sh",
+        IMAGE_STAGE / "01-run-chroot.sh",
+    ):
+        subprocess.run(["bash", "-n", str(path)], check=True)
 
 
 def test_deployment_script_has_valid_shell_syntax():

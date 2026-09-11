@@ -1,0 +1,35 @@
+[Unit]
+Description=Mege printer SSH reverse tunnel
+Wants=network-online.target
+After=network-online.target wg-quick@mege.service
+Requires=wg-quick@mege.service
+ConditionPathExists=/etc/wireguard/mege.conf
+ConditionPathExists=/home/pi/.ssh/mege-outside-printer-tunnel
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+ExecStart=/usr/bin/ssh -6 -NT \
+  -o AddressFamily=inet6 \
+  -o BatchMode=yes \
+  -o ExitOnForwardFailure=yes \
+  -o IdentitiesOnly=yes \
+  -o PermitLocalCommand=no \
+  -o RequestTTY=no \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=yes \
+  -o UserKnownHostsFile=/home/pi/.ssh/mege-outside-known_hosts \
+  -i /home/pi/.ssh/mege-outside-printer-tunnel \
+  -R 127.0.0.1:17125:127.0.0.1:80 \
+  printer-tunnel@os.meges-world.net
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
