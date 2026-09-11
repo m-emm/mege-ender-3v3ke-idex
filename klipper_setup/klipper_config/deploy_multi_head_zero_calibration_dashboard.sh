@@ -143,6 +143,15 @@ temporary.write_text(json.dumps({}, indent=2) + "\n", encoding="utf-8")
 temporary.replace(path)
 PY
 fi
+if [[ ! -f "${REMOTE_DASHBOARD_DIR}/data/activity.json" ]]; then
+  DASHBOARD_ACTIVITY_PATH="${REMOTE_DASHBOARD_DIR}/data/activity.json" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+path = Path(os.environ["DASHBOARD_ACTIVITY_PATH"])
+path.write_text(json.dumps({"schema_version": 1, "kind": "idex_calibration_activity", "state": "idle", "progress": "Waiting for a calibration workflow"}, indent=2) + "\n", encoding="utf-8")
+PY
+fi
 for asset in index.html style.css app.js; do
   install -m 0644 "${REMOTE_TMP}/${asset}" "${REMOTE_DASHBOARD_DIR}/${asset}"
 done

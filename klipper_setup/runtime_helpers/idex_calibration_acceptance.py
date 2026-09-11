@@ -13,10 +13,14 @@ from __future__ import annotations
 import argparse
 import base64
 import copy
+import contextlib
 import datetime as dt
 import hashlib
 import json
 import os
+import tempfile
+import uuid
+import fcntl
 import sys
 from pathlib import Path
 from typing import Any
@@ -36,11 +40,118 @@ def utc_now() -> str:
 
 def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    os.replace(temporary, path)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _ledger_lock(root: Path):
+    lock_path = root / "data" / ".acceptance.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+")
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    return handle
+
+
+def _release_ledger_lock(handle) -> None:
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    handle.close()
+
+
+def _activity_path(root: Path) -> Path:
+    return root / "data" / "activity.json"
+
+
+@contextlib.contextmanager
+def _activity_lock(root: Path):
+    lock_path = root / "data" / ".activity.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+")
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    try:
+        yield
+    finally:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        handle.close()
+
+
+def _read_activity(root: Path) -> dict[str, Any] | None:
+    try:
+        value = json.loads(_activity_path(root).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _activity_time(value: Any) -> float:
+    try:
+        return dt.datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError, OverflowError):
+        return float("-inf")
+
+
+def _publish_activity(root: Path, payload: dict[str, Any], *, terminal: str | None = None) -> dict[str, Any] | None:
+    """Publish volatile activity without touching the acceptance projection."""
+    with _activity_lock(root):
+        current = _read_activity(root)
+        attempt_id = payload.get("attempt_id")
+        state = load_state(root / "data" / "accepted.json")
+        active = state.get("attempt") or {}
+        if not attempt_id or active.get("attempt_id") != attempt_id:
+            return current
+        incoming_started = payload.get("started_at") or utc_now()
+        if current and _activity_time(incoming_started) < _activity_time(current.get("started_at")):
+            return current
+        record = copy.deepcopy(current or {})
+        record.update({
+            "schema_version": 1,
+            "kind": "idex_calibration_activity",
+            "attempt_id": attempt_id,
+            "activity_id": payload.get("activity_id") or record.get("activity_id") or str(uuid.uuid4()),
+            "owner": payload.get("owner") or record.get("owner") or "calibration",
+            "state": terminal or payload.get("state") or "busy",
+            "step": payload.get("step", record.get("step")),
+            "operation": payload.get("operation", record.get("operation", "Calibration")),
+            "progress": payload.get("progress", record.get("progress", "")),
+            "started_at": incoming_started,
+            "heartbeat_at": payload.get("heartbeat_at") or utc_now(),
+            "updated_at": utc_now(),
+        })
+        atomic_write_json(_activity_path(root), record)
+        return record
+
+
+def _publish_heartbeat(root: Path, payload: dict[str, Any]) -> dict[str, Any] | None:
+    with _activity_lock(root):
+        current = _read_activity(root)
+        if not current:
+            return None
+        active = (load_state(root / "data" / "accepted.json").get("attempt") or {}).get("attempt_id")
+        if payload.get("attempt_id") != active:
+            return current
+        if payload.get("attempt_id") != current.get("attempt_id") or payload.get("activity_id") != current.get("activity_id"):
+            return current
+        heartbeat_at = payload.get("heartbeat_at") or utc_now()
+        if _activity_time(heartbeat_at) < _activity_time(current.get("heartbeat_at")):
+            return current
+        record = copy.deepcopy(current)
+        record["heartbeat_at"] = heartbeat_at
+        record["updated_at"] = utc_now()
+        if payload.get("progress") is not None:
+            record["progress"] = payload["progress"]
+        atomic_write_json(_activity_path(root), record)
+        return record
 
 
 def stable_hash(value: Any) -> str:
@@ -254,24 +365,29 @@ def project_current(state: dict[str, Any]) -> dict[str, Any]:
         chapters["tool_alignment"] = copy.deepcopy(tools)
     if mesh:
         target = chapters.setdefault("bed_calibration", {})
-        target["mesh"] = copy.deepcopy(mesh)
+        target["mesh"] = copy.deepcopy(mesh.get("mesh", mesh))
 
     attempt = state.get("attempt")
     if isinstance(attempt, dict):
         attempt_chapters = attempt.get("chapters") or {}
         # A live chapter is rendered in place, while the accepted version is
         # retained in accepted_sources for the dashboard's provenance panel.
+        # Do not merge accepted detail into an owned live chapter: that makes
+        # old plots and contacts look like they belong to the new attempt.
         for key, value in attempt_chapters.items():
             if key in {"bed_calibration", "tool_alignment"}:
-                # Keep accepted detail (contacts, plots, tables) visible when
-                # a later attempt only publishes a small progress patch.
-                # Nested dictionaries are merged; an explicitly published
-                # scalar still replaces its accepted counterpart.
-                existing = chapters.setdefault(key, {})
-                if isinstance(existing, dict) and isinstance(value, dict):
-                    _deep_merge(existing, value)
-                else:
-                    chapters[key] = copy.deepcopy(value)
+                live = copy.deepcopy(value)
+                # Bed reference and mesh are separate accepted chapters even
+                # though legacy snapshots nest them under bed_calibration.
+                # Preserve the non-owned side while replacing the chapter
+                # currently being re-measured.
+                accepted_bed = chapters.get("bed_calibration") or {}
+                if key == "bed_calibration" and isinstance(live, dict):
+                    if "reference" not in live and "reference" in accepted_bed:
+                        live["reference"] = copy.deepcopy(accepted_bed["reference"])
+                    if "mesh" not in live and "mesh" in accepted_bed:
+                        live["mesh"] = copy.deepcopy(accepted_bed["mesh"])
+                chapters[key] = live
         if attempt.get("status") in {"failed", "completed"}:
             # Failed attempts do not become accepted evidence, but their
             # summary remains available for explicit failure details.
@@ -286,7 +402,7 @@ def project_current(state: dict[str, Any]) -> dict[str, Any]:
         "status": attempt.get("status", "idle") if isinstance(attempt, dict) else "idle",
         "stage": attempt.get("stage", "idle") if isinstance(attempt, dict) else "idle",
         "updated_at": state.get("updated_at"),
-        "attempt": copy.deepcopy(attempt),
+        "attempt": {key: copy.deepcopy(value) for key, value in attempt.items() if key != "activity"},
         "accepted": copy.deepcopy(accepted),
         "accepted_sources": {
             chapter: {
@@ -315,6 +431,13 @@ def write_state(root: Path, state: dict[str, Any]) -> dict[str, Any]:
     state["schema_version"] = SCHEMA_VERSION
     state["kind"] = "idex_calibration_acceptance"
     state["updated_at"] = utc_now()
+    # Callers may construct an initial state directly (not through a command);
+    # keep its readiness projection coherent without embedding live activity.
+    if not state.get("readiness", {}).get("checks"):
+        state["readiness"] = readiness(state.get("accepted") or {})
+        if (state.get("attempt") or {}).get("status") in {"preparing", "running"}:
+            state["readiness"]["printable"] = False
+            state["readiness"]["reasons"] = ["An active calibration attempt is still running"] + state["readiness"].get("reasons", [])
     state_path = root / "data" / "accepted.json"
     current_path = root / "data" / "current.json"
     atomic_write_json(state_path, state)
@@ -328,26 +451,63 @@ def write_state(root: Path, state: dict[str, Any]) -> dict[str, Any]:
     return state
 
 
-def apply_command(root: Path, command: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _apply_command_unlocked(root: Path, command: str, payload: dict[str, Any]) -> dict[str, Any]:
     state = load_state(root / "data" / "accepted.json")
     if command == "begin":
-        attempt = copy.deepcopy(payload.get("attempt") or {})
+        incoming = copy.deepcopy(payload.get("attempt") or {})
+        existing = state.get("attempt")
+        # Child chapter runners share the coordinator's attempt ID.  Joining
+        # that attempt preserves its history while allowing the child to own
+        # and replace its chapter payload.
+        if (
+            isinstance(existing, dict)
+            and existing.get("attempt_id")
+            and existing.get("attempt_id") == incoming.get("attempt_id")
+        ):
+            attempt = copy.deepcopy(existing)
+            for key, value in incoming.items():
+                if key != "chapters":
+                    attempt[key] = value
+            if "chapters" in incoming:
+                _deep_merge(attempt.setdefault("chapters", {}), incoming["chapters"])
+        else:
+            attempt = incoming
         attempt.setdefault("status", "running")
         attempt.setdefault("chapters", {})
         # A new attempt must not inherit a stale error/rollback message from
         # an earlier failed or interrupted attempt.
         for key in ("error", "rollback", "message", "printable"):
             attempt.pop(key, None)
+        attempt.pop("activity", None)
         state["attempt"] = attempt
+    elif command == "heartbeat":
+        return _publish_activity(root, payload)
+    elif command == "activity":
+        return _publish_activity(root, payload)
     elif command == "update":
+        incoming_attempt_id = payload.get("attempt_id") or payload.get("batch_id")
+        existing_attempt = state.get("attempt")
+        # An update for a different attempt starts a fresh live candidate.
+        # Never carry nested chapter detail (contacts, plots, errors, or
+        # terminal statuses) across attempt IDs; accepted chapters are
+        # projected separately and remain available through provenance.
+        if (
+            incoming_attempt_id
+            and isinstance(existing_attempt, dict)
+            and existing_attempt.get("attempt_id")
+            and existing_attempt.get("attempt_id") != incoming_attempt_id
+        ):
+            state["attempt"] = {}
         attempt = state.setdefault("attempt", {})
-        attempt.update({k: copy.deepcopy(v) for k, v in payload.items() if k != "chapters"})
+        attempt.pop("activity", None)
+        attempt.update({k: copy.deepcopy(v) for k, v in payload.items() if k not in {"chapters", "activity"}})
         if "chapters" in payload:
             _deep_merge(attempt.setdefault("chapters", {}), payload["chapters"])
     elif command == "accept":
         chapter = str(payload["chapter"])
         entry = copy.deepcopy(payload["entry"])
         if isinstance(state.get("attempt"), dict):
+            state["attempt"].pop("activity", None)
             state["attempt"].update(
                 {
                     key: copy.deepcopy(payload[key])
@@ -398,6 +558,7 @@ def apply_command(root: Path, command: str, payload: dict[str, Any]) -> dict[str
         state["history"] = state["history"][-40:]
     elif command == "fail":
         attempt = state.setdefault("attempt", {})
+        attempt.pop("activity", None)
         attempt.update(
             {
                 "status": "failed",
@@ -412,14 +573,52 @@ def apply_command(root: Path, command: str, payload: dict[str, Any]) -> dict[str
     else:
         raise ValueError(f"unknown acceptance command: {command}")
     state["readiness"] = readiness(state.get("accepted") or {}, payload.get("current_invariants"))
+    active = state.get("attempt") or {}
+    if active.get("status") in {"preparing", "running"}:
+        state["readiness"]["printable"] = False
+        state["readiness"]["reasons"] = ["An active calibration attempt is still running"] + state["readiness"].get("reasons", [])
     if command == "ready" and state["readiness"]["printable"]:
         state["readiness"]["reasons"] = []
     return write_state(root, state)
 
 
+def apply_command(root: Path, command: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Apply a serialized ledger mutation or publish volatile activity."""
+    if command == "heartbeat":
+        return _publish_heartbeat(root, payload)
+    if command == "activity":
+        return _publish_activity(root, payload, terminal=payload.get("state") if payload.get("state") in {"failed", "completed"} else None)
+    lock = _ledger_lock(root)
+    try:
+        result = _apply_command_unlocked(root, command, payload)
+        # Terminal ledger mutations leave a diagnostic activity record behind.
+        if command == "fail":
+            _publish_activity(root, {
+                "attempt_id": payload.get("attempt_id") or payload.get("batch_id") or (result.get("attempt") or {}).get("attempt_id"),
+                "activity_id": payload.get("activity_id"),
+                "owner": "ledger",
+                "step": payload.get("step"),
+                "operation": payload.get("stage", "Calibration failed"),
+                "progress": payload.get("error", ""),
+                "state": "failed",
+            }, terminal="failed")
+        elif command == "ready" and result.get("readiness", {}).get("printable"):
+            attempt_id = (result.get("attempt") or {}).get("attempt_id") or payload.get("batch_id")
+            _publish_activity(root, {
+                "attempt_id": attempt_id,
+                "owner": "ledger",
+                "operation": "Calibration chain ready",
+                "progress": "All accepted chapters passed",
+                "state": "completed",
+            }, terminal="completed")
+        return result
+    finally:
+        _release_ledger_lock(lock)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("begin", "update", "accept", "fail", "ready"))
+    parser.add_argument("command", choices=("begin", "update", "activity", "heartbeat", "accept", "fail", "ready"))
     parser.add_argument("--root", default="/home/pi/printer_data/calibration")
     args = parser.parse_args(argv)
     payload = json.loads(sys.stdin.read() or "{}")

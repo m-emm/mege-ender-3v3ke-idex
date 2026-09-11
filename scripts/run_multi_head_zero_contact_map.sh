@@ -89,6 +89,42 @@ PY
   printf '%s' "${payload}" | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" update
 }
 
+activity_pid=""
+activity_id=""
+start_activity_heartbeat() {
+  local step="$1" operation="$2"
+  activity_id="$(python3 - <<'PY'
+import uuid
+print(uuid.uuid4())
+PY
+)"
+  python3 - "${dashboard_batch_id}" "${activity_id}" "${step}" "${operation}" <<'PY' | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" activity >/dev/null 2>&1 || true
+import datetime as dt, json, sys
+now = dt.datetime.now(dt.timezone.utc).isoformat()
+print(json.dumps({"attempt_id": sys.argv[1], "activity_id": sys.argv[2], "owner": "multi-head-zero-shell", "state": "busy", "step": int(sys.argv[3]), "operation": sys.argv[4], "progress": "Starting operation", "started_at": now, "heartbeat_at": now}))
+PY
+  (
+    while true; do
+      python3 - "${dashboard_batch_id}" "${activity_id}" <<'PY' | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" heartbeat >/dev/null 2>&1 || true
+import datetime as dt
+import json
+import sys
+now = dt.datetime.now(dt.timezone.utc).isoformat()
+print(json.dumps({"attempt_id": sys.argv[1], "activity_id": sys.argv[2], "heartbeat_at": now}))
+PY
+      sleep 5
+    done
+  ) &
+  activity_pid="$!"
+}
+stop_activity_heartbeat() {
+  if [[ -n "${activity_pid}" ]]; then
+    kill "${activity_pid}" 2>/dev/null || true
+    wait "${activity_pid}" 2>/dev/null || true
+    activity_pid=""
+  fi
+}
+
 run_remote_batch() {
   local mode="$1"
   local run_id="$2"
@@ -160,10 +196,12 @@ cleanup_transaction() {
 trap cleanup_transaction EXIT
 printer_console "paired calibration complete; applying absolute T0/T1 XY and T1 Z correction"
 echo "Applying absolute T0/T1 XY and T1 Z correction..."
+start_activity_heartbeat 4 "Applying T0/T1 alignment correction"
 if ! python "${APPLY_SCRIPT}" \
     --t0-run "${calibration_dir}/T0" \
     --t1-run "${calibration_dir}/T1" \
     --result "${calibration_result}"; then
+  stop_activity_heartbeat
   rollback_alignment
   exit 1
 fi
@@ -172,9 +210,11 @@ dashboard_publish "${calibration_result}" "${calibration_id}_calibration_result.
 printer_console "absolute XY and T1 Z correction calculated; deploying configuration"
 echo "Deploying paired calibration and checking parity..."
 if ! "${UPDATE_SCRIPT}" || ! "${UPDATE_SCRIPT}" --check; then
+  stop_activity_heartbeat
   rollback_alignment
   exit 1
 fi
+stop_activity_heartbeat
 printer_console "configuration deployment parity passed; starting 13-contact verification"
 
 verification_id="${timestamp}_T0_T1_verification"

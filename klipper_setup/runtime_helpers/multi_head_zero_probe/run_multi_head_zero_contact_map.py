@@ -12,6 +12,9 @@ import math
 import os
 import shutil
 import sys
+import tempfile
+import threading
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -272,11 +275,16 @@ def workflow_log(moonraker_url, message):
 
 def atomic_write_json(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(".%s.%d.tmp" % (path.name, os.getpid()))
-    temporary.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    os.replace(temporary, path)
+    fd, temporary_name = tempfile.mkstemp(prefix=".%s." % path.name, suffix=".tmp", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def dashboard_record(record):
@@ -346,8 +354,11 @@ class DashboardPublisher:
             },
         }
         self._attempt = {
-            "attempt_id": run_id,
+            # The dashboard batch is the immutable attempt.  Per-tool run IDs
+            # remain artifact identifiers and must not replace it.
+            "attempt_id": batch_id,
             "batch_id": batch_id,
+            "run_id": run_id,
             "run_scope": run_scope,
             "workflow": workflow,
             "tool_selection": tool_selection,
@@ -356,7 +367,13 @@ class DashboardPublisher:
             "chapters": {"tool_alignment": chapters["tool_alignment"]},
         }
         self._acceptance_begin()
+        self._activity_id = str(uuid.uuid4())
+        self._activity_started = dt.datetime.now(dt.timezone.utc).isoformat()
+        self.set_activity(4, f"{workflow} preparation", "Preparing T0 and T1")
         self.publish()
+        self._activity_stop = threading.Event()
+        self._activity_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
+        self._activity_thread.start()
 
     def _acceptance_begin(self):
         acceptance_apply(self.root, "begin", {"attempt": self._attempt})
@@ -371,6 +388,38 @@ class DashboardPublisher:
             "chapters": copy.deepcopy(self.payload.get("chapters", {})),
         })
         acceptance_apply(self.root, "update", self._attempt)
+
+    def set_activity(self, step=4, operation="Toolhead alignment", progress=""):
+        self._activity = {
+            "state": "busy",
+            "attempt_id": self._attempt["attempt_id"],
+            "activity_id": self._activity_id,
+            "owner": "multi-head-zero",
+            "step": step,
+            "operation": operation,
+            "started_at": self._activity_started,
+            "heartbeat_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "progress": progress,
+        }
+        acceptance_apply(self.root, "activity", self._activity)
+
+    def _heartbeat_loop(self):
+        while not self._activity_stop.wait(5.0):
+            activity = copy.deepcopy(getattr(self, "_activity", {}) or {})
+            if not activity:
+                continue
+            now = dt.datetime.now(dt.timezone.utc).isoformat()
+            activity["heartbeat_at"] = now
+            try:
+                acceptance_apply(self.root, "heartbeat", {
+                    "attempt_id": self._attempt["attempt_id"],
+                    "activity_id": self._activity_id,
+                    "heartbeat_at": now,
+                    "progress": activity.get("progress", ""),
+                })
+            except Exception:
+                # A transient dashboard write must never stop calibration.
+                pass
 
     def event(self, message):
         self.payload["events"] = (
@@ -395,6 +444,11 @@ class DashboardPublisher:
         self.payload["chapters"]["tool_alignment"][workflow]["runs"][
             tool.lower()
         ] = payload
+        self.set_activity(
+            4,
+            f"{tool} {workflow} contacts",
+            f"{len(records)}/{total} contacts",
+        )
         self.publish()
 
     def publish_plot(self, source, tool, workflow):
@@ -402,9 +456,14 @@ class DashboardPublisher:
         artifacts.mkdir(parents=True, exist_ok=True)
         filename = "%s_%s_%s.png" % (self.payload["run_id"], tool, workflow)
         target = artifacts / filename
-        temporary = target.with_name(".%s.%d.tmp" % (target.name, os.getpid()))
-        shutil.copyfile(source, temporary)
-        os.replace(temporary, target)
+        fd, temporary_name = tempfile.mkstemp(prefix=".%s." % target.name, suffix=".tmp", dir=target.parent)
+        temporary = Path(temporary_name)
+        os.close(fd)
+        try:
+            shutil.copyfile(source, temporary)
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
         return "artifacts/%s" % filename
 
     def finish(self, status, error=None):
@@ -428,6 +487,11 @@ class DashboardPublisher:
         if error:
             self._attempt["error"] = error
         self.publish()
+        if status in {"completed", "failed"}:
+            record = copy.deepcopy(getattr(self, "_activity", {}) or {})
+            record.update({"state": status, "heartbeat_at": dt.datetime.now(dt.timezone.utc).isoformat(), "progress": error or "Alignment workflow completed"})
+            acceptance_apply(self.root, "activity", record)
+        self._activity_stop.set()
 
 
 def perform_contact(

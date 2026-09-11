@@ -10,6 +10,10 @@ const verificationState = document.querySelector("#verification-state");
 const verificationTools = document.querySelector("#verification-tools");
 const verificationOutcome = document.querySelector("#verification-outcome");
 const readiness = document.querySelector("#readiness");
+const activity = document.querySelector("#activity");
+const activityTitle = document.querySelector("#activity-title");
+const activityDetail = document.querySelector("#activity-detail");
+const activitySignal = document.querySelector("#activity-signal");
 const printerState = document.querySelector("#printer-state");
 const printerX = document.querySelector("#printer-x");
 const printerY = document.querySelector("#printer-y");
@@ -92,11 +96,15 @@ const WORKFLOW_STATUS_LABELS = Object.freeze({
   passed: "Passed",
   failed: "Failed",
   blocked: "Blocked",
+  remeasuring: "Re-measuring",
 });
 
 let dashboardContentHash = "";
+let activityContentHash = "";
 let printerStatusContentHash = "";
 let printerConsoleContentHash = "";
+let currentDashboardData = null;
+let currentActivityData = null;
 let cameraRetryTimer = null;
 
 async function startCameraStream() {
@@ -349,6 +357,7 @@ function normaliseStatus(value, fallback = "pending") {
   if (["running", "in_progress", "inprogress"].includes(status)) return "running";
   if (["failed", "aborted", "error"].includes(status)) return "failed";
   if (["blocked", "stale"].includes(status)) return "blocked";
+  if (["remeasuring", "re-measuring", "rechecking"].includes(status)) return "remeasuring";
   if (status === "pending") return "pending";
   return fallback;
 }
@@ -383,6 +392,47 @@ function displayStage(data) {
   if (stage.includes("mesh")) return "Mesh and readiness";
   if (stage.includes("reference") || stage.includes("bed_calibration")) return "Bed Z reference";
   return "Calibration workflow";
+}
+
+function activeStepNumber(data, chapters, passed, activitySource = null) {
+  const activityStep = Number(activitySource?.step ?? data.attempt?.activity?.step ?? data.activity?.step);
+  if (Number.isInteger(activityStep) && activityStep >= 1 && activityStep <= 7) return activityStep;
+  return stepFromStage(data, chapters, passed);
+}
+
+function elapsedSince(iso) {
+  const timestamp = Date.parse(iso || "");
+  if (!Number.isFinite(timestamp)) return "No signal yet";
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  return seconds < 2 ? "Last signal just now" : `Last signal ${seconds}s ago`;
+}
+
+function renderActivity(data, chapters, passed, activitySource = null) {
+  if (!activity) return;
+  const source = activitySource || data.attempt?.activity || data.activity || {};
+  const heartbeat = source.heartbeat_at || data.updated_at;
+  const age = Date.parse(heartbeat || "") ? (Date.now() - Date.parse(heartbeat)) / 1000 : Infinity;
+  const matching = !source.attempt_id || source.attempt_id === data.attempt?.attempt_id || source.attempt_id === data.batch_id || source.attempt_id === data.run_id;
+  const sourceState = String(source.state || "").toLowerCase();
+  const effectiveState = sourceState === "idle" ? String(data.status || "idle").toLowerCase() : sourceState || String(data.status || "idle").toLowerCase();
+  const active = matching && ["busy", "preparing", "running"].includes(effectiveState);
+  const state = active ? (age < 15 ? "busy" : age <= 60 ? "delayed" : "stale") : effectiveState;
+  activity.className = `activity ${state}`;
+  if (active) {
+    const step = activeStepNumber(data, chapters, passed, source);
+    activityTitle.textContent = `BUSY · Step ${step || "?"} — ${WORKFLOW_STEPS.find((item) => item.number === step)?.title || displayStage(data)}`;
+    activityDetail.textContent = source.operation || source.progress || "Calibration is still progressing.";
+  } else if (state === "failed") {
+    activityTitle.textContent = "Calibration stopped";
+    activityDetail.textContent = data.error || "The last calibration attempt failed.";
+  } else if (state === "completed") {
+    activityTitle.textContent = "Calibration attempt complete";
+    activityDetail.textContent = "The accepted calibration chain determines readiness.";
+  } else {
+    activityTitle.textContent = "No calibration activity";
+    activityDetail.textContent = "Waiting for a workflow to start.";
+  }
+  activitySignal.textContent = active && age > 60 ? `NO RECENT SIGNAL · ${elapsedSince(heartbeat)}` : elapsedSince(heartbeat);
 }
 
 function renderTool(tool, run, priors) {
@@ -520,6 +570,18 @@ function normaliseChapters(data) {
   return { tool_alignment: chapters };
 }
 
+function acceptedChapters(data) {
+  const accepted = data.accepted || {};
+  const chapters = {};
+  const bed = accepted.bed_reference?.data;
+  const tools = accepted.tool_alignment?.data;
+  const mesh = accepted.mesh?.data;
+  if (bed || mesh) chapters.bed_calibration = {...(bed || {})};
+  if (mesh) chapters.bed_calibration.mesh = mesh.mesh || mesh;
+  if (tools) chapters.tool_alignment = tools;
+  return chapters;
+}
+
 function chapterForStep(chapters, chapter) {
   if (chapter === "bed-reference" || chapter === "bed-mesh") {
     return chapters.bed_calibration || {};
@@ -602,8 +664,9 @@ function runScopeIncludesStep(scope, number) {
 }
 
 function deriveWorkflowSteps(data, chapters) {
-  const passed = stepEvidence(data, chapters);
-  const activeStep = data.status === "running" ? stepFromStage(data, chapters, passed) : null;
+  const accepted = acceptedChapters(data);
+  const passed = stepEvidence(data, accepted);
+  const activeStep = ["running", "preparing"].includes(data.status) ? activeStepNumber(data, chapters, passed) : null;
   const failedStep = data.status === "failed" ? stepFromStage(data, chapters, passed) : null;
   const staleMesh = chapters.bed_calibration?.mesh?.status === "stale";
   return WORKFLOW_STEPS.map((step) => {
@@ -611,12 +674,16 @@ function deriveWorkflowSteps(data, chapters) {
     if (failedStep && step.number === failedStep) status = "failed";
     else if (failedStep && step.number > failedStep) status = "blocked";
     else if (staleMesh && step.number >= 5) status = "blocked";
-    else if (activeStep === step.number && status !== "passed") status = "running";
+    else if (activeStep === step.number) status = "running";
     let note = "";
     if (status === "passed") note = "Accepted in the calibration chain.";
     if (status === "running") note = "This is the active stage.";
     if (status === "failed") note = [conciseError(data.error || chapterForStep(chapters, step.chapter).error) || "The current run stopped here.", data.attempt?.rollback].filter(Boolean).join(" · ");
     if (status === "blocked") note = `Waiting for step ${failedStep} to pass before continuing.`;
+    if (activeStep && runScopeIncludesStep(data.run_scope, step.number) && step.number > activeStep && passed[step.number - 1]) {
+      status = "remeasuring";
+      note = "Previously accepted evidence is retained as history; this run is re-measuring it.";
+    }
     if (staleMesh && step.number >= 5) note = "Accepted mesh is stale after a T0 frame change; refresh the mesh.";
     if (status === "pending" && data.status !== "idle" && !runScopeIncludesStep(data.run_scope, step.number)) {
       note = `Not part of this ${String(data.run_scope || "partial").replaceAll("_", " ")} run; another compatible chapter attempt is required.`;
@@ -629,6 +696,7 @@ function roadmapChapterStatus(chapter, steps) {
   const states = steps.filter((step) => step.chapter === chapter).map((step) => step.status);
   if (states.includes("failed")) return "failed";
   if (states.includes("running")) return "running";
+  if (states.includes("remeasuring")) return "remeasuring";
   if (states.length && states.every((state) => state === "passed")) return "passed";
   if (states.length && states.every((state) => state === "blocked")) return "blocked";
   return "pending";
@@ -749,7 +817,12 @@ function render(data) {
   updated.textContent = data.updated_at ? `Updated ${new Date(data.updated_at).toLocaleTimeString()}` : "";
   const chapters = normaliseChapters(data);
   renderAcceptedProvenance(data);
-  const roadmapSteps = deriveWorkflowSteps(data, chapters);
+  // Current and activity snapshots are polled independently.  Always fold
+  // the latest cached activity into the initial render as well; otherwise a
+  // current.json update can briefly treat an accepted chapter as complete
+  // until the following activity poll marks it as re-measuring/running.
+  const roadmapSteps = deriveWorkflowSteps({...data, activity: currentActivityData}, chapters);
+  renderActivity(data, chapters, stepEvidence(data, acceptedChapters(data)), currentActivityData);
   renderRoadmap(data, chapters, roadmapSteps);
   const alignment = chapters.tool_alignment || {};
   const priors = data.configured_priors;
@@ -763,9 +836,10 @@ function render(data) {
     roadmapChapterStatus("bed-reference", roadmapSteps),
     roadmapChapterStatus("bed-mesh", roadmapSteps),
   );
-  const printable = data.readiness?.printable === true;
+  const activeAttempt = ["preparing", "running"].includes(String(data.status || "").toLowerCase());
+  const printable = data.readiness?.printable === true && !activeAttempt;
   const partial = data.status === "completed" && !printable;
-  const failed = data.status === "failed" || partial || (data.readiness?.reasons || []).length > 0;
+  const failed = !activeAttempt && (data.status === "failed" || partial || (data.readiness?.reasons || []).length > 0);
   readiness.className = `readiness ${printable ? "ready" : (failed ? "failed" : "calibrating")}`;
   readiness.textContent = printable ? "READY TO PRINT" : (failed ? "NOT READY TO PRINT" : "CALIBRATING");
   empty.hidden = Boolean(hasAlignment || chapters.bed_calibration || data.status !== "idle");
@@ -914,9 +988,16 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape" && 
 
 async function refresh() {
   try {
-    const response = await fetch(`data/current.json?t=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const current = await response.json();
+    const [currentResult, activityResult] = await Promise.allSettled([
+      fetch(`data/current.json?t=${Date.now()}`, { cache: "no-store" }).then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      }),
+      fetch(`data/activity.json?t=${Date.now()}`, { cache: "no-store" }).then((response) => response.ok ? response.json() : null),
+    ]);
+    if (currentResult.status !== "fulfilled") throw currentResult.reason;
+    const current = currentResult.value;
+    const separateActivity = activityResult.status === "fulfilled" ? activityResult.value : null;
     try {
       const previousResponse = await fetch(`data/last_successful.json?t=${Date.now()}`, { cache: "no-store" });
       if (previousResponse.ok) {
@@ -927,9 +1008,22 @@ async function refresh() {
       // The current snapshot remains useful when no successful history exists.
     }
     const currentHash = contentHash(current);
+    const activityCandidate = separateActivity || current.attempt?.activity || current.activity || {};
+    const nextActivityHash = contentHash(activityCandidate);
     if (currentHash !== dashboardContentHash) {
       dashboardContentHash = currentHash;
+      currentDashboardData = current;
+      currentActivityData = activityCandidate;
       render(current);
+    }
+    if (nextActivityHash !== activityContentHash) {
+      activityContentHash = nextActivityHash;
+      currentActivityData = activityCandidate;
+      if (currentDashboardData && currentHash === dashboardContentHash) {
+        const chapters = normaliseChapters(currentDashboardData);
+        renderActivity(currentDashboardData, chapters, stepEvidence(currentDashboardData, acceptedChapters(currentDashboardData)), currentActivityData);
+        renderRoadmap(currentDashboardData, chapters, deriveWorkflowSteps({...currentDashboardData, activity: currentActivityData}, chapters));
+      }
     }
   } catch (error) {
     headline.textContent = `Calibration dashboard unavailable: ${error.message}`;

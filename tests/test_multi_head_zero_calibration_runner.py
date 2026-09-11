@@ -597,6 +597,32 @@ def test_verification_report_lists_failed_checks_with_values_and_limits(tmp_path
     assert result["checks"]["t1_x"]["passed"] is False
 
 
+def test_target_xy_limit_is_60_um_but_paired_limit_remains_50_um(tmp_path):
+    verifier = load_verifier()
+
+    def measurement(name, x, y):
+        return {
+            "run_dir": tmp_path / name,
+            "x": x,
+            "y": y,
+            "centre_z": 0.8,
+            "centre_statistics": {"count": 5, "median": 0.8, "standard_deviation": 0.001},
+            "ring": {direction: {"x": 0.0, "y": 0.0} for direction in verifier.VERIFICATION_DIRECTIONS},
+            "centre_contacts": [],
+        }
+
+    result = verifier.paired_result(
+        tmp_path / "calibration_result.json",
+        measurement("T0", 75.0, -9.0),
+        measurement("T1", 75.0564, -9.0),
+        {"x": 75.0, "y": -9.0},
+    )
+    assert result["checks"]["t1_x"]["passed"] is True
+    assert result["checks"]["paired_x"]["passed"] is False
+    assert result["checks"]["t1_x"]["limit_mm"] == pytest.approx(0.060)
+    assert result["checks"]["paired_x"]["limit_mm"] == pytest.approx(0.050)
+
+
 def test_dashboard_snapshot_is_atomic_and_retains_completed_run(tmp_path, monkeypatch):
     runner = load_runner()
     monkeypatch.setattr(runner, "DEFAULT_DASHBOARD_ROOT", str(tmp_path))

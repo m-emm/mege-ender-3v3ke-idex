@@ -24,9 +24,18 @@ publish_state() {
   local stage="$2"
   local message="$3"
   local printable="${4:-false}"
+  local step
+  case "${stage}" in
+    *bed_calibration.reference*) step=1 ;;
+    *tool_alignment*) step=4 ;;
+    *bed_calibration.mesh*) step=5 ;;
+    *) step=7 ;;
+  esac
   local payload
-  payload="$(python3 - "${batch_id}" "${status}" "${stage}" "${message}" "${printable}" <<'PY'
+payload="$(python3 - "${batch_id}" "${status}" "${stage}" "${message}" "${printable}" <<'PY'
 import json, sys
+import datetime as dt
+step = 1 if "bed_calibration.reference" in sys.argv[3] else 4 if "tool_alignment" in sys.argv[3] else 5 if "mesh" in sys.argv[3] else 7
 print(json.dumps({
     "attempt_id": sys.argv[1], "batch_id": sys.argv[1],
     "run_scope": "full", "status": sys.argv[2], "stage": sys.argv[3],
@@ -36,6 +45,12 @@ print(json.dumps({
 PY
 )"
   printf '%s' "${payload}" | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" update
+  python3 - "${batch_id}" "${step}" "${message}" <<'PY' | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" activity >/dev/null 2>&1 || true
+import datetime as dt, json, sys, uuid
+now = dt.datetime.now(dt.timezone.utc).isoformat()
+state = "failed" if sys.argv[2] == "failed" else "completed" if sys.argv[2] == "completed" else "busy"
+print(json.dumps({"attempt_id": sys.argv[1], "activity_id": str(uuid.uuid4()), "owner": "full-coordinator", "state": state, "step": int(sys.argv[2]), "operation": sys.argv[3], "progress": sys.argv[3], "started_at": now, "heartbeat_at": now}))
+PY
 }
 
 printer_console() {

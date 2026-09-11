@@ -17,6 +17,11 @@
         <time id="updated"></time>
       </header>
       <section id="readiness" class="readiness calibrating">CALIBRATION STATE UNKNOWN</section>
+      <section id="activity" class="activity idle" aria-live="polite" aria-label="Calibration activity">
+        <div class="activity-indicator" aria-hidden="true"></div>
+        <div><strong id="activity-title">No calibration activity</strong><p id="activity-detail">Waiting for a workflow to start.</p></div>
+        <time id="activity-signal">—</time>
+      </section>
       <p class="unit-legend">Units: coordinates, absolute Z, and the common Z correction are shown in mm; alignment corrections, errors, spans, and repeatability are shown in µm.</p>
       <section class="printer-panels" aria-label="Printer context">
         <article class="printer-panel panel-card">

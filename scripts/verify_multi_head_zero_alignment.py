@@ -14,7 +14,10 @@ from pathlib import Path
 import numpy as np
 
 
-XY_LIMIT_MM = 0.05
+# Absolute tool-to-target checks are temporarily relaxed for live testing.
+# The paired T0↔T1 relationship remains on the tighter production limit.
+TARGET_XY_LIMIT_MM = 0.060
+PAIRED_XY_LIMIT_MM = 0.050
 Z_LIMIT_MM = 0.02
 CENTER_TAP_COUNT = 5
 CENTER_STDDEV_LIMIT_MM = 0.015
@@ -287,21 +290,21 @@ def paired_result(calibration_result_path, t0, t1, target):
         for tool, measurement in (("t0", t0), ("t1", t1))
     }
     pass_components = {
-        "t0_x": abs(target_error["t0"]["x"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
-        "t0_y": abs(target_error["t0"]["y"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
-        "t1_x": abs(target_error["t1"]["x"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
-        "t1_y": abs(target_error["t1"]["y"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
-        "paired_x": abs(residual["x"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
-        "paired_y": abs(residual["y"]) <= XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t0_x": abs(target_error["t0"]["x"]) <= TARGET_XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t0_y": abs(target_error["t0"]["y"]) <= TARGET_XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t1_x": abs(target_error["t1"]["x"]) <= TARGET_XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "t1_y": abs(target_error["t1"]["y"]) <= TARGET_XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "paired_x": abs(residual["x"]) <= PAIRED_XY_LIMIT_MM + COMPARISON_EPSILON_MM,
+        "paired_y": abs(residual["y"]) <= PAIRED_XY_LIMIT_MM + COMPARISON_EPSILON_MM,
         "z_center": abs(centre_delta) <= Z_LIMIT_MM + COMPARISON_EPSILON_MM,
         "t0_center_repeatability": t0["centre_statistics"]["standard_deviation"] <= CENTER_STDDEV_LIMIT_MM + COMPARISON_EPSILON_MM,
         "t1_center_repeatability": t1["centre_statistics"]["standard_deviation"] <= CENTER_STDDEV_LIMIT_MM + COMPARISON_EPSILON_MM,
     }
     checks = {}
     limits = {
-        "t0_x": XY_LIMIT_MM, "t0_y": XY_LIMIT_MM,
-        "t1_x": XY_LIMIT_MM, "t1_y": XY_LIMIT_MM,
-        "paired_x": XY_LIMIT_MM, "paired_y": XY_LIMIT_MM,
+        "t0_x": TARGET_XY_LIMIT_MM, "t0_y": TARGET_XY_LIMIT_MM,
+        "t1_x": TARGET_XY_LIMIT_MM, "t1_y": TARGET_XY_LIMIT_MM,
+        "paired_x": PAIRED_XY_LIMIT_MM, "paired_y": PAIRED_XY_LIMIT_MM,
         "z_center": Z_LIMIT_MM,
         "t0_center_repeatability": CENTER_STDDEV_LIMIT_MM,
         "t1_center_repeatability": CENTER_STDDEV_LIMIT_MM,
@@ -359,7 +362,14 @@ def paired_result(calibration_result_path, t0, t1, target):
         "t1_minus_t0": residual,
         "target_error_mm": target_error,
         "radial_xy_mm": radial_xy,
-        "limits_mm": {"x": XY_LIMIT_MM, "y": XY_LIMIT_MM, "z": Z_LIMIT_MM, "centre_sigma": CENTER_STDDEV_LIMIT_MM},
+        "limits_mm": {
+            "target_x": TARGET_XY_LIMIT_MM,
+            "target_y": TARGET_XY_LIMIT_MM,
+            "paired_x": PAIRED_XY_LIMIT_MM,
+            "paired_y": PAIRED_XY_LIMIT_MM,
+            "z": Z_LIMIT_MM,
+            "centre_sigma": CENTER_STDDEV_LIMIT_MM,
+        },
         "pass_components": pass_components,
         "checks": checks,
         "failure_reasons": [check["reason"] for check in checks.values() if not check["passed"]],

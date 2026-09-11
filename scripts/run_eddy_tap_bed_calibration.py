@@ -17,7 +17,10 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
+import threading
 import time
+import uuid
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -94,11 +97,16 @@ def utc_now() -> str:
 
 def atomic_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    os.replace(temporary, path)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def acceptance_call(remote_host: str, command: str, payload: dict[str, Any]) -> None:
@@ -191,7 +199,14 @@ class DashboardPublisher:
             "stage": "bed_calibration.preflight",
             "chapters": {"bed_calibration": self.bed},
         }
+        self._activity_stop = threading.Event()
+        self._activity_thread = None
+        self._activity_id = str(uuid.uuid4())
+        self._activity_started = utc_now()
         acceptance_call(self.remote_host, "begin", {"attempt": self._attempt})
+        self.activity(1, "Bed Center Z=0 measurement", "Preparing Eddy reference")
+        self._activity_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
+        self._activity_thread.start()
         self.publish()
 
     def event(self, message: str, *, status: str | None = None) -> None:
@@ -199,6 +214,48 @@ class DashboardPublisher:
         if status is not None:
             self.bed["status"] = status
         self.publish()
+
+    def activity(self, step: int, operation: str, progress: str = "") -> None:
+        now = utc_now()
+        self._activity = {
+            "state": "busy",
+            "attempt_id": self.batch_id,
+            "activity_id": self._activity_id,
+            "owner": "eddy-bed-calibration",
+            "step": step,
+            "operation": operation,
+            "started_at": self._activity_started,
+            "heartbeat_at": now,
+            "progress": progress,
+        }
+        acceptance_call(self.remote_host, "activity", self._activity)
+
+    def _heartbeat_loop(self) -> None:
+        while not self._activity_stop.wait(5.0):
+            activity = dict(getattr(self, "_activity", {}) or {})
+            if not activity:
+                continue
+            now = utc_now()
+            activity["heartbeat_at"] = now
+            try:
+                acceptance_call(self.remote_host, "heartbeat", {
+                    "attempt_id": self.batch_id,
+                    "activity_id": self._activity_id,
+                    "heartbeat_at": now,
+                    "progress": activity.get("progress", ""),
+                })
+            except Exception:
+                pass
+
+    def stop_activity(self) -> None:
+        if hasattr(self, "_activity_stop"):
+            self._activity_stop.set()
+
+    def finish_activity(self, state: str, progress: str = "") -> None:
+        record = dict(getattr(self, "_activity", {}) or {})
+        if record:
+            record.update({"state": state, "progress": progress or record.get("progress", ""), "heartbeat_at": utc_now()})
+            acceptance_call(self.remote_host, "activity", record)
 
     def publish(self) -> None:
         self._attempt.update(
@@ -689,9 +746,16 @@ def collect_reference(
 
 
 def _write_bytes_atomic(path: Path, content: bytes) -> None:
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.rollback")
-    temporary.write_bytes(content)
-    os.replace(temporary, path)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".rollback", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def generated_fingerprint() -> str:
@@ -1066,6 +1130,7 @@ def main(argv: list[str]) -> int:
                 "live configuration does not match local calibration source"
             )
         if phase == "mesh":
+            dashboard.activity(5, "Tap mesh acquisition", "Preparing the bed mesh run")
             homed = prepare_t0(client)
             dashboard.bed["homing_required"] = homed
             dashboard.event("Eddy mesh preflight passed", status="running")
@@ -1076,6 +1141,7 @@ def main(argv: list[str]) -> int:
             )
             dashboard.bed["mesh"].update(mesh)
             dashboard.publish()
+            dashboard.activity(6, "Redeploy and verify the mesh", "Persisting and checking the active mesh")
             persisted = persist_mesh(
                 client, dashboard, run_dir=run_dir, fixed=fixed, mesh=mesh
             )
@@ -1095,6 +1161,7 @@ def main(argv: list[str]) -> int:
             console(client, f"Eddy bed reference started; homing_required={homed}")
 
             x, y = manifest["reference"]["x"], manifest["reference"]["y"]
+            dashboard.activity(1, "Bed Center Z=0 measurement", "Banded centre discovery")
             before_discovery = discover_reference(
                 client, dashboard, x=x, y=y, phase="before_rebase"
             )
@@ -1134,6 +1201,7 @@ def main(argv: list[str]) -> int:
                 "difference_preserved": True,
             }
             dashboard.bed["reference"]["rebase"] = rebase
+            dashboard.activity(2, "Bed Center Z=0 calibration update", "Deploying the common T0/T1 Z correction")
             atomic_json(run_dir / "z_rebase_result.json", rebase)
             dashboard.bed["stage"] = "reference_deployment"
             dashboard.event(
@@ -1155,6 +1223,7 @@ def main(argv: list[str]) -> int:
             ] = target_fingerprint
             atomic_json(run_dir / "z_rebase_result.json", rebase)
             prepare_t0(client)
+            dashboard.activity(3, "Bed Center Z=0 verification", "Five fixed-window centre taps")
             after = collect_reference(
                 client,
                 dashboard,
@@ -1201,12 +1270,14 @@ def main(argv: list[str]) -> int:
                     }
                 )
             else:
+                dashboard.activity(5, "Tap mesh acquisition", "Measuring the bed surface")
                 mesh = run_mesh(client, dashboard, fixed=fixed)
                 mesh["active_physical_verification"] = verify_active_mesh_contacts(
                     client, fixed
                 )
                 dashboard.bed["mesh"].update(mesh)
                 dashboard.publish()
+                dashboard.activity(6, "Redeploy and verify the mesh", "Persisting and checking the active mesh")
                 persisted = persist_mesh(
                     client, dashboard, run_dir=run_dir, fixed=fixed, mesh=mesh
                 )
@@ -1232,6 +1303,10 @@ def main(argv: list[str]) -> int:
         try:
             dashboard.event(f"Eddy bed calibration FAILED: {exc}", status="failed")
             console(client, f"Eddy bed calibration FAILED: {exc}")
+        except BaseException:
+            pass
+        try:
+            dashboard.stop_activity()
         except BaseException:
             pass
         try:
@@ -1309,6 +1384,8 @@ def main(argv: list[str]) -> int:
             ),
         },
     )
+    dashboard.finish_activity("completed", "Eddy bed workflow completed")
+    dashboard.stop_activity()
     print(f"Eddy bed calibration complete: {run_dir}")
     return 0
 

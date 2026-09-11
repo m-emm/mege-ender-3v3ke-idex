@@ -16,6 +16,19 @@ time, .hint, .last-successful { color: #8190a1; font-size: .86rem; }
 .readiness.ready { color: #87e3ad; border-color: #4ba878; background: #14291f; }
 .readiness.failed { color: #ff928d; border-color: #bc635f; background: #2b1919; }
 .readiness.calibrating { color: #ffd479; border-color: #a67c2b; background: #2a2417; }
+.activity { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 10px 14px; border: 1px solid #405264; border-radius: 7px; background: #141c25; }
+.activity-indicator { width: 11px; height: 11px; flex: 0 0 11px; border-radius: 50%; background: #8190a1; }
+.activity strong { font-size: .95rem; letter-spacing: .02em; }
+.activity p { margin: 2px 0 0; font-size: .8rem; }
+.activity time { margin-left: auto; white-space: nowrap; }
+.activity.busy { border-color: #a67c2b; background: #2a2417; }
+.activity.busy .activity-indicator { background: #ffd479; box-shadow: 0 0 0 0 rgba(255,212,121,.7); animation: activity-pulse 1.5s infinite; }
+.activity.delayed { border-color: #9b7130; background: #262116; }
+.activity.delayed .activity-indicator { background: #e9ae4f; }
+.activity.stale { border-color: #bc635f; background: #2b1919; }
+.activity.stale .activity-indicator, .activity.failed .activity-indicator { background: #ff928d; }
+.activity.completed .activity-indicator { background: #87e3ad; }
+@keyframes activity-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,212,121,.65); } 50% { box-shadow: 0 0 0 7px rgba(255,212,121,0); } }
 .printer-panels { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; margin: 16px 0 20px; }
 .panel-card { min-width: 0; background: #18202a; border: 1px solid #2b3745; border-radius: 8px; padding: 15px; }
 .panel-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -52,6 +65,7 @@ time, .hint, .last-successful { color: #8190a1; font-size: .86rem; }
 .status-label.passed { color: #87e3ad; }
 .status-label.failed { color: #ff928d; }
 .status-label.blocked { color: #d19b9b; }
+.status-label.remeasuring { color: #b9c8d8; }
 .workflow-roadmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 10px; margin: 0 0 14px; }
 .workflow-step { min-height: 132px; padding: 12px; border: 1px solid #334354; border-radius: 7px; background: #141c25; }
 .workflow-step-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #aab7c5; font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; }
@@ -69,6 +83,8 @@ time, .hint, .last-successful { color: #8190a1; font-size: .86rem; }
 .workflow-step.failed .workflow-step-heading strong { color: #ff928d; }
 .workflow-step.blocked { border-color: #5d4b4b; background: #211c21; opacity: .82; }
 .workflow-step.blocked .workflow-step-heading strong { color: #d19b9b; }
+.workflow-step.remeasuring { border-color: #6b7f95; background: #1c2530; }
+.workflow-step.remeasuring .workflow-step-heading strong { color: #b9c8d8; }
 .subchapter { margin-top: 16px; }
 .subchapter[hidden] { display: none; }
 .subchapter-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 10px; }

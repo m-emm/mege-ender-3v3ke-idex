@@ -3,12 +3,12 @@
 set -euo pipefail
 
 if [[ "$#" -ne 1 ]]; then
-  echo "Usage: $0 begin|update|accept|fail|ready" >&2
+  echo "Usage: $0 begin|update|activity|heartbeat|accept|fail|ready" >&2
   exit 2
 fi
 command_name="$1"
 case "${command_name}" in
-  begin|update|accept|fail|ready) ;;
+  begin|update|activity|heartbeat|accept|fail|ready) ;;
   *) echo "unknown acceptance command: ${command_name}" >&2; exit 2 ;;
 esac
 remote_host="${MENDERPI_HOST:-pi@menderpi.local}"

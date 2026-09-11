@@ -30,6 +30,8 @@ def test_dashboard_uses_three_ordered_chapters():
     assert "Chapter 1A" not in html
     assert "Chapter 1B" not in html
     assert 'id="last-successful"' in html
+    assert 'id="activity"' in html
+    assert 'id="activity-title"' in html
     assert 'class="printer-panels"' in html
     assert 'id="printer-console"' in html
     assert 'data-stream-url="/webcam/?action=stream"' in html
@@ -82,6 +84,9 @@ def test_dashboard_uses_three_ordered_chapters():
     assert 'bedMeshChapter.hidden = false' in script
     for state in ("pending", "running", "passed", "failed", "blocked"):
         assert f".workflow-step.{state}" in style
+    assert ".workflow-step.remeasuring" in style
+    assert "heartbeat_at" in script
+    assert "BUSY · Step" in script
     assert "border-bottom: 1px solid #2b3745" in style
 
 
