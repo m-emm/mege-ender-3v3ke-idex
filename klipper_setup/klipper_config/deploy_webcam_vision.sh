@@ -13,7 +13,6 @@ VISION_CLEAN_SLATE="${VISION_CLEAN_SLATE:-0}"
 
 required_files=(
   moonraker.conf
-  nginx-mainsail.conf
   vision_framebuffer.py
   vision_capture.py
   vision_calibration.py
@@ -86,7 +85,6 @@ trap cleanup EXIT
 
 scp \
   "${FILES_DIR}/moonraker.conf" \
-  "${FILES_DIR}/nginx-mainsail.conf" \
   "${FILES_DIR}/vision_framebuffer.py" \
   "${FILES_DIR}/vision_capture.py" \
   "${FILES_DIR}/vision_calibration.py" \
@@ -213,7 +211,6 @@ sudo setfacl -m u:www-data:--x "${USER_HOME}"
 
 backup_if_exists "${CONFIG_DIR}/crowsnest.conf"
 backup_if_exists "${CONFIG_DIR}/moonraker.conf"
-backup_if_exists /etc/nginx/sites-available/mainsail
 backup_if_exists /etc/systemd/system/vision-framebuffer.service
 backup_if_exists /etc/systemd/system/vision-framebuffer-nozzle-cam.service
 backup_if_exists /etc/systemd/system/vision-capture.service
@@ -222,10 +219,6 @@ backup_if_exists /etc/systemd/system/vision-capture-nozzle-cam.service
 sudo rm -f "${CONFIG_DIR}/crowsnest.conf"
 sudo install -m 0644 "${REMOTE_TMP}/moonraker.conf" "${CONFIG_DIR}/moonraker.conf"
 sudo chown "${USERNAME}:${USERNAME}" "${CONFIG_DIR}/moonraker.conf"
-
-sudo install -m 0644 "${REMOTE_TMP}/nginx-mainsail.conf" /etc/nginx/sites-available/mainsail
-sudo ln -sf /etc/nginx/sites-available/mainsail /etc/nginx/sites-enabled/mainsail
-sudo rm -f /etc/nginx/sites-enabled/default
 
 sudo install -m 0755 "${REMOTE_TMP}/vision_framebuffer.py" /usr/local/bin/vision_framebuffer.py
 sudo install -m 0755 "${REMOTE_TMP}/vision_capture.py" /usr/local/bin/vision_capture.py
@@ -270,7 +263,6 @@ sudo systemctl enable nginx moonraker \
   vision-framebuffer vision-framebuffer-nozzle-cam \
   vision-capture vision-capture-nozzle-cam
 sudo systemctl disable --now crowsnest || true
-sudo systemctl restart nginx
 sudo systemctl restart moonraker
 sudo systemctl reset-failed crowsnest vision-framebuffer vision-framebuffer-nozzle-cam || true
 sudo systemctl restart vision-framebuffer

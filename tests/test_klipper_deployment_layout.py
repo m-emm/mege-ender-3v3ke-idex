@@ -14,6 +14,9 @@ OVERLAY_DUPLICATE_ROOT = (
 UPDATER = SETUP / "klipper_config/update_menderpi.sh"
 IMAGE_STAGE = SETUP / "image_build/overlays/stage2/99-klipperpi"
 OUTSIDE_ROOT = IMAGE_STAGE / "files/mege_outside"
+INSTALLED_OVERLAY = IMAGE_STAGE / "files/installed_overlay"
+INSTALLED_ROOTFS = INSTALLED_OVERLAY / "rootfs"
+INSTALLED_DEPLOY = SETUP / "klipper_config/deploy_installed_overlay.sh"
 
 
 def manifest(root):
@@ -103,5 +106,41 @@ def test_mege_outside_scripts_have_valid_shell_syntax():
         subprocess.run(["bash", "-n", str(path)], check=True)
 
 
+def test_installed_overlay_is_used_after_mainsail_and_in_live_deployment():
+    image_installer = (IMAGE_STAGE / "01-run-chroot.sh").read_text(encoding="utf-8")
+    updater = UPDATER.read_text(encoding="utf-8")
+    deployer = INSTALLED_DEPLOY.read_text(encoding="utf-8")
+    mainsail_overlay = INSTALLED_ROOTFS / "var/www/mainsail/index.html"
+    nginx_overlay = INSTALLED_ROOTFS / "etc/nginx/sites-available/mainsail"
+
+    assert mainsail_overlay.is_file()
+    assert nginx_overlay.is_file()
+    assert 'wget -q "${MAINSAIL_URL}" -O "${TMP_ZIP}"' in image_installer
+    assert 'rmdir /var/www/mainsail/mainsail' in image_installer
+    assert '"${FILES_DIR}/installed_overlay/rootfs/" /' in image_installer
+    assert image_installer.index('rmdir /var/www/mainsail/mainsail') < image_installer.index(
+        '"${FILES_DIR}/installed_overlay/rootfs/" /'
+    )
+    assert 'crossorigin="use-credentials"' in mainsail_overlay.read_text(encoding="utf-8")
+    nginx = nginx_overlay.read_text(encoding="utf-8")
+    assert nginx.count("proxy_set_header X-Forwarded-For $remote_addr;") == 2
+    assert nginx.count("proxy_set_header X-Real-IP $remote_addr;") == 2
+    assert 'deploy_installed_overlay.sh" --check' in updater
+    assert 'deploy_installed_overlay.sh"' in updater
+    assert "--dry-run" in deployer
+    assert "--backup-dir=\"$BACKUP_ROOT\"" in deployer
+    assert 'sudo -n nginx -t' in deployer
+    assert 'sudo -n systemctl reload nginx' in deployer
+
+
 def test_deployment_script_has_valid_shell_syntax():
-    subprocess.run(["bash", "-n", str(UPDATER)], check=True)
+    for path in (UPDATER, INSTALLED_DEPLOY, IMAGE_STAGE / "01-run-chroot.sh"):
+        subprocess.run(["bash", "-n", str(path)], check=True)
+
+
+def test_bespoke_mainsail_patch_files_are_gone():
+    assert not (IMAGE_STAGE / "files/mainsail_patch").exists()
+    assert not (SETUP / "klipper_config/deploy_mainsail_manifest_patch.sh").exists()
+    assert "MAINSAIL_PATCHER" not in (IMAGE_STAGE / "01-run-chroot.sh").read_text(
+        encoding="utf-8"
+    )

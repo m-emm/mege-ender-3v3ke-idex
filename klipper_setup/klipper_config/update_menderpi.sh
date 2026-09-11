@@ -292,6 +292,7 @@ PY
 
 if [ "$MODE" = check ]; then
   check_live_config
+  MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_installed_overlay.sh" --check
   MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_multi_head_zero_calibration_dashboard.sh" --check
   MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_eddy_tap_dashboard.sh" --check
   exit 0
@@ -505,6 +506,8 @@ REMOTE_SCRIPT
 
 echo "Verifying deployed directory bundles..."
 check_live_config
+echo "Deploying the tracked installed-file overlay..."
+MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_installed_overlay.sh"
 echo "Deploying the multi-head-zero calibration dashboard..."
 MENDERPI_HOST="$REMOTE_HOST" bash "$SCRIPT_DIR/deploy_multi_head_zero_calibration_dashboard.sh"
 echo "Deploying the Eddy tap trace dashboard..."

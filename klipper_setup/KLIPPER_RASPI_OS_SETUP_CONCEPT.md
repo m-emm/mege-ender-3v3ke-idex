@@ -40,7 +40,7 @@ klipper_setup/
             hostname
             klipper.service
             moonraker.service
-            nginx-mainsail.conf   # required (Mainsail)
+            installed_overlay/    # complete installed-file replacements
             klipperscreen.service
             printer.cfg
             moonraker.conf
@@ -115,7 +115,7 @@ Install base + UI tooling:
 3) Install `files/authorized_keys` for `${USERNAME}` (default `pi`).
 4) Enable Avahi so `<hostname>.local` resolves.
 5) Create `/opt/klipper` and `/opt/moonraker` venvs; clone pinned commits; `pip install -r requirements.txt` in each.
-6) Deploy Mainsail: fetch pinned release tarball, unpack to `/var/www/mainsail`, configure nginx from `files/nginx-mainsail.conf`, enable nginx.
+6) Deploy Mainsail: fetch the pinned release tarball, unpack to `/var/www/mainsail`, copy `files/installed_overlay/rootfs/` onto `/`, then enable nginx. The overlay contains the complete nginx site and the deliberately adjusted Mainsail index.
 7) Install KlipperScreen: clone pinned commit to `/opt/klipperscreen`, run installer with X11 backend; install `files/klipperscreen.service`; set `/etc/X11/Xwrapper.config` from overlay to allow service start on vt1.
 8) Install systemd units from `files/*.service`; `systemctl enable ssh avahi-daemon klipper moonraker nginx klipperscreen`.
 9) Place configs into `/home/${USERNAME}/printer_data/config/printer.cfg` and `moonraker.conf` (matching modern Moonraker layout).

@@ -414,16 +414,6 @@ systemctl_enable_safe lightdm
 # Deterministic graphical target (works reliably in chroot)
 ln -sf /lib/systemd/system/graphical.target /etc/systemd/system/default.target
 
-# --- Nginx for Mainsail ------------------------------------------------------
-
-log "Configuring nginx for Mainsail"
-require_file "${FILES_DIR}/nginx-mainsail.conf"
-
-install -m 0644 "${FILES_DIR}/nginx-mainsail.conf" /etc/nginx/sites-available/mainsail
-ln -sf /etc/nginx/sites-available/mainsail /etc/nginx/sites-enabled/mainsail
-rm -f /etc/nginx/sites-enabled/default
-systemctl_enable_safe nginx
-
 log "Installing Eddy tap trace dashboard"
 require_file "${FILES_DIR}/eddy_dashboard/index.html"
 require_file "${FILES_DIR}/eddy_dashboard/style.css"
@@ -643,6 +633,15 @@ if [ -d /var/www/mainsail/mainsail ]; then
   mv /var/www/mainsail/mainsail/* /var/www/mainsail/
   rmdir /var/www/mainsail/mainsail
 fi
+
+log "Applying tracked installed-file overlay"
+require_dir "${FILES_DIR}/installed_overlay/rootfs"
+rsync -a --checksum --no-owner --no-group \
+  "${FILES_DIR}/installed_overlay/rootfs/" /
+ln -sf /etc/nginx/sites-available/mainsail /etc/nginx/sites-enabled/mainsail
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl_enable_safe nginx
 
 chown -R www-data:www-data /var/www/mainsail
 
