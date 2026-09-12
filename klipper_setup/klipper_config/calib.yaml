@@ -4,10 +4,10 @@
 
 t0_x_endstop: -85.187
 t0_y_endstop: -14.152
-t0_z_endstop: 289.213
+t0_z_endstop: 289.221
 t1_x_endstop: 345.617
 t1_y_endstop: -12.503
-t1_z_endstop: 288.524
+t1_z_endstop: 288.532
 
 input_shaper_t0_x_type: mzv
 input_shaper_t0_x_frequency_hz: 31.600

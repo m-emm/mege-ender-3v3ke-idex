@@ -415,12 +415,18 @@ function renderActivity(data, chapters, passed, activitySource = null) {
   const matching = !source.attempt_id || source.attempt_id === data.attempt?.attempt_id || source.attempt_id === data.batch_id || source.attempt_id === data.run_id;
   const sourceState = String(source.state || "").toLowerCase();
   const effectiveState = sourceState === "idle" ? String(data.status || "idle").toLowerCase() : sourceState || String(data.status || "idle").toLowerCase();
-  const active = matching && ["busy", "preparing", "running"].includes(effectiveState);
-  const state = active ? (age < 15 ? "busy" : age <= 60 ? "delayed" : "stale") : effectiveState;
+  const terminalRun = ["failed", "completed", "aborted"].includes(String(data.status || "").toLowerCase());
+  // A stale volatile activity record must never resurrect a terminal ledger
+  // state as BUSY. This is especially important after a coordinator crash,
+  // where activity.json is intentionally preserved for diagnosis.
+  const active = matching && !terminalRun && ["busy", "preparing", "running"].includes(effectiveState);
+  const terminalState = String(data.status || "idle").toLowerCase();
+  const state = active ? (age < 15 ? "busy" : age <= 60 ? "delayed" : "stale") : (terminalRun ? terminalState : effectiveState);
   activity.className = `activity ${state}`;
   if (active) {
     const step = activeStepNumber(data, chapters, passed, source);
-    activityTitle.textContent = `BUSY · Step ${step || "?"} — ${WORKFLOW_STEPS.find((item) => item.number === step)?.title || displayStage(data)}`;
+    const signalLabel = state === "busy" ? "BUSY · Step" : state === "delayed" ? "DELAYED · Step" : "NO RECENT SIGNAL · Step";
+    activityTitle.textContent = `${signalLabel} ${step || "?"} — ${WORKFLOW_STEPS.find((item) => item.number === step)?.title || displayStage(data)}`;
     activityDetail.textContent = source.operation || source.progress || "Calibration is still progressing.";
   } else if (state === "failed") {
     activityTitle.textContent = "Calibration stopped";
@@ -718,6 +724,15 @@ function renderRoadmap(data, chapters, steps = deriveWorkflowSteps(data, chapter
         ${step.note ? `<small>${escapeHtml(step.note)}</small>` : ""}
       </article>`).join("");
   });
+}
+
+function renderLiveChapterStatuses(data, chapters, steps) {
+  // Activity-only polls must update the chapter summaries as well as the
+  // highlighted card. Keep detailed measurement DOM untouched so plots,
+  // scroll positions, and copy/paste state remain stable.
+  setDisplayStatus(bedReferenceState, roadmapChapterStatus("bed-reference", steps));
+  setDisplayStatus(toolAlignmentState, roadmapChapterStatus("tool-alignment", steps));
+  setDisplayStatus(bedMeshState, roadmapChapterStatus("bed-mesh", steps));
 }
 
 function referenceCard(reference) {
@@ -1021,8 +1036,10 @@ async function refresh() {
       currentActivityData = activityCandidate;
       if (currentDashboardData && currentHash === dashboardContentHash) {
         const chapters = normaliseChapters(currentDashboardData);
+        const liveSteps = deriveWorkflowSteps({...currentDashboardData, activity: currentActivityData}, chapters);
         renderActivity(currentDashboardData, chapters, stepEvidence(currentDashboardData, acceptedChapters(currentDashboardData)), currentActivityData);
-        renderRoadmap(currentDashboardData, chapters, deriveWorkflowSteps({...currentDashboardData, activity: currentActivityData}, chapters));
+        renderRoadmap(currentDashboardData, chapters, liveSteps);
+        renderLiveChapterStatuses(currentDashboardData, chapters, liveSteps);
       }
     }
   } catch (error) {

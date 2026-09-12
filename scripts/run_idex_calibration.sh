@@ -45,11 +45,14 @@ print(json.dumps({
 PY
 )"
   printf '%s' "${payload}" | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" update
-  python3 - "${batch_id}" "${step}" "${message}" <<'PY' | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" activity >/dev/null 2>&1 || true
+  # Keep the terminal activity state separate from the roadmap step. The
+  # previous implementation passed only the numeric step and then compared
+  # that value with "failed"/"completed", leaving failed runs looking BUSY.
+  python3 - "${batch_id}" "${status}" "${step}" "${message}" <<'PY' | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" activity >/dev/null 2>&1 || true
 import datetime as dt, json, sys, uuid
 now = dt.datetime.now(dt.timezone.utc).isoformat()
 state = "failed" if sys.argv[2] == "failed" else "completed" if sys.argv[2] == "completed" else "busy"
-print(json.dumps({"attempt_id": sys.argv[1], "activity_id": str(uuid.uuid4()), "owner": "full-coordinator", "state": state, "step": int(sys.argv[2]), "operation": sys.argv[3], "progress": sys.argv[3], "started_at": now, "heartbeat_at": now}))
+print(json.dumps({"attempt_id": sys.argv[1], "activity_id": str(uuid.uuid4()), "owner": "full-coordinator", "state": state, "step": int(sys.argv[3]), "operation": sys.argv[4], "progress": sys.argv[4], "started_at": now, "heartbeat_at": now}))
 PY
 }
 

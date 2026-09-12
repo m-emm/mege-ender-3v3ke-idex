@@ -462,6 +462,11 @@ class DashboardPublisher:
         try:
             shutil.copyfile(source, temporary)
             os.replace(temporary, target)
+            # Dashboard artifacts are served directly by nginx.  The
+            # temporary file is created with the process umask (often 0600),
+            # so make the published plot explicitly web-readable after the
+            # atomic replace.
+            os.chmod(target, 0o644)
         finally:
             temporary.unlink(missing_ok=True)
         return "artifacts/%s" % filename

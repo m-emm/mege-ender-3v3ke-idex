@@ -556,6 +556,8 @@ def test_clean_vision_calibration_runtime_and_deployment_are_wired():
     live_deploy = (KLIPPER_CONFIG_DIR / "deploy_webcam_vision.sh").read_text(
         encoding="utf-8"
     )
+    assert live_deploy.count('"service": "mjpegstreamer-adaptive"') == 2
+    assert '"service": "mjpegstreamer",' not in live_deploy
     extra = (
         Path(__file__).resolve().parents[1]
         / "klipper_setup/klipper_host/klippy/extras/vision.py"

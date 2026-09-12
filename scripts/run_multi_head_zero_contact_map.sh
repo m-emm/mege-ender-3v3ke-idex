@@ -64,6 +64,10 @@ dashboard_publish() {
   local event="$4"
   local remote_file="${DASHBOARD_ROOT}/artifacts/${artifact_name}"
   scp -q "${local_file}" "${REMOTE_HOST}:${remote_file}"
+  # scp preserves a restrictive local mode (for example 0600 from a secure
+  # umask).  nginx serves these files directly, so publish them explicitly as
+  # owner/group writable and world-readable before advertising the URL.
+  ssh "${REMOTE_HOST}" "chmod 0644 -- '${remote_file}'"
   local payload
   payload="$(python3 - "${local_file}" "${artifact_name}" "${state_key}" "${event}" "${dashboard_batch_id}" <<'PY'
 import json, sys
@@ -91,6 +95,22 @@ PY
 
 activity_pid=""
 activity_id=""
+set_activity_operation() {
+  local step="$1" operation="$2" progress="${3:-${operation}}"
+  # Keep the same activity identity while changing the operation. This makes
+  # long deployment/restart windows visible instead of leaving the dashboard
+  # stuck on the preceding correction label.
+  python3 - "${dashboard_batch_id}" "${activity_id}" "${step}" "${operation}" "${progress}" <<'PY' | "${REPO_ROOT}/scripts/publish_idex_acceptance.sh" activity >/dev/null 2>&1 || true
+import datetime as dt, json, sys
+now = dt.datetime.now(dt.timezone.utc).isoformat()
+print(json.dumps({
+    "attempt_id": sys.argv[1], "activity_id": sys.argv[2],
+    "owner": "multi-head-zero-shell", "state": "busy", "step": int(sys.argv[3]),
+    "operation": sys.argv[4], "progress": sys.argv[5],
+    "started_at": now, "heartbeat_at": now,
+}))
+PY
+}
 start_activity_heartbeat() {
   local step="$1" operation="$2"
   activity_id="$(python3 - <<'PY'
@@ -209,11 +229,13 @@ dashboard_publish "${calibration_result}" "${calibration_id}_calibration_result.
 
 printer_console "absolute XY and T1 Z correction calculated; deploying configuration"
 echo "Deploying paired calibration and checking parity..."
+set_activity_operation 4 "Deploying corrected T0/T1 configuration" "Waiting for Klippy restart and parity checks"
 if ! "${UPDATE_SCRIPT}" || ! "${UPDATE_SCRIPT}" --check; then
   stop_activity_heartbeat
   rollback_alignment
   exit 1
 fi
+set_activity_operation 4 "T0/T1 configuration deployed" "Preparing 13-contact verification"
 stop_activity_heartbeat
 printer_console "configuration deployment parity passed; starting 13-contact verification"
 
