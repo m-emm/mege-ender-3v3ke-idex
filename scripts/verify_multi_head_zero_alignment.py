@@ -106,7 +106,7 @@ def load_calibration_result(path):
         raise VerificationError("missing calibration result: %s" % path)
     result = json.loads(path.read_text(encoding="utf-8"))
     if (
-        result.get("schema_version") != 4
+        result.get("schema_version") != 5
         or result.get("workflow") != "multi_head_zero_calibration_result"
     ):
         raise VerificationError("%s is not a calibration result" % path)
@@ -118,6 +118,18 @@ def load_calibration_result(path):
         )
     for axis in ("x", "y"):
         finite(target_center.get(axis), "calibration target %s" % axis.upper())
+    procedure = result.get("calibration_procedure")
+    if (
+        not isinstance(procedure, dict)
+        or procedure.get("algorithm") != "three_stage_sphere_ring_calibration_v3"
+        or procedure.get("contact_count") != 47
+        or procedure.get("refined_ring_unique_contact_count") != 8
+        or procedure.get("refined_ring_round_count") != 3
+        or procedure.get("refined_ring_contact_count") != 24
+    ):
+        raise VerificationError(
+            "%s does not use the three-round 47-contact calibration procedure" % path
+        )
     return result
 
 

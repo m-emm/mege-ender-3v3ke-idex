@@ -64,6 +64,7 @@ def main():
         )
         for index in range(8)
     ]
+    ring_circuit = path_length(ring + [ring[0]])
     settings = probe_settings()
     max_tap_seconds = (
         abs(settings["start_z"] - settings["target_z"]) / settings["probe_speed"]
@@ -77,16 +78,16 @@ def main():
             "seed": 9,
             "summit": 1,
             "phase_2_ring": 8,
-            "phase_3_ring": 8,
-            "total": 26,
+            "phase_3_ring": 24,
+            "total": 47,
         },
-        "contacts_total": 52,
+        "contacts_total": 94,
         "verification": {
-            "contacts_per_tool": {"centre": 1, "ring": 8, "total": 9},
-            "contacts_total": 18,
-            "full_calibration_and_verification_contacts": 70,
-            "max_seconds_total": 18 * max_tap_seconds,
-            "full_calibration_and_verification_max_seconds": 70 * max_tap_seconds,
+            "contacts_per_tool": {"centre": 5, "ring": 8, "total": 13},
+            "contacts_total": 26,
+            "full_calibration_and_verification_contacts": 120,
+            "max_seconds_total": 26 * max_tap_seconds,
+            "full_calibration_and_verification_max_seconds": 120 * max_tap_seconds,
         },
         "seed_order": seed,
         "xy_path_mm_per_tool": {
@@ -99,17 +100,20 @@ def main():
                 ]
             ),
             "seed_to_nominal_summit": math.dist(seed[-1], summit),
-            "ring": math.dist(summit, ring[0]) + path_length(ring),
-            "total_nominal": path_length(seed + [summit] + ring + ring),
+            "phase_2_ring": math.dist(summit, ring[0]) + path_length(ring),
+            "phase_3_ring_circuit": ring_circuit,
+            "phase_3_ring_rounds": 3,
+            "phase_3_ring_total": 3 * ring_circuit,
+            "total_nominal": path_length(seed + [summit] + ring) + 3 * ring_circuit,
         },
         "z_motion": {
             "per_contact": ["guarded descent", "fast retract to START_Z"],
             "guarded_descent_max_mm": abs(settings["start_z"] - settings["target_z"]),
-            "guarded_descent_max_seconds_total": 52
+            "guarded_descent_max_seconds_total": 94
             * abs(settings["start_z"] - settings["target_z"])
             / settings["probe_speed"],
             "max_seconds_per_contact": max_tap_seconds,
-            "max_seconds_total": 52 * max_tap_seconds,
+            "max_seconds_total": 94 * max_tap_seconds,
         },
         "switch_safety": "One machine-Z=10.000 recovery before preparation; no per-tap tool switches.",
     }

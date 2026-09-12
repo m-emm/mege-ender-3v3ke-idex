@@ -36,7 +36,7 @@ def test_dashboard_uses_three_ordered_chapters():
     assert 'id="printer-console"' in html
     assert 'data-stream-url="/webcam/?action=stream"' in html
     assert "Units: coordinates, absolute Z, and the common Z correction are shown in mm" in html
-    assert "31 contacts per tool" in html
+    assert "47 contacts per tool" in html
     assert "13 contacts per tool" in html
     assert 'id="events"' not in html
     assert "last_successful.json" in script
@@ -66,6 +66,8 @@ def test_dashboard_uses_three_ordered_chapters():
     assert "startCameraStream" in script
     assert "printerCamera.src" in script
     assert "formatMillimetres" in script
+    assert "calibrationContactCount" in script
+    assert "ring_round_count" in script
     assert "formatConsoleTimestamp" in script
     assert "dashboardContentHash" in script
     assert "slice(-60).reverse()" in script

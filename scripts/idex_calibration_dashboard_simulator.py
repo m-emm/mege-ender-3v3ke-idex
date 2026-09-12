@@ -41,6 +41,7 @@ STEPS = {
     7: ("completed", "Accepted calibration chain readiness"),
 }
 CHAPTER_STEPS = {"bed_reference": (1, 2, 3), "tool_alignment": (4,), "mesh": (5, 6)}
+CALIBRATION_CONTACT_COUNT = 47
 
 
 def now() -> str:
@@ -182,6 +183,36 @@ class Simulator:
         }
         ledger.apply_command(self.root, "activity", payload)
 
+    @staticmethod
+    def _three_round_calibration_records(run: dict[str, Any]) -> list[dict[str, Any]]:
+        """Expand the captured legacy Phase-3 ring into credible v3 fixture data.
+
+        Captured production evidence remains deliberately immutable 31-contact
+        history.  A live simulated candidate, however, needs the actual new
+        47-contact sequence.  The three deterministic offsets make the three
+        samples at each angle visibly separate without pretending they were
+        captured on the printer.
+        """
+        records = copy.deepcopy(run.get("records", []))
+        phase_three = [record for record in records if record.get("phase") == "phase_3_ring"]
+        if len(phase_three) != 8:
+            return records
+        prefix = [record for record in records if record.get("phase") != "phase_4_centre" and record.get("phase") != "phase_3_ring"]
+        centre = [record for record in records if record.get("phase") == "phase_4_centre"]
+        expanded = []
+        for round_index, offset in enumerate((-0.0006, 0.0, 0.0006), start=1):
+            for angle_index, record in enumerate(phase_three):
+                item = copy.deepcopy(record)
+                item["round_index"] = round_index
+                item["angle_degrees"] = angle_index * 45.0
+                if isinstance(item.get("trigger_z"), (int, float)):
+                    item["trigger_z"] = float(item["trigger_z"]) + offset
+                expanded.append(item)
+        candidate = prefix + expanded + centre
+        for index, record in enumerate(candidate, start=1):
+            record["sample_index"] = index
+        return candidate
+
     def _stage_payload(self, step: int, completed: int = 0, total: int | None = None) -> dict[str, Any]:
         accepted = self._source_accepted()
         if step <= 3:
@@ -204,8 +235,11 @@ class Simulator:
             visible = {}
             for tool in ("t0", "t1"):
                 run = copy.deepcopy(runs.get(tool, {}))
-                records = run.get("records", [])[:completed]
-                visible[tool] = {"workflow": "calibration", "state": "running", "progress": {"completed": len(records), "total": total or 31}, "records": records}
+                records = self._three_round_calibration_records(run)
+                # Simulate the normal T0-then-T1 sequence. T1 is explicitly
+                # awaiting re-measurement while T0 is still collecting data.
+                tool_records = records[:completed] if tool == "t0" else []
+                visible[tool] = {"workflow": "calibration", "state": "running", "progress": {"completed": len(tool_records), "total": total or CALIBRATION_CONTACT_COUNT}, "records": tool_records}
             return {"tool_alignment": {"calibration": {"status": "running", "runs": visible}}}
         source_mesh = copy.deepcopy((accepted.get("mesh") or {}).get("data", {}).get("mesh", {}))
         points = source_mesh.get("points", [])[:completed]
@@ -229,6 +263,30 @@ class Simulator:
                 if not bed:
                     chapters.pop("bed_calibration", None)
         ledger.write_state(self.root, state)
+
+    def _new_tool_alignment_entry(self, entry: dict[str, Any]) -> dict[str, Any]:
+        """Turn captured legacy evidence into a deterministic v3 simulator result."""
+        source = copy.deepcopy(entry)
+        calibration = source.setdefault("data", {}).setdefault("calibration", {})
+        for run in calibration.get("runs", {}).values():
+            records = self._three_round_calibration_records(run)
+            run["records"] = records
+            run["progress"] = {"completed": CALIBRATION_CONTACT_COUNT, "total": CALIBRATION_CONTACT_COUNT}
+            run["state"] = "completed"
+        result = calibration.setdefault("result", {}).setdefault("data", {})
+        procedure = {
+            "algorithm": "three_stage_sphere_ring_calibration_v3",
+            "contact_count": CALIBRATION_CONTACT_COUNT,
+            "refined_ring_unique_contact_count": 8,
+            "refined_ring_round_count": 3,
+            "refined_ring_contact_count": 24,
+        }
+        result["schema_version"] = 5
+        result["calibration_procedure"] = procedure
+        source.setdefault("invariants", {}).setdefault("fixed_inputs", {})[
+            "calibration_procedure"
+        ] = procedure
+        return source
 
     def start(self, scope: str = "full") -> dict[str, Any]:
         if scope not in {"full", "bed_reference", "tool_alignment", "mesh_refresh"}:
@@ -259,7 +317,7 @@ class Simulator:
                 "attempt_id": attempt["attempt_id"], "batch_id": attempt["batch_id"], "run_scope": attempt.get("run_scope", "full"),
                 "status": "running", "stage": stage, "chapters": self._stage_payload(number, completed, total),
             })
-            self._record_activity(number, operation or default_operation, f"{completed}/{total or (31 if number == 4 else 49 if number in {5, 6} else 5)} simulated contacts")
+            self._record_activity(number, operation or default_operation, f"{completed}/{total or (CALIBRATION_CONTACT_COUNT if number == 4 else 49 if number in {5, 6} else 5)} simulated contacts")
             self._move_printer_for_step(number)
             self._console(f"IDEX simulator: Step {number} — {operation or default_operation}")
             return self.snapshot()
@@ -275,7 +333,7 @@ class Simulator:
             return self.snapshot()
 
     def complete_step(self, number: int) -> dict[str, Any]:
-        total = 31 if number == 4 else 49 if number in {5, 6} else 5
+        total = CALIBRATION_CONTACT_COUNT if number == 4 else 49 if number in {5, 6} else 5
         self.step(number, completed=total, total=total)
         next_step = number + 1
         if next_step <= 7 and self._active_attempt().get("run_scope") == "full":
@@ -292,6 +350,8 @@ class Simulator:
             source = copy.deepcopy(self._source_accepted().get(chapter))
             if not source:
                 raise ValueError(f"fixture has no accepted {chapter} evidence")
+            if chapter == "tool_alignment":
+                source = self._new_tool_alignment_entry(source)
             # A captured mesh can legitimately be stale on the live printer
             # after a later tool-frame change. Completing a simulated mesh
             # chapter represents a new, verified persisted matrix, so use the
@@ -361,12 +421,12 @@ class Simulator:
         if name in {"delayed-heartbeat", "stale-heartbeat"}:
             self.start("full"); self.step(3, completed=2, total=5); return self.set_heartbeat_age(20 if name == "delayed-heartbeat" else 61)
         if name in {"accepted-bed-active-tool", "failed-tool-rerun"}:
-            self.start("tool_alignment"); self.step(4, completed=8, total=31)
+            self.start("tool_alignment"); self.step(4, completed=8, total=CALIBRATION_CONTACT_COUNT)
             if name == "failed-tool-rerun": return self.fail_step(4, "Simulated paired X/Y limit failed")
             return self.snapshot()
         if name.startswith("failed-"):
             step = {"failed-bed": 3, "failed-tool": 4, "failed-mesh": 6}[name]
-            self.start("full"); self.step(step, completed=2, total=5 if step == 3 else 31 if step == 4 else 49); return self.fail_step(step, "Simulated verification limit exceeded")
+            self.start("full"); self.step(step, completed=2, total=5 if step == 3 else CALIBRATION_CONTACT_COUNT if step == 4 else 49); return self.fail_step(step, "Simulated verification limit exceeded")
         if name == "stale-mesh":
             self.start("tool_alignment"); self.complete_chapter("tool_alignment")
             state = ledger.load_state(self.data_root / "accepted.json")

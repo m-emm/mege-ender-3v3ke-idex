@@ -32,6 +32,13 @@ STEP_RANGES = {
     "tool_alignment": (4, 4),
     "mesh": (5, 6),
 }
+TOOL_ALIGNMENT_PROCEDURE = {
+    "algorithm": "three_stage_sphere_ring_calibration_v3",
+    "contact_count": 47,
+    "refined_ring_unique_contact_count": 8,
+    "refined_ring_round_count": 3,
+    "refined_ring_contact_count": 24,
+}
 
 
 def utc_now() -> str:
@@ -159,6 +166,27 @@ def stable_hash(value: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _invalidate_legacy_tool_alignment(accepted: dict[str, Any]) -> None:
+    """Keep old tool artifacts as history, but never as v3 acceptance evidence."""
+    entry = accepted.get("tool_alignment")
+    if not isinstance(entry, dict) or entry.get("status") not in {
+        "passed",
+        "accepted",
+        "completed",
+    }:
+        return
+    procedure = ((entry.get("invariants") or {}).get("fixed_inputs") or {}).get(
+        "calibration_procedure"
+    )
+    if procedure == TOOL_ALIGNMENT_PROCEDURE:
+        return
+    entry["status"] = "stale"
+    entry["stale_reason"] = (
+        "Legacy 31-contact tool alignment is history only; rerun the 47-contact procedure"
+    )
+    entry["compatibility"] = {"state": "incompatible", "reason": entry["stale_reason"]}
+
+
 def empty_state() -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
@@ -207,6 +235,7 @@ def load_state(path: Path) -> dict[str, Any]:
     state.setdefault("readiness", {})
     state["schema_version"] = SCHEMA_VERSION
     state["kind"] = "idex_calibration_acceptance"
+    _invalidate_legacy_tool_alignment(state["accepted"])
     return state
 
 
@@ -357,7 +386,8 @@ def project_current(state: dict[str, Any]) -> dict[str, Any]:
     accepted = state.get("accepted") or {}
     chapters: dict[str, Any] = {}
     bed = _chapter_data(accepted.get("bed_reference"))
-    tools = _chapter_data(accepted.get("tool_alignment"))
+    tool_entry = accepted.get("tool_alignment") or {}
+    tools = _chapter_data(tool_entry) if tool_entry.get("status") != "stale" else None
     mesh = _chapter_data(accepted.get("mesh"))
     if bed:
         chapters["bed_calibration"] = copy.deepcopy(bed)
@@ -444,6 +474,7 @@ def project_current(state: dict[str, Any]) -> dict[str, Any]:
 def write_state(root: Path, state: dict[str, Any]) -> dict[str, Any]:
     state["schema_version"] = SCHEMA_VERSION
     state["kind"] = "idex_calibration_acceptance"
+    _invalidate_legacy_tool_alignment(state.setdefault("accepted", {}))
     state["updated_at"] = utc_now()
     # Callers may construct an initial state directly (not through a command);
     # keep its readiness projection coherent without embedding live activity.

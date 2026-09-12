@@ -71,19 +71,19 @@ def load_run(run_dir, expected_tool):
         raise CalibrationError(
             "%s is not a %s calibration run" % (manifest_path, expected_tool)
         )
-    if manifest.get("schema_version") != 5 or manifest.get("workflow") != "calibration":
-        raise CalibrationError("%s is not a schema-v5 calibration run" % manifest_path)
+    if manifest.get("schema_version") != 6 or manifest.get("workflow") != "calibration":
+        raise CalibrationError("%s is not a schema-v6 calibration run" % manifest_path)
     if manifest.get("status") != "completed":
         raise CalibrationError("%s is not completed" % manifest_path)
     calibration = manifest.get("calibration")
     if (
         not isinstance(calibration, dict)
-        or calibration.get("algorithm") != "three_stage_sphere_ring_calibration_v2"
-        or calibration.get("contact_count") != 31
+        or calibration.get("algorithm") != "three_stage_sphere_ring_calibration_v3"
+        or calibration.get("contact_count") != 47
         or calibration.get("termination_reason") != "phase_4_centre_complete"
     ):
         raise CalibrationError(
-            "%s has no valid 31-contact calibration result" % manifest_path
+            "%s has no valid 47-contact three-round calibration result" % manifest_path
         )
     phase_1 = calibration.get("phase_1")
     phase_2 = calibration.get("phase_2")
@@ -124,10 +124,80 @@ def load_run(run_dir, expected_tool):
         raise CalibrationError("%s has an invalid final-centre median" % manifest_path)
     if abs(finite(centre_statistics.get("standard_deviation"), "%s final-centre sigma" % expected_tool) - statistics.pstdev(centre_values)) > 1.0e-9:
         raise CalibrationError("%s has an invalid final-centre sigma" % manifest_path)
-    if phase_2.get("ring_contact_count") != 8 or phase_3.get("ring_contact_count") != 8:
+    if phase_2.get("ring_contact_count") != 8:
         raise CalibrationError(
-            "%s does not contain two completed eight-contact rings" % manifest_path
+            "%s does not contain the completed first eight-contact ring" % manifest_path
         )
+    phase_3_contacts = phase_3.get("ring_contacts")
+    phase_3_fit_inputs = phase_3.get("fit_inputs")
+    phase_3_statistics = phase_3.get("per_angle_statistics")
+    if (
+        phase_3.get("ring_contact_count") != 24
+        or phase_3.get("ring_unique_contact_count") != 8
+        or phase_3.get("ring_round_count") != 3
+        or not isinstance(phase_3_contacts, list)
+        or len(phase_3_contacts) != 24
+        or not isinstance(phase_3_fit_inputs, dict)
+        or len(phase_3_fit_inputs.get("angles_degrees", [])) != 24
+        or len(phase_3_fit_inputs.get("trigger_z_mm", [])) != 24
+        or not isinstance(phase_3_statistics, list)
+        or len(phase_3_statistics) != 8
+        or any(
+            not isinstance(item, dict) or item.get("count") != 3
+            for item in phase_3_statistics
+        )
+    ):
+        raise CalibrationError(
+            "%s does not contain three complete eight-contact refined-ring rounds"
+            % manifest_path
+        )
+    try:
+        phase_3_round_angle_counts = {
+            (int(contact["round_index"]), float(contact["angle_degrees"]))
+            for contact in phase_3_contacts
+        }
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CalibrationError("%s has invalid refined-ring contact metadata" % manifest_path) from exc
+    if len(phase_3_round_angle_counts) != 24:
+        raise CalibrationError("%s has duplicate or incomplete refined-ring rounds" % manifest_path)
+    expected_ring_order = [
+        (round_index, float(angle_index * 45))
+        for round_index in (1, 2, 3)
+        for angle_index in range(8)
+    ]
+    observed_ring_order = [
+        (int(contact["round_index"]), float(contact["angle_degrees"]))
+        for contact in phase_3_contacts
+    ]
+    if observed_ring_order != expected_ring_order:
+        raise CalibrationError(
+            "%s does not retain three complete clockwise refined-ring rounds"
+            % manifest_path
+        )
+    raw_angles = [float(value) for value in phase_3_fit_inputs["angles_degrees"]]
+    raw_heights = [finite(value, "%s refined-ring Z" % expected_tool) for value in phase_3_fit_inputs["trigger_z_mm"]]
+    if raw_angles != [angle for _, angle in expected_ring_order]:
+        raise CalibrationError("%s has invalid refined-ring fit angles" % manifest_path)
+    if raw_heights != [
+        finite(contact.get("trigger_z"), "%s refined-ring contact Z" % expected_tool)
+        for contact in phase_3_contacts
+    ]:
+        raise CalibrationError("%s refined-ring fit inputs do not match contacts" % manifest_path)
+    for angle_index, aggregate in enumerate(phase_3_statistics):
+        values = raw_heights[angle_index::8]
+        expected_angle = float(angle_index * 45)
+        if (
+            finite(aggregate.get("angle_degrees"), "refined-ring angle") != expected_angle
+            or abs(finite(aggregate.get("mean"), "refined-ring mean") - statistics.mean(values)) > 1.0e-9
+            or abs(finite(aggregate.get("minimum"), "refined-ring minimum") - min(values)) > 1.0e-9
+            or abs(finite(aggregate.get("maximum"), "refined-ring maximum") - max(values)) > 1.0e-9
+            or abs(finite(aggregate.get("span"), "refined-ring span") - (max(values) - min(values))) > 1.0e-9
+            or abs(finite(aggregate.get("standard_deviation"), "refined-ring sigma") - statistics.pstdev(values)) > 1.0e-9
+        ):
+            raise CalibrationError(
+                "%s has invalid refined-ring angle aggregate at %.0f degrees"
+                % (manifest_path, expected_angle)
+            )
     return {
         "manifest": manifest,
         "run_dir": run_dir.resolve(),
@@ -143,6 +213,13 @@ def load_run(run_dir, expected_tool):
             phase_4["statistics"].get("median"), "%s final-centre median Z" % expected_tool
         ),
         "centre_statistics": centre_statistics,
+        "calibration_procedure": {
+            "algorithm": calibration.get("algorithm"),
+            "contact_count": calibration.get("contact_count"),
+            "refined_ring_unique_contact_count": phase_3.get("ring_unique_contact_count"),
+            "refined_ring_round_count": phase_3.get("ring_round_count"),
+            "refined_ring_contact_count": phase_3.get("ring_contact_count"),
+        },
         "ball_radius_mm": finite(calibration.get("ball_radius_mm"), "ball radius"),
         "ring_radius_mm": finite(calibration.get("ring_radius_mm"), "ring radius"),
     }
@@ -221,6 +298,8 @@ def verify_sources(t0_run, t1_run):
         raise CalibrationError("T0 and T1 runs used different sphere geometry")
     if source_config_fingerprint(t0_run) != source_config_fingerprint(t1_run):
         raise CalibrationError("T0 and T1 runs used different config fingerprints")
+    if t0_run["calibration_procedure"] != t1_run["calibration_procedure"]:
+        raise CalibrationError("T0 and T1 runs used different calibration procedures")
     target_t0 = configured_target(t0_run)
     target_t1 = configured_target(t1_run)
     if target_t0 != target_t1:
@@ -321,7 +400,7 @@ def write_result(
     target_config_fingerprint,
 ):
     payload = {
-        "schema_version": 4,
+        "schema_version": 5,
         "workflow": "multi_head_zero_calibration_result",
         "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "source_runs": {"t0": str(t0_run["run_dir"]), "t1": str(t1_run["run_dir"])},
@@ -337,6 +416,7 @@ def write_result(
             "t0": t0_run["centre_statistics"],
             "t1": t1_run["centre_statistics"],
         },
+        "calibration_procedure": t0_run["calibration_procedure"],
         "phase_2_centers": {
             "t0": {axis: t0_run["phase_2_%s" % axis] for axis in ("x", "y")},
             "t1": {axis: t1_run["phase_2_%s" % axis] for axis in ("x", "y")},

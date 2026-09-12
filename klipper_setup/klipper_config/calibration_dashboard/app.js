@@ -2,6 +2,7 @@ const headline = document.querySelector("#headline");
 const lastSuccessful = document.querySelector("#last-successful");
 const updated = document.querySelector("#updated");
 const calibrationChapter = document.querySelector("#calibration-chapter");
+const calibrationHeading = document.querySelector("#calibration-heading");
 const calibrationState = document.querySelector("#calibration-state");
 const calibrationTools = document.querySelector("#calibration-tools");
 const calibrationOutcome = document.querySelector("#calibration-outcome");
@@ -68,7 +69,7 @@ const WORKFLOW_STEPS = Object.freeze([
     number: 4,
     chapter: "tool-alignment",
     title: "T0/T1 toolhead alignment",
-    description: "Align X/Y/Z with 31-contact ball calibration and 13-contact verification.",
+    description: "Align X/Y/Z with 47-contact ball calibration and 13-contact verification.",
   },
   {
     number: 5,
@@ -246,6 +247,7 @@ function calculationDetails(run) {
     return `<dl class="calculation-details">
       <dt>First ring correction</dt><dd>ΔX ${formatMicrometres(first.harmonic?.dx_mm)} · ΔY ${formatMicrometres(first.harmonic?.dy_mm)}</dd>
       <dt>Final ring correction</dt><dd>ΔX ${formatMicrometres(final.harmonic.dx_mm)} · ΔY ${formatMicrometres(final.harmonic.dy_mm)}</dd>
+      <dt>Refined ring</dt><dd>${Number(final.ring_round_count || 1)} rounds · ${Number(final.ring_contact_count || 8)} raw taps</dd>
       <dt>Final centre σ</dt><dd>${formatMicrometres(summary.phase_4?.statistics?.standard_deviation)} · 5/5 taps</dd>
     </dl>`;
   }
@@ -263,6 +265,21 @@ function calculationDetails(run) {
     </dl>`;
   }
   return "";
+}
+
+function calibrationContactCount(entry) {
+  if (!entry) return 47;
+  const totals = Object.values(entry.runs || {})
+    .map((run) => Number(run?.progress?.total))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (totals.length) return Math.max(...totals);
+  const result = entry.result?.data || entry.data || {};
+  const procedure = result.calibration_procedure || result.procedure || {};
+  const procedureCount = Number(procedure.contact_count);
+  if (Number.isFinite(procedureCount) && procedureCount > 0) return procedureCount;
+  // Immutable 31-contact artifacts remain valid history and are deliberately
+  // labelled as such rather than being relabelled as the new procedure.
+  return 31;
 }
 
 function contactColour(z, minZ, maxZ) {
@@ -580,7 +597,9 @@ function acceptedChapters(data) {
   const accepted = data.accepted || {};
   const chapters = {};
   const bed = accepted.bed_reference?.data;
-  const tools = accepted.tool_alignment?.data;
+  const tools = accepted.tool_alignment?.status === "stale"
+    ? undefined
+    : accepted.tool_alignment?.data;
   const mesh = accepted.mesh?.data;
   if (bed || mesh) chapters.bed_calibration = {...(bed || {})};
   if (mesh) chapters.bed_calibration.mesh = mesh.mesh || mesh;
@@ -843,6 +862,9 @@ function render(data) {
   const priors = data.configured_priors;
   const hasAlignment = Boolean(alignment.calibration || alignment.verification);
   toolAlignmentChapter.hidden = false;
+  if (calibrationHeading) {
+    calibrationHeading.textContent = `Ball alignment · ${calibrationContactCount(alignment.calibration)} contacts per tool`;
+  }
   setDisplayStatus(toolAlignmentState, roadmapChapterStatus("tool-alignment", roadmapSteps));
   renderChapter(calibrationChapter, calibrationState, calibrationTools, calibrationOutcome, alignment.calibration, priors, calibrationCards(alignment.calibration));
   renderChapter(verificationChapter, verificationState, verificationTools, verificationOutcome, alignment.verification, priors, `${verificationCentreProgressCard(alignment.verification)}${verificationCards(alignment.verification)}`);

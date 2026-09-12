@@ -33,7 +33,7 @@ homing and final slow X latch, and confirms the ball switch is physically
 3. Verify five fixed-window T0 taps from `START_Z=2` toward `Z=-1`; banded
    discovery is not repeated.
 4. **Chapter 2 — Toolhead alignment:** align T0/T1 X, Y, and relative Z with
-   the 31-contact ball calibration and 13-contact fixed-target verification.
+   the 47-contact ball calibration and 13-contact fixed-target verification.
 5. **Chapter 3 — Mesh and readiness:** acquire the native 7×7 Tap mesh and
    write the accepted matrix atomically to `calib.yaml`.
 6. Regenerate, deploy, reload, and verify the persisted active mesh, including
@@ -77,10 +77,14 @@ operator-facing phases are the Bed Center Z=0 measurement, calibration update,
 and verification. Tool verification requires each recovered centre to be
 within 0.06 mm of `(75,-9)`, paired X/Y within 0.05 mm, paired centre-median
 T1−T0 Z within 0.02 mm, and population σ no greater than 15 µm for each
-five-tap centre series. The 31-contact calibration and 13-contact verification
+five-tap centre series. The 47-contact calibration and 13-contact verification
 must be complete; a noisy or incomplete centre series blocks correction or
 mesh progression. The stored mesh must exactly equal the accepted live matrix,
 be active, and pass the mesh-aware contact checks.
+
+The 47-contact alignment is procedure v3. Earlier 31-contact results are kept
+as historical artifacts but must be rerun before they can contribute to the
+accepted calibration chain.
 
 If any step fails, leave the printer alone and inspect `/calibration/` and the
 batch directory printed by the script. A failed candidate deployment is rolled

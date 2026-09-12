@@ -54,7 +54,7 @@ def test_only_tool_selection_is_exposed_to_the_user():
         runner.build_parser().parse_args(["--workflow", "calibration"])
 
 
-def test_calibration_adds_a_second_ring_around_the_first_refined_centre():
+def test_calibration_adds_three_refined_ring_rounds_around_the_first_refined_centre():
     runner = load_runner()
     args = SimpleNamespace(
         tool="T0",
@@ -88,8 +88,8 @@ def test_calibration_adds_a_second_ring_around_the_first_refined_centre():
         progress_callback=lambda record: progress.append(record["sample_index"]),
     )
 
-    assert len(records) == 31
-    assert progress == list(range(1, 32))
+    assert len(records) == 47
+    assert progress == list(range(1, 48))
     assert [
         (record["commanded_x"], record["commanded_y"]) for record in records[:9]
     ] == [
@@ -106,12 +106,20 @@ def test_calibration_adds_a_second_ring_around_the_first_refined_centre():
     assert summary["phase_1"]["fit"]["status"] == "valid"
     phase_2_centre = summary["phase_2"]["refined_center"]
     phase_3_ring = summary["phase_3"]["ring_contacts"]
-    assert summary["contact_count"] == 31
+    assert summary["algorithm"] == "three_stage_sphere_ring_calibration_v3"
+    assert summary["contact_count"] == 47
     assert summary["phase_4"]["contact_count"] == 5
     assert summary["phase_4"]["statistics"]["median"] == pytest.approx(
         1.0 - 0.05 * ((summary["phase_4"]["target"]["x"] - 3.0) ** 2 + summary["phase_4"]["target"]["y"] ** 2)
     )
     assert summary["phase_4"]["repeatability_passed"] is True
+    assert len(phase_3_ring) == 24
+    assert [record["round_index"] for record in phase_3_ring] == [
+        *([1] * 8), *([2] * 8), *([3] * 8)
+    ]
+    assert [record["angle_degrees"] for record in phase_3_ring] == pytest.approx(
+        [0.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0] * 3
+    )
     assert all(
         (
             (record["x"] - phase_2_centre["x"]) ** 2
@@ -121,6 +129,40 @@ def test_calibration_adds_a_second_ring_around_the_first_refined_centre():
         == pytest.approx(args.ring_radius_mm)
         for record in phase_3_ring
     )
+    assert all(item["count"] == 3 for item in summary["phase_3"]["per_angle_statistics"])
+    assert len(summary["phase_3"]["fit_inputs"]["angles_degrees"]) == 24
+    assert len(summary["phase_3"]["fit_inputs"]["trigger_z_mm"]) == 24
+
+
+def test_three_round_fit_matches_eight_per_angle_means_and_preserves_scatter():
+    runner = load_runner()
+    theta = np.tile(np.arange(8) * np.pi / 4.0, 3)
+    # The offsets deliberately vary by round. Repeating complete angle rounds
+    # makes the all-24 least-squares result exactly match the eight means.
+    means = 2.0 + 0.04 * np.cos(theta[:8]) - 0.03 * np.sin(theta[:8])
+    round_offsets = np.repeat(np.array([-0.006, 0.0, 0.006]), 8)
+    raw = np.tile(means, 3) + round_offsets
+    all_fit = runner.fit_xy_from_ring(75.0, -9.0, theta, raw, 5.0, 2.8)
+    mean_fit = runner.fit_xy_from_ring(
+        75.0,
+        -9.0,
+        theta[:8],
+        [float(np.mean(raw[index::8])) for index in range(8)],
+        5.0,
+        2.8,
+    )
+    assert all_fit["x"] == pytest.approx(mean_fit["x"])
+    assert all_fit["y"] == pytest.approx(mean_fit["y"])
+    assert all_fit["sample_count"] == 24
+
+
+def test_calibration_plot_describes_raw_round_scatter_without_a_sphere_comparison():
+    source = RUNNER_PATH.read_text(encoding="utf-8")
+    assert "Three-round refined-ring Z scatter" in source
+    assert "Round %d raw taps" in source
+    assert "Per-angle mean ± σ" in source
+    assert "Per-angle spans (µm)" in source
+    assert "Final correction: ΔX" in source
 
 
 def test_final_centre_statistics_require_five_finite_taps_and_use_median():
@@ -429,10 +471,10 @@ def test_workflow_event_is_emitted_to_the_printer_console(monkeypatch):
         runner, "run_gcode", lambda _url, script: commands.append(script)
     )
 
-    runner.printer_log("unused", 'T0 1/31 phase_1_seed Z=0.500 "quoted"')
+    runner.printer_log("unused", 'T0 1/47 phase_1_seed Z=0.500 "quoted"')
 
     assert commands == [
-        "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 1/31 phase_1_seed Z=0.500 'quoted'\""
+        "RESPOND TYPE=echo MSG=\"MHZ calibration: T0 1/47 phase_1_seed Z=0.500 'quoted'\""
     ]
 
 
@@ -474,13 +516,13 @@ def test_applier_uses_the_final_centre_median(tmp_path):
     run_dir = tmp_path / "T0"
     run_dir.mkdir()
     manifest = {
-        "schema_version": 5,
+        "schema_version": 6,
         "workflow": "calibration",
         "tool": "T0",
         "status": "completed",
         "calibration": {
-            "algorithm": "three_stage_sphere_ring_calibration_v2",
-                "contact_count": 31,
+            "algorithm": "three_stage_sphere_ring_calibration_v3",
+                "contact_count": 47,
                 "termination_reason": "phase_4_centre_complete",
             "ball_radius_mm": 5.0,
             "ring_radius_mm": 2.8,
@@ -493,7 +535,27 @@ def test_applier_uses_the_final_centre_median(tmp_path):
                 "refined_center": {"x": 74.1, "y": -8.1},
             },
                 "phase_3": {
-                "ring_contact_count": 8,
+                "ring_contact_count": 24,
+                "ring_unique_contact_count": 8,
+                "ring_round_count": 3,
+                "ring_contacts": [
+                    {"trigger_z": 1.1, "round_index": round_index, "angle_degrees": angle_index * 45.0}
+                    for round_index in (1, 2, 3)
+                    for angle_index in range(8)
+                ],
+                "fit_inputs": {"angles_degrees": [angle * 45.0 for _round in range(3) for angle in range(8)], "trigger_z_mm": [1.1] * 24},
+                "per_angle_statistics": [
+                    {
+                        "angle_degrees": angle * 45.0,
+                        "count": 3,
+                        "mean": 1.1,
+                        "minimum": 1.1,
+                        "maximum": 1.1,
+                        "span": 0.0,
+                        "standard_deviation": 0.0,
+                    }
+                    for angle in range(8)
+                ],
                 "refined_center": {"x": 74.9, "y": -8.9},
                 },
                 "phase_4": {
@@ -520,6 +582,10 @@ def test_applier_uses_the_final_centre_median(tmp_path):
     assert result["x"] == pytest.approx(74.9)
     assert result["y"] == pytest.approx(-8.9)
     assert result["z"] == pytest.approx(1.1)
+    manifest["schema_version"] = 5
+    (run_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(applier.CalibrationError, match="schema-v6"):
+        applier.load_run(run_dir, "T0")
 
 
 def test_generated_parked_tool_limits_preserve_measured_clearance():

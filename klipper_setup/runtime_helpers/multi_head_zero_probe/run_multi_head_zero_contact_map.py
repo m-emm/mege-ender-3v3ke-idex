@@ -42,9 +42,14 @@ FIT_CONCAVITY_EPSILON = 1.0e-6
 SEED_CONTACT_COUNT = 9
 CENTER_TAP_COUNT = 5
 CENTER_STDDEV_LIMIT_MM = 0.015
-CALIBRATION_CONTACT_COUNT = 31
+REFINED_RING_UNIQUE_CONTACT_COUNT = 8
+REFINED_RING_ROUND_COUNT = 3
+REFINED_RING_CONTACT_COUNT = REFINED_RING_UNIQUE_CONTACT_COUNT * REFINED_RING_ROUND_COUNT
+CALIBRATION_CONTACT_COUNT = 47
 VERIFICATION_CONTACT_COUNT = 13
 FRAME_TOLERANCE_MM = 1.0e-6
+CALIBRATION_ALGORITHM = "three_stage_sphere_ring_calibration_v3"
+CALIBRATION_MANIFEST_SCHEMA_VERSION = 6
 
 
 class ContactMapError(RuntimeError):
@@ -642,6 +647,8 @@ def contact_payload(record):
         "trigger_z": float(record["trigger_z"]),
     }
     for key in (
+        "angle_degrees",
+        "round_index",
         "machine_commanded_x",
         "machine_commanded_y",
         "machine_trigger_x",
@@ -799,14 +806,21 @@ def sphere_z(x_values, y_values, x_center, y_center, z_max, ball_radius_mm):
 def fit_xy_from_ring(x_rough, y_rough, theta, z_values, ball_radius_mm, ring_radius_mm):
     theta = np.asarray(theta, dtype=float)
     z_values = np.asarray(z_values, dtype=float)
-    if len(theta) != 8 or len(z_values) != 8:
-        raise ContactMapError("ring refinement requires exactly eight contacts")
-    a_cos = float(2.0 / len(theta) * np.sum(z_values * np.cos(theta)))
-    b_sin = float(2.0 / len(theta) * np.sum(z_values * np.sin(theta)))
+    if len(theta) != len(z_values) or len(theta) < REFINED_RING_UNIQUE_CONTACT_COUNT:
+        raise ContactMapError("ring refinement requires matching contact angles and heights")
+    design = np.column_stack((np.ones(len(theta)), np.cos(theta), np.sin(theta)))
+    coefficients, _, rank, _ = np.linalg.lstsq(design, z_values, rcond=None)
+    if rank != 3:
+        raise ContactMapError("ring refinement first-harmonic fit is rank deficient")
+    a_cos = float(coefficients[1])
+    b_sin = float(coefficients[2])
     scale = math.sqrt(ball_radius_mm**2 - ring_radius_mm**2) / ring_radius_mm
     return {
         "a_cos_mm": a_cos,
         "b_sin_mm": b_sin,
+        "mean_z_mm": float(coefficients[0]),
+        "fit_method": "least_squares_first_harmonic",
+        "sample_count": int(len(theta)),
         "scale": scale,
         "dx_mm": a_cos * scale,
         "dy_mm": b_sin * scale,
@@ -898,33 +912,41 @@ def run_ring_refinement(
     center,
     summit_z,
     phase,
+    round_count=1,
     contact_function,
     progress_callback,
 ):
     theta, targets = ring_targets(center["x"], center["y"], args.ring_radius_mm)
+    if round_count < 1:
+        raise ContactMapError("ring refinement requires at least one round")
     ring_records = []
-    for angle, target in zip(theta, targets):
-        record = contact_function(
-            args.moonraker_url,
-            tool=args.tool,
-            tool_index=tool_index,
-            x=float(target[0]),
-            y=float(target[1]),
-            sample_index=len(records) + 1,
-            phase=phase,
-        )
-        record["angle_degrees"] = float(math.degrees(angle))
-        records.append(record)
-        if progress_callback is not None:
-            progress_callback(record)
-        require_contact(
-            record, "%s contact %.0f degrees" % (phase, math.degrees(angle))
-        )
-        ring_records.append(record)
+    for round_index in range(1, round_count + 1):
+        for angle, target in zip(theta, targets):
+            record = contact_function(
+                args.moonraker_url,
+                tool=args.tool,
+                tool_index=tool_index,
+                x=float(target[0]),
+                y=float(target[1]),
+                sample_index=len(records) + 1,
+                phase=phase,
+            )
+            record["angle_degrees"] = float(math.degrees(angle))
+            record["round_index"] = round_index
+            records.append(record)
+            if progress_callback is not None:
+                progress_callback(record)
+            require_contact(
+                record,
+                "%s round %d contact %.0f degrees"
+                % (phase, round_index, math.degrees(angle)),
+            )
+            ring_records.append(record)
+    expanded_theta = np.tile(theta, round_count)
     refined = fit_xy_from_ring(
         center["x"],
         center["y"],
-        theta,
+        expanded_theta,
         [record["trigger_z"] for record in ring_records],
         args.ball_radius_mm,
         args.ring_radius_mm,
@@ -941,11 +963,38 @@ def run_ring_refinement(
         float(record["trigger_z"] - expected)
         for record, expected in zip(ring_records, expected_ring_z)
     ]
+    per_angle = []
+    for angle in theta:
+        samples = [
+            float(record["trigger_z"])
+            for record in ring_records
+            if math.isclose(float(record["angle_degrees"]), float(math.degrees(angle)), abs_tol=1.0e-6)
+        ]
+        if len(samples) != round_count:
+            raise ContactMapError("refined ring has incomplete angle rounds")
+        per_angle.append(
+            {
+                "angle_degrees": float(math.degrees(angle)),
+                "count": len(samples),
+                "mean": float(np.mean(samples)),
+                "minimum": min(samples),
+                "maximum": max(samples),
+                "span": max(samples) - min(samples),
+                "standard_deviation": float(np.std(samples)),
+            }
+        )
     return {
         "ring_center": {"x": center["x"], "y": center["y"]},
         "ring_contact_count": len(ring_records),
+        "ring_unique_contact_count": len(theta),
+        "ring_round_count": round_count,
         "ring_angles_degrees": [float(math.degrees(angle)) for angle in theta],
         "ring_contacts": [contact_payload(record) for record in ring_records],
+        "fit_inputs": {
+            "angles_degrees": [float(record["angle_degrees"]) for record in ring_records],
+            "trigger_z_mm": [float(record["trigger_z"]) for record in ring_records],
+        },
+        "per_angle_statistics": per_angle,
         "harmonic": {
             "a_cos_mm": refined["a_cos_mm"],
             "b_sin_mm": refined["b_sin_mm"],
@@ -1022,6 +1071,7 @@ def run_calibration(
         center=phase_2["refined_center"],
         summit_z=summit["trigger_z"],
         phase="phase_3_ring",
+        round_count=REFINED_RING_ROUND_COUNT,
         contact_function=contact_function,
         progress_callback=progress_callback,
     )
@@ -1036,7 +1086,7 @@ def run_calibration(
         progress_callback=progress_callback,
     )
     return {
-        "algorithm": "three_stage_sphere_ring_calibration_v2",
+        "algorithm": CALIBRATION_ALGORITHM,
         "contact_count": CALIBRATION_CONTACT_COUNT,
         "ball_radius_mm": args.ball_radius_mm,
         "ring_radius_mm": args.ring_radius_mm,
@@ -1141,8 +1191,12 @@ def run_verification(
 
 def render_calibration(output_dir, tool, records, summary):
     figure, (xy_axis, residual_axis) = plt.subplots(
-        1, 2, figsize=(13, 5), constrained_layout=True
+        1, 2, figsize=(13, 6.2), constrained_layout=False
     )
+    # Keep the measurement axes clear: the legend belongs in a dedicated strip
+    # above the residual plot, while the audit annotation gets its own footer.
+    # This prevents long per-angle summaries from covering the plotted taps.
+    figure.subplots_adjust(left=0.06, right=0.97, top=0.80, bottom=0.28, wspace=0.30)
     phase_1 = summary["phase_1"]
     phase_2 = summary["phase_2"]
     phase_3 = summary["phase_3"]
@@ -1246,59 +1300,103 @@ def render_calibration(output_dir, tool, records, summary):
         aspect="equal",
         xlabel="Commanded X (mm)",
         ylabel="Commanded Y (mm)",
-        title="31-contact calibration (%s)" % tool,
+        title="%d-contact calibration (%s)" % (summary["contact_count"], tool),
     )
     xy_axis.grid(True, alpha=0.3)
     xy_axis.legend(fontsize=8, loc="upper right")
-    # Show the final refined ring's height variation directly.  The ring
-    # median is the reference datum for this diagnostic; no sphere model is
-    # fitted or subtracted here, so the plot exposes the measured bed/ball
-    # fluctuation at each ring contact.
-    ring_values = [
-        float(item["trigger_z"])
-        for item in final_ring
-        if item.get("trigger_z") is not None
-        and np.isfinite(float(item["trigger_z"]))
-    ]
+    # Show every final-ring measurement directly. The all-sample ring median
+    # is the datum; no sphere model is fitted or subtracted from this plot.
+    ring_values = [float(item["trigger_z"]) for item in final_ring if item.get("trigger_z") is not None and np.isfinite(float(item["trigger_z"]))]
     ring_median = float(np.median(ring_values)) if ring_values else float("nan")
-    ring_residuals_um = [(value - ring_median) * 1000.0 for value in ring_values]
-    ring_labels = [
-        "%g°" % angle for angle in phase_3.get("ring_angles_degrees", [])
-    ][:len(ring_residuals_um)]
-    residual_axis.plot(
-        range(1, len(ring_residuals_um) + 1),
-        ring_residuals_um,
-        marker="o",
-        color="tab:blue",
-        label="Refined-ring taps",
-    )
+    round_count = int(phase_3.get("ring_round_count") or 1)
+    angles = [float(item.get("angle_degrees", 0.0)) for item in final_ring]
+    rounds = [int(item.get("round_index") or 1) for item in final_ring]
+    for round_index in range(1, round_count + 1):
+        indices = [index for index, value in enumerate(rounds) if value == round_index]
+        if not indices:
+            continue
+        residual_axis.scatter(
+            [angles[index] for index in indices],
+            [(ring_values[index] - ring_median) * 1000.0 for index in indices],
+            s=42,
+            marker=("o", "s", "^", "D")[min(round_index - 1, 3)],
+            alpha=0.8,
+            label="Round %d raw taps" % round_index,
+            zorder=3,
+        )
+    point_statistics = phase_3.get("per_angle_statistics") or []
+    if point_statistics:
+        mean_angles = [float(item["angle_degrees"]) for item in point_statistics]
+        mean_residuals = [(float(item["mean"]) - ring_median) * 1000.0 for item in point_statistics]
+        mean_sigma = [float(item["standard_deviation"]) * 1000.0 for item in point_statistics]
+        residual_axis.errorbar(
+            mean_angles,
+            mean_residuals,
+            yerr=mean_sigma,
+            color="black",
+            marker="_",
+            linewidth=1.1,
+            capsize=3,
+            label="Per-angle mean ± σ",
+            zorder=4,
+        )
     residual_axis.axhline(
         0.0, color="tab:green", linewidth=0.9, label="Ring median",
     )
-    if ring_labels:
-        residual_axis.set_xticks(range(1, len(ring_labels) + 1), ring_labels, rotation=35, ha="right")
+    if angles:
+        ordered_angles = phase_3.get("ring_angles_degrees", [])
+        residual_axis.set_xticks(ordered_angles, ["%g°" % angle for angle in ordered_angles], rotation=35, ha="right")
     residual_axis.set(
-        xlabel="Refined-ring contact",
+        xlabel="Refined-ring angle",
         ylabel="Z − ring median (µm)",
-        title="Refined-ring Z variation (%s)" % tool,
+        title="Three-round refined-ring Z scatter (%s)" % tool,
     )
     residual_axis.grid(True, alpha=0.3)
-    residual_axis.legend(fontsize=8)
-    residual_axis.text(
-        0.03,
-        0.03,
-        "Phase-2 XY: %.4f, %.4f\nFinal XY: %.4f, %.4f\nRing median Z: %.4f mm\nRing span: %.1f µm"
-        % (
-            phase_2_refined["x"],
-            phase_2_refined["y"],
-            refined["x"],
-            refined["y"],
-            ring_median,
-            (max(ring_values) - min(ring_values)) * 1000.0 if ring_values else float("nan"),
-        ),
-        transform=residual_axis.transAxes,
+    residual_axis.legend(
+        fontsize=8,
+        ncol=3,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.16),
+        borderaxespad=0.0,
+        frameon=True,
+    )
+    span_values = [
+        "%g° %.1f" % (float(item["angle_degrees"]), float(item["span"]) * 1000.0)
+        for item in point_statistics
+    ]
+    # Four angles per line keeps the footer compact and readable at the
+    # dashboard's rendered resolution.
+    per_angle_spans = "\n".join(
+        ", ".join(span_values[index:index + 4])
+        for index in range(0, len(span_values), 4)
+    ) or "unavailable"
+    annotation = (
+        "Phase-2 XY: %.4f, %.4f · Final XY: %.4f, %.4f · "
+        "Final correction: ΔX %+.1f µm · ΔY %+.1f µm\n"
+        "%d rounds × 8 points; fit uses all %d taps · Ring median Z: %.4f mm · raw span %.1f µm\n"
+        "Per-angle spans (µm):\n%s"
+    ) % (
+        phase_2_refined["x"],
+        phase_2_refined["y"],
+        refined["x"],
+        refined["y"],
+        phase_3["harmonic"]["dx_mm"] * 1000.0,
+        phase_3["harmonic"]["dy_mm"] * 1000.0,
+        round_count,
+        len(ring_values),
+        ring_median,
+        (max(ring_values) - min(ring_values)) * 1000.0 if ring_values else float("nan"),
+        per_angle_spans,
+    )
+    figure.text(
+        0.55,
+        0.035,
+        annotation,
+        ha="center",
         va="bottom",
-        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
+        fontsize=7,
+        linespacing=1.15,
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.88},
     )
     path = output_dir / ("%s_calibration.png" % tool)
     figure.savefig(path, dpi=200)
@@ -1467,7 +1565,11 @@ def run_tool_workflow(
     args = configured_runtime_args(priors, tool, DEFAULT_MOONRAKER_URL)
     records = []
     manifest = {
-        "schema_version": 5,
+        "schema_version": (
+            CALIBRATION_MANIFEST_SCHEMA_VERSION
+            if workflow == "calibration"
+            else 5
+        ),
         "run_id": batch_dir.name,
         "tool": tool,
         "workflow": workflow,
@@ -1497,8 +1599,16 @@ def run_tool_workflow(
         )
         workflow_log(
             DEFAULT_MOONRAKER_URL,
-            "%s %d/%d %s%s"
-            % (tool, record["sample_index"], contact_total, record["phase"], suffix),
+            "%s %d/%d %s%s%s"
+            % (
+                tool,
+                record["sample_index"],
+                contact_total,
+                record["phase"],
+                " round %d/%d" % (record["round_index"], REFINED_RING_ROUND_COUNT)
+                if record.get("phase") == "phase_3_ring" else "",
+                suffix,
+            ),
         )
 
     try:

@@ -104,3 +104,24 @@ def test_stale_mesh_acceptance_status_is_visible_to_dashboard_roadmap(tmp_path):
     mesh = current["chapters"]["bed_calibration"]["mesh"]
     assert mesh["status"] == "stale"
     assert mesh["stale_reason"] == "T0 frame changed"
+
+
+def test_legacy_31_contact_tool_alignment_becomes_history_only(tmp_path):
+    module = load_module()
+    state = module.empty_state()
+    state["accepted"] = {
+        "tool_alignment": {
+            "status": "accepted",
+            "attempt_id": "legacy",
+            "artifact": "artifacts/legacy-tool.json",
+            "data": {"calibration": {"runs": {}}},
+            "invariants": {"fixed_inputs": {}},
+        },
+    }
+    module.write_state(tmp_path, state)
+    current = json.loads((tmp_path / "data/current.json").read_text())
+    entry = current["accepted"]["tool_alignment"]
+    assert entry["status"] == "stale"
+    assert "31-contact" in entry["stale_reason"]
+    assert "tool_alignment" not in current["chapters"]
+    assert current["accepted_sources"]["tool_alignment"]["artifact"] == "artifacts/legacy-tool.json"

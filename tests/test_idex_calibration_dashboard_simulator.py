@@ -42,15 +42,27 @@ def test_fixture_set_has_read_only_provenance_and_real_dashboard_inputs():
 def test_active_candidate_replaces_old_accepted_tool_detail_without_leaking_plots(tmp_path):
     sim = simulator(tmp_path)
     sim.start("tool_alignment")
-    sim.step(4, completed=8, total=31)
+    sim.step(4, completed=8, total=47)
     current = sim.snapshot()["current"]
     candidate = current["chapters"]["tool_alignment"]["calibration"]
     assert candidate["status"] == "running"
     assert "verification" not in current["chapters"]["tool_alignment"]
-    assert candidate["runs"]["t0"]["progress"] == {"completed": 8, "total": 31}
+    assert candidate["runs"]["t0"]["progress"] == {"completed": 8, "total": 47}
     assert "plot" not in candidate["runs"]["t0"]
     assert "plot" not in candidate["runs"]["t1"]
     assert current["accepted_sources"]["tool_alignment"]["attempt_id"]
+
+
+def test_simulator_exposes_all_three_live_refined_ring_rounds(tmp_path):
+    sim = simulator(tmp_path)
+    sim.start("tool_alignment")
+    sim.step(4, completed=42, total=47)
+    run = sim.snapshot()["current"]["chapters"]["tool_alignment"]["calibration"]["runs"]["t0"]
+    refined = [record for record in run["records"] if record.get("phase") == "phase_3_ring"]
+    assert run["progress"] == {"completed": 42, "total": 47}
+    assert len(refined) == 24
+    assert [record["round_index"] for record in refined] == [*([1] * 8), *([2] * 8), *([3] * 8)]
+    assert [record["angle_degrees"] for record in refined] == [angle * 45.0 for _round in range(3) for angle in range(8)]
 
 
 def test_heartbeat_changes_only_activity_file_and_keeps_current_projection_byte_identical(tmp_path):
@@ -95,7 +107,7 @@ def test_invalid_mixed_state_is_explicitly_diagnosed(tmp_path):
 def test_fresh_start_uses_new_attempt_and_does_not_inherit_candidate_progress(tmp_path):
     sim = simulator(tmp_path)
     first = sim.start("tool_alignment")["current"]["attempt"]["attempt_id"]
-    sim.step(4, completed=11, total=31)
+    sim.step(4, completed=11, total=47)
     second = sim.dispatch({"action": "restart", "scope": "tool_alignment"})["current"]
     assert second["attempt"]["attempt_id"] != first
     candidate = second["chapters"]["tool_alignment"]["calibration"]

@@ -23,7 +23,7 @@
     <section><strong>Events</strong><div id="sim-events">
       <div>Start: <button data-action="start" data-scope="full">full</button><button data-action="start" data-scope="bed_reference">bed</button><button data-action="start" data-scope="tool_alignment">tool</button><button data-action="start" data-scope="mesh_refresh">mesh</button><button data-action="restart">Restart</button></div>
       <div>Set step: ${[1, 2, 3, 4, 5, 6, 7].map((number) => `<button data-action="step" data-number="${number}">${number}</button>`).join("")}</div>
-      <div>Progress <input id="sim-progress" value="1/31" aria-label="Contact progress"><button data-action="progress">Apply</button><button data-action="heartbeat">Heartbeat</button></div>
+      <div>Progress <input id="sim-progress" value="1/47" aria-label="Contact progress"><button data-action="progress">Apply</button><button data-action="heartbeat">Heartbeat</button></div>
       <div>Finish step: ${[1, 2, 3, 4, 5, 6, 7].map((number) => `<button data-action="complete-step" data-number="${number}">${number}</button>`).join("")}</div>
       <div>Finish chapter: <button data-action="complete-chapter" data-chapter="bed_reference">bed</button><button data-action="complete-chapter" data-chapter="tool_alignment">tool</button><button data-action="complete-chapter" data-chapter="mesh">mesh</button></div>
       <div>Fail step <input id="sim-fail-step" value="4" aria-label="Fail step"><input id="sim-fail-reason" value="Simulated limit failed" aria-label="Failure reason"><button class="danger" data-action="fail-step">Fail</button></div>

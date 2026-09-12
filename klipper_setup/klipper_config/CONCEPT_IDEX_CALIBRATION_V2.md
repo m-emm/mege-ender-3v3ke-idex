@@ -264,26 +264,33 @@ for relative T0/T1 Z alignment.
 
 ### 2. Multi-head-zero calibration (step 4)
 
-For T0, then T1, the runner performs the fixed 31-contact sequence:
+For T0, then T1, the runner performs the fixed 47-contact sequence:
 
 1. nine serpentine seed contacts over the configured safe envelope;
 2. one mandatory direct contact at the fitted rough summit;
 3. one mandatory eight-point `2.8 mm` ring around that summit;
-4. one mandatory eight-point `2.8 mm` ring around the first refined centre; and
+4. three complete clockwise eight-point `2.8 mm` rings around the first refined centre (24 contacts); and
 5. five final-centre contacts at the refined XY position.
 
 The `2.8 mm` ring retains enough sphere slope for the harmonic XY fit while
 keeping contacts close to vertical. Ring Z values are consumed only by that
 fit and are not exposed as an operator-facing Z diagnostic.
 
-The second ring's harmonic centre is the final X/Y measurement. The median of
+The three-round refined-ring harmonic centre is the final X/Y measurement. It
+fits all 24 raw heights with a least-squares first harmonic (equivalently, the
+eight per-angle three-sample means), while preserving the raw scatter for
+audit and plots. The median of
 the five final-centre contacts is the authoritative Z measurement. Each series
 must contain exactly five completed contacts and have population standard
 deviation `σ ≤ 15 µm`; an incomplete or noisy series fails before any
-correction is applied. T0 completes all 31 contacts, Z lifts to the safe switch
+correction is applied. T0 completes all 47 contacts, Z lifts to the safe switch
 height, and the workflow selects T1 exactly once. Active carriage, extruder,
 logical origin, mesh state, and manual adjustment are verified for every
 contact.
+
+This is the `three_stage_sphere_ring_calibration_v3` procedure. Earlier
+31-contact artifacts remain available as historical evidence, but are not
+compatible tool-alignment acceptance evidence; a 47-contact rerun is required.
 
 The coordinator calculates and stages:
 
@@ -467,7 +474,7 @@ bed_mesh_horizontal_move_z_mm
 ```
 
 Algorithm constants that have only one supported value are code constants, not
-configuration: the 5 mm ball radius, 2.8 mm ring, 31-contact calibration
+configuration: the 5 mm ball radius, 2.8 mm ring, 47-contact calibration
 layout, 13-contact verification layout, five-tap centre gate, safe switch lift,
 contact order, correction formulae, and acceptance logic. If an implementation genuinely needs an
 operator-tunable physical limit, it may be added to `calib_config.yaml`; it may
@@ -711,10 +718,10 @@ This chapter shows:
 
 ### Chapter 2 — Toolhead alignment (step 4)
 
-This chapter keeps both 31-contact calibration cards and both fixed-target
+This chapter keeps both 47-contact calibration cards and both fixed-target
 13-contact verification cards visible together. It shows:
 
-- current tool and `n/31` or `n/13` progress;
+- current tool and `n/47` or `n/13` progress;
 - the live isometric contact plots;
 - clickable fullscreen completed PNG plots;
 - rough summit, phase-2 centre, and final phase-3 centre;

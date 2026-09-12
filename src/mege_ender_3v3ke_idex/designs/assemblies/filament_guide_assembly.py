@@ -23,6 +23,14 @@ mount_eye_depth = 20
 mount_eye_fillet_radius = 2
 mount_eye_screw_hole_inset = 6
 mount_eye_screw_size = "M5"
+mount_spacer_clearance = 0.1
+frame_depth = 8.5
+frame_width = 5
+spacer_thickness = 1
+spacer_bearing_clearance = 0.4
+spool_gap = 0.1
+frame_spool_clearance = 2
+mount_spacer_extra_border = 0.5
 
 
 def create_filament_guide_spool():
@@ -133,12 +141,6 @@ def create_filament_guide_spool():
 
 
 def create_filament_guide_assembly():
-    frame_depth = 8.5
-    frame_width = 4
-    spacer_thickness = 0.5
-    spacer_bearing_clearance = 0.2
-    spool_gap = 0.1
-    frame_spool_clearance = 1.5
 
     left_spool = create_filament_guide_spool()
     left_spool = left_spool.prefixed_copy("left_filament_guide_spool")
@@ -167,6 +169,8 @@ def create_filament_guide_assembly():
     )
 
     frame = frame.cut(frame_cutter)
+
+    fused_size = get_bounding_box_size(fused)
 
     retval = LeaderFollowersCuttersPart(frame)
 
@@ -243,6 +247,31 @@ def create_filament_guide_assembly():
     mount_eye = mount_eye.cut(mount_screw_cutter)
 
     retval = retval.fuse(mount_eye)
+
+    spacers_size = get_bounding_box_size(spacers)
+
+    spool_connector_bite_cutter = materialize_bounding_box(
+        frame,
+        x_size=fused_size[0],
+        y_size=spacers_size[1] + 2 * mount_spacer_extra_border,
+        z_enlargement=-2 * frame_width / 2,
+    )
+
+    retval.leader, rest = take_bite_out_of(retval.leader, spool_connector_bite_cutter)
+
+    clearance_cutter = materialize_bounding_box(
+        rest,
+        x_enlargement=2 * mount_spacer_clearance,
+        y_enlargement=2 * mount_spacer_clearance,
+        z_enlargement=2 * mount_spacer_clearance,
+    )
+
+    retval.leader = retval.leader.cut(clearance_cutter)
+
+    top_rest, bottom_rest = cut_in_two(rest, cut_normal=(0, 0, 1))
+
+    retval.add_named_follower(top_rest, "top_mount_spacer")
+    retval.add_named_follower(bottom_rest, "bottom_mount_spacer")
 
     if not checked_one:
         raise RuntimeError("No cutters were found in the filament guide assembly.")

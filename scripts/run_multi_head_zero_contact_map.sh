@@ -273,8 +273,12 @@ print(json.dumps({
     'run_scope': sys.argv[5], 'artifact': 'artifacts/' + sys.argv[3],
     'data': {'calibration': {'result': {'artifact': 'artifacts/' + sys.argv[3], 'data': calibration}},
              'verification': {'report': {'data': verification}}},
-    'invariants': {
-      'fixed_inputs': {'source_config_fingerprint': calibration.get('source_config_fingerprint'), 'target_center': target},
+  'invariants': {
+    'fixed_inputs': {
+      'source_config_fingerprint': calibration.get('source_config_fingerprint'),
+      'target_center': target,
+      'calibration_procedure': calibration.get('calibration_procedure'),
+    },
       't0_xy': [t0.get('x_endstop'), t0.get('y_endstop')],
       't1_xy': [t1.get('x_endstop'), t1.get('y_endstop')],
       'relative_z_delta': (calibration.get('measured_t1_minus_t0') or {}).get('z'),
