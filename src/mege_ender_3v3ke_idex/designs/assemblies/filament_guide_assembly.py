@@ -27,9 +27,9 @@ mount_spacer_clearance = 0.1
 frame_depth = 8.5
 frame_width = 5
 spacer_thickness = 1
-spacer_bearing_clearance = 0.4
+spacer_bearing_clearance = 1.0
 spool_gap = 0.1
-frame_spool_clearance = 2
+frame_spool_clearance = 2.3
 mount_spacer_extra_border = 0.5
 
 
